@@ -9,9 +9,9 @@
     "network.http"
   ],
   "checksums": {
-    "adapter.mjs": "31ac9804adb63b6774646914f40a384438c04e4c3889a9d616b91124937187db"
+    "adapter.mjs": "6bc900d1070d3c33146c6532aa7db384c3c4b48c1b045f90db7adf53521b9de4"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "generic-http-json",
   "dryRunSupport": true,
@@ -23,7 +23,7 @@
   },
   "packageName": "@tkersey/world-capabilities/generic-http-json",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "079e6ac68f8fa67491d5b6e75740545008b5b148386fc133d654d1b7a7a514f9",
+  "packFingerprint": "ad8e394b875c83f88d4e59cffc464089e2fc1438f015b8f079ebde847eb92fe0",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",

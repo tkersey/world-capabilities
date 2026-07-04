@@ -9,9 +9,9 @@
     "memory.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "7e41f481cbeacbd54730277fe44664bfa041d9adbae07450e68cbae13c2d201f"
+    "adapter.mjs": "2bfbf2e3192b421dc080e8dc7d97e4688e6c07eb4863543a62a24872da42c984"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "local-memory-kv",
   "dryRunSupport": true,
@@ -23,7 +23,7 @@
   },
   "packageName": "@tkersey/world-capabilities/local-memory-kv",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "ba2c1234513fd8c309590f3f3daff8b6e25f30979cb55c58c7369da8e33bee21",
+  "packFingerprint": "ea5d2853d3ebdc0497a3d64075457ac43fe726986e78e20d8ae473b5bb928bc8",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",

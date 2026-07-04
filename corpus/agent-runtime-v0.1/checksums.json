@@ -11,6 +11,8 @@
   "corpus/negative/malformed-host-request-target.json": "da5d9de75548dd4f85e6f37800da83de3366465b2bdddcc205bfbb5db772be6c",
   "corpus/negative/malformed-sum-variant.json": "08d880a2e4897a0c19014826ff10790dbac762416063eb18287981dd29bbf842",
   "corpus/negative/missing-idempotency-key.json": "77acee32c30135a7162c699506f7e51eff6b35f82ca5fc3230147d801883d98b",
+  "corpus/negative/nested-forbidden-evidence-key.json": "3bc8d8e0daba29f22b9fbd1088ce8e321397f51353c32898c92239221d11ba53",
+  "corpus/negative/nested-forbidden-world-evidence.json": "51e53d9d8af9c3564a33e111f9c0c56a6d33ea7085412e1336b63c000de3b227",
   "corpus/negative/oversized-response.json": "e647989148849689d17af5fb419c943365e01a5e617589f5f6859c382aa295c6",
   "corpus/negative/secret-shaped-diagnostics.json": "42fcea0f79654e6878f74bcf8802549b85d6aff804a73eb079a034002c514fdc",
   "corpus/negative/stale-resolution.json": "c9dfcb5a2325e045e6b1f68ad7e69908834a37d22b27f4956bd043a8f3051140",

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, fail, stableStringify } from "./assertions.mjs";
@@ -62,19 +62,63 @@ export const FORBIDDEN_EVIDENCE_KEYS = [
   "archiveSealBytes"
 ];
 
-const PACKAGE_IMPORT = /(?:import|export)\s+(?:[^'"]+\s+from\s+)?["']([^"']+)["']/g;
-const SIDE_EFFECT_IMPORT = /import\s+["']([^"']+)["']/g;
 const DYNAMIC_IMPORT = /\bimport\s*\(/;
 const EVAL_PATTERNS = [
-  /\beval\s*\(/,
-  /\bFunction\s*\(/,
+  /\beval\b/,
+  /\bFunction\b/,
+  /\bconstructor\b/,
+  /\[\s*["'][^"']*["']\s*\+/,
+  /\+\s*["'][^"']*["']\s*\]/,
+  /\bReflect\b/,
+  /\bglobalThis\b/,
+  /\bglobal\b/,
+  /\bself\b/,
   /globalThis\s*\[\s*["']Function["']\s*\]/,
+  /import\s*\.\s*meta\b/,
+  /process\s*\[/,
+  /process\s*\.\s*constructor\b/,
   /process\s*\.\s*getBuiltinModule\s*\(/,
+  /process\s*\[\s*["']getBuiltinModule["']\s*\]/,
+  /process\s*\.\s*mainModule\b/,
+  /process\s*\[\s*["']mainModule["']\s*\]/,
+  /globalThis\s*\[\s*["']process["']\s*\]/,
+  /=\s*process\b/,
+  /import\s*\.\s*meta\s*\.\s*require\b/,
+  /import\s*\.\s*meta\s*\[\s*["']require["']\s*\]/,
+  /\bcreateRequire\b/,
   /\bnew\s+Worker\s*\(/
 ];
+const COMMONJS_REQUIRE = /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g;
+const ANY_COMMONJS_REQUIRE = /\brequire\b/;
+const COMMONJS_MODULE_LOADER = /\b(?:module|exports)\b/;
+const PROCESS_ACCESS = /\bprocess\b/;
+const BUN_ACCESS = /\bBun\b/;
+const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
+const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|ts|tsx)$/;
+const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
+const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
+const IMPORT_SCANNER = new Bun.Transpiler({ loader: "js" });
 
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+export function pathInside(root, candidate) {
+  const rel = relative(root, candidate);
+  return rel === "" || (!!rel && !rel.startsWith("..") && !isAbsolute(rel));
+}
+
+async function resolvePackPath(pack, artifactPath) {
+  assert(typeof artifactPath === "string" && artifactPath.length > 0, `${pack.name}: empty artifact path rejected`);
+  assert(!isAbsolute(artifactPath), `${pack.name}: absolute artifact path rejected`);
+  assert(!artifactPath.split(/[\\/]/).includes(".."), `${pack.name}: artifact path escapes pack root`);
+  const root = resolve(pack.dir);
+  const full = resolve(root, artifactPath);
+  assert(pathInside(root, full), `${pack.name}: artifact path escapes pack root`);
+  const rootReal = await realpath(root);
+  const fullReal = await realpath(full);
+  assert(pathInside(rootReal, fullReal), `${pack.name}: artifact path escapes pack root`);
+  return full;
 }
 
 export async function packageNames() {
@@ -180,46 +224,91 @@ export async function verifyChecksums(pack) {
     expected.set(match[2], match[1]);
   }
   for (const artifact of pack.manifest.artifacts) {
+    const full = await resolvePackPath(pack, artifact.path);
     const checksum = expected.get(artifact.path);
     assert(checksum, `${pack.name}: artifact ${artifact.path} missing from checksums.sha256`);
-    const actual = sha256Bytes(await readFile(join(pack.dir, artifact.path)));
+    const actual = sha256Bytes(await readFile(full));
     assert(actual === checksum, `${pack.name}: checksum mismatch for ${artifact.path}`);
     assert(pack.manifest.checksums[artifact.path] === checksum, `${pack.name}: manifest checksum mismatch for ${artifact.path}`);
   }
 }
 
 export function parseImports(source) {
-  const imports = [];
-  for (const regex of [PACKAGE_IMPORT, SIDE_EFFECT_IMPORT]) {
-    regex.lastIndex = 0;
-    for (const match of source.matchAll(regex)) imports.push(match[1]);
-  }
+  const imports = scanImportEntries(source)
+    .map((entry) => entry.path)
+    .filter((path) => typeof path === "string" && path.length > 0);
   return [...new Set(imports)];
+}
+
+export function scanImportEntries(source) {
+  return IMPORT_SCANNER.scanImports(source);
+}
+
+function stripScannedRequireCalls(source, importEntries) {
+  const requireCounts = new Map();
+  for (const entry of importEntries) {
+    if (entry.kind !== "require-call" || typeof entry.path !== "string") continue;
+    requireCounts.set(entry.path, (requireCounts.get(entry.path) ?? 0) + 1);
+  }
+  return source.replace(COMMONJS_REQUIRE, (match, specifier) => {
+    const count = requireCounts.get(specifier) ?? 0;
+    if (count <= 0) return match;
+    requireCounts.set(specifier, count - 1);
+    return "";
+  });
+}
+
+function loaderScanSource(source) {
+  return IMPORT_SCANNER.transformSync(source).replace(/\/\*[\s\S]*?\*\//g, " ");
+}
+
+function withoutAllowedProcessAccess(source, artifact) {
+  if (artifact.role === "sidecar") return source.replace(/\bprocess\s*\.\s*stdout\s*\.\s*write\b/g, "");
+  return source;
+}
+
+function withoutAllowedBunAccess(source, artifact) {
+  if (artifact.role === "sidecar") return source.replace(/\bBun\s*\.\s*stdin\s*\.\s*stream\b/g, "");
+  return source;
 }
 
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
+  const root = resolve(pack.dir);
   for (const artifact of pack.manifest.artifacts) {
-    if (!/\.(mjs|js|cjs|ts|tsx)$/.test(artifact.path)) continue;
-    const full = join(pack.dir, artifact.path);
+    const full = await resolvePackPath(pack, artifact.path);
+    if (!EXECUTABLE_ARTIFACT.test(artifact.path)) continue;
     const source = await readFile(full, "utf8");
-    assert(!DYNAMIC_IMPORT.test(source), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+    const loaderSource = loaderScanSource(source);
+    const importEntries = scanImportEntries(source);
+    const specifiers = [...new Set(importEntries
+      .map((entry) => entry.path)
+      .filter((path) => typeof path === "string" && path.length > 0))];
+    assert(!importEntries.some((entry) => entry.kind === "dynamic-import"), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+    assert(!DYNAMIC_IMPORT.test(loaderSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
     for (const pattern of EVAL_PATTERNS) {
-      assert(!pattern.test(source), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+      assert(!pattern.test(loaderSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }
-    for (const specifier of parseImports(source)) {
+    assert(!ANY_COMMONJS_REQUIRE.test(stripScannedRequireCalls(loaderSource, importEntries)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+    assert(!COMPUTED_MEMBER_ACCESS.test(loaderSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+    for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
+        assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
         assert(allowedBuiltins.has(specifier), `${pack.name}: unchecked builtin ${specifier}`);
+        assert(!FORBIDDEN_EXECUTION_BUILTINS.has(specifier), `${pack.name}: code execution builtin ${specifier} rejected`);
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
       const imported = normalize(join(artifact.path, "..", specifier));
-      const normalized = imported.endsWith(".mjs") || imported.endsWith(".js") ? imported : `${imported}.mjs`;
-      const resolved = resolve(pack.dir, normalized);
-      assert(resolved.startsWith(resolve(pack.dir)), `${pack.name}: host path import ${specifier}`);
-      assert(covered.has(relative(pack.dir, resolved)), `${pack.name}: local import ${specifier} not checksum-covered`);
+      const normalized = EXECUTABLE_ARTIFACT.test(imported) ? imported : `${imported}.mjs`;
+      const resolved = resolve(root, normalized);
+      assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
+      assert(covered.has(relative(root, resolved)), `${pack.name}: local import ${specifier} not checksum-covered`);
     }
+    assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
+    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, artifact)), `${pack.name}: process access rejected in ${artifact.path}`);
+    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, artifact)), `${pack.name}: Bun access rejected in ${artifact.path}`);
   }
   validateSidecarCommand(pack);
 }

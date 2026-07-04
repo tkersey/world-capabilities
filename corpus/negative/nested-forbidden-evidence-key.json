@@ -1,0 +1,23 @@
+{
+  "hostRequest": {
+    "idempotencyKey": "world:idem:neg",
+    "payload": {
+      "meta": {
+        "capsuleBytes": "forbidden"
+      }
+    },
+    "requestId": "neg-nested-forbidden-evidence-key",
+    "responseSchema": {
+      "statuses": [
+        "ok",
+        "rejected",
+        "failed"
+      ]
+    },
+    "target": {
+      "actuationClass": "model",
+      "actuatorRef": "actuator.fixture",
+      "descriptorFingerprint": "desc.fixture.v0"
+    }
+  }
+}
