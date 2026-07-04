@@ -1,0 +1,15 @@
+{
+  "hostRequest": {
+    "requestId": "neg-wrong-schema",
+    "idempotencyKey": "world:idem:neg",
+    "target": {
+      "descriptorFingerprint": "desc.fixture.v0",
+      "actuatorRef": "actuator.fixture",
+      "actuationClass": "model"
+    },
+    "responseSchema": {
+      "statuses": []
+    },
+    "payload": {}
+  }
+}

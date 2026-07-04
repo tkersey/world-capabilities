@@ -1,0 +1,6 @@
+{
+  "name": "agent-runtime",
+  "version": "0.1",
+  "packKind": "fixture-distribution",
+  "description": "Minimal checked-in Agent Runtime v0.1 fixture metadata for Foundry v0."
+}

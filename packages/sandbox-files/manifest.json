@@ -1,0 +1,60 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    }
+  ],
+  "authorityLabels": [
+    "file.fixture"
+  ],
+  "checksums": {
+    "adapter.mjs": "475b3072b20906fb9f535651093ebaf25da06a247d6c1f9b310daa811849ac46"
+  },
+  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverAbiVersion": "capability-driver-v0",
+  "driverId": "sandbox-files",
+  "dryRunSupport": true,
+  "idempotencySupport": "full-world-key-bound",
+  "maximumRequestBytes": 16384,
+  "maximumResponseBytes": 16384,
+  "metadata": {
+    "allowedBuiltins": [
+      "node:fs/promises",
+      "node:path"
+    ],
+    "mode": "fixture-root-only"
+  },
+  "packageName": "@tkersey/world-capabilities/sandbox-files",
+  "packageVersion": "0.0.0-foundry-v0",
+  "packFingerprint": "60cedc15d685922b22d4dbd55441356057014d2d7b607346923df6f4a8a71e6c",
+  "packFormatVersion": "foundry-pack-v0",
+  "recoverSupport": false,
+  "recoveryClass": "idempotent",
+  "replaySupport": true,
+  "secretRequirements": [],
+  "shadowSupport": false,
+  "supportedActuationClasses": [
+    "file"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.sandbox-files"
+  ],
+  "supportedApplianceAbiVersions": [
+    "agent-runtime-v0.1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.sandbox-files.v0"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "turn-closure-v0"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-hostrequest-v0"
+  ]
+}

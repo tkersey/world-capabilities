@@ -1,0 +1,46 @@
+{
+  "corpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverId": "generic-http-json",
+  "vectors": [
+    {
+      "id": "endpoint-allowlist-required",
+      "passed": true
+    },
+    {
+      "id": "method-allowlist-required",
+      "passed": true
+    },
+    {
+      "id": "idempotency-key-required-before-effect",
+      "passed": true
+    },
+    {
+      "id": "target-fingerprint-required-before-effect",
+      "passed": true
+    },
+    {
+      "id": "schema-compatibility-before-effect",
+      "passed": true
+    },
+    {
+      "id": "secret-availability-before-effect",
+      "passed": true
+    },
+    {
+      "id": "post-response-validation-failed-no-retry",
+      "passed": true
+    },
+    {
+      "id": "no-fetch-in-dry-run",
+      "passed": true
+    },
+    {
+      "id": "no-fetch-when-policy-denied",
+      "passed": true
+    },
+    {
+      "id": "no-fetch-when-idempotency-missing",
+      "passed": true
+    }
+  ]
+}

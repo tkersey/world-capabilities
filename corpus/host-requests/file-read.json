@@ -1,0 +1,16 @@
+{
+  "requestId": "hr-file-read",
+  "idempotencyKey": "world:idem:file-read",
+  "target": {
+    "descriptorFingerprint": "desc.sandbox-files.v0",
+    "actuatorRef": "actuator.sandbox-files",
+    "actuationClass": "file"
+  },
+  "responseSchema": {
+    "statuses": ["ok", "rejected", "failed"]
+  },
+  "payload": {
+    "operation": "read",
+    "path": "fixture.txt"
+  }
+}

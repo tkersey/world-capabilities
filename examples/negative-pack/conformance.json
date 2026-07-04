@@ -1,0 +1,5 @@
+{
+  "driverId": "negative-pack",
+  "corpusFingerprint": "invalid",
+  "vectors": [{"id": "intentional-failure", "passed": false}]
+}

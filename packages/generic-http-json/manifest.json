@@ -1,0 +1,61 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    }
+  ],
+  "authorityLabels": [
+    "network.http"
+  ],
+  "checksums": {
+    "adapter.mjs": "31ac9804adb63b6774646914f40a384438c04e4c3889a9d616b91124937187db"
+  },
+  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverAbiVersion": "capability-driver-v0",
+  "driverId": "generic-http-json",
+  "dryRunSupport": true,
+  "idempotencySupport": "required-before-effect",
+  "maximumRequestBytes": 16384,
+  "maximumResponseBytes": 16384,
+  "metadata": {
+    "mode": "dry-run-default"
+  },
+  "packageName": "@tkersey/world-capabilities/generic-http-json",
+  "packageVersion": "0.0.0-foundry-v0",
+  "packFingerprint": "079e6ac68f8fa67491d5b6e75740545008b5b148386fc133d654d1b7a7a514f9",
+  "packFormatVersion": "foundry-pack-v0",
+  "recoverSupport": false,
+  "recoveryClass": "best_effort",
+  "replaySupport": false,
+  "secretRequirements": [
+    {
+      "name": "API_TOKEN",
+      "requiredByDefault": false
+    }
+  ],
+  "shadowSupport": true,
+  "supportedActuationClasses": [
+    "http"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.generic-http-json"
+  ],
+  "supportedApplianceAbiVersions": [
+    "agent-runtime-v0.1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.generic-http-json.v0"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "turn-closure-v0"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-hostrequest-v0"
+  ]
+}

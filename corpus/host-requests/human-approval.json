@@ -1,0 +1,16 @@
+{
+  "requestId": "hr-human-approval",
+  "idempotencyKey": "world:idem:human-approval",
+  "target": {
+    "descriptorFingerprint": "desc.human-approval.v0",
+    "actuatorRef": "actuator.human-approval",
+    "actuationClass": "approval"
+  },
+  "responseSchema": {
+    "statuses": ["ok", "rejected", "deferred"]
+  },
+  "payload": {
+    "prompt": "Approve fixture write?",
+    "anchor": "world:host-request:1"
+  }
+}

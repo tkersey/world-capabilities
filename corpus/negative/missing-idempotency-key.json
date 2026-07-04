@@ -1,0 +1,14 @@
+{
+  "hostRequest": {
+    "requestId": "neg-missing-idempotency",
+    "target": {
+      "descriptorFingerprint": "desc.fixture.v0",
+      "actuatorRef": "actuator.fixture",
+      "actuationClass": "model"
+    },
+    "responseSchema": {
+      "statuses": ["ok", "rejected", "failed"]
+    },
+    "payload": {}
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "requestId": "hr-model-decision",
+  "idempotencyKey": "world:idem:model-decision",
+  "target": {
+    "descriptorFingerprint": "desc.fixture-model.v0",
+    "actuatorRef": "actuator.fixture-model",
+    "actuationClass": "model"
+  },
+  "responseSchema": {
+    "statuses": ["ok", "rejected", "failed"]
+  },
+  "payload": {
+    "prompt": "choose fixture action",
+    "tools": ["write_fixture"]
+  }
+}

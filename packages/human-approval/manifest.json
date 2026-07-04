@@ -1,0 +1,60 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    }
+  ],
+  "authorityLabels": [
+    "human.approval"
+  ],
+  "checksums": {
+    "adapter.mjs": "1e7a66492c967d51e651909418e53079be1055a91d5888d49bfa8a54effaad2a"
+  },
+  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverAbiVersion": "capability-driver-v0",
+  "driverId": "human-approval",
+  "dryRunSupport": true,
+  "idempotencySupport": "operator-event-id-required",
+  "maximumRequestBytes": 8192,
+  "maximumResponseBytes": 8192,
+  "metadata": {
+    "modes": [
+      "noninteractive-allow",
+      "noninteractive-deny",
+      "dry-run"
+    ]
+  },
+  "packageName": "@tkersey/world-capabilities/human-approval",
+  "packageVersion": "0.0.0-foundry-v0",
+  "packFingerprint": "06187470a96ef29f9f1956d36caef44f5d03b77852a2ed2dbe13c91836462c0e",
+  "packFormatVersion": "foundry-pack-v0",
+  "recoverSupport": false,
+  "recoveryClass": "best_effort",
+  "replaySupport": false,
+  "secretRequirements": [],
+  "shadowSupport": false,
+  "supportedActuationClasses": [
+    "approval"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.human-approval"
+  ],
+  "supportedApplianceAbiVersions": [
+    "agent-runtime-v0.1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.human-approval.v0"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "deferred"
+  ],
+  "supportedTurnClosureVersions": [
+    "turn-closure-v0"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-hostrequest-v0"
+  ]
+}

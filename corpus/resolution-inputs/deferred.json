@@ -1,0 +1,7 @@
+{
+  "requestId": "hr-deferred",
+  "status": "deferred",
+  "payload": {
+    "reason": "operator_required"
+  }
+}

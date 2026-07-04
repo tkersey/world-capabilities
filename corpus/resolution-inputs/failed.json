@@ -1,0 +1,7 @@
+{
+  "requestId": "hr-failed",
+  "status": "failed",
+  "payload": {
+    "reason": "adapter_failed"
+  }
+}

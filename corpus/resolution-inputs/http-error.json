@@ -1,0 +1,8 @@
+{
+  "requestId": "hr-http-error",
+  "status": "failed",
+  "payload": {
+    "httpStatus": 503,
+    "reason": "upstream_unavailable"
+  }
+}

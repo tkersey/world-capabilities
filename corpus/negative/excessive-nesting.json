@@ -1,0 +1,17 @@
+{
+  "hostRequest": {
+    "requestId": "neg-excessive-nesting",
+    "idempotencyKey": "world:idem:neg",
+    "target": {
+      "descriptorFingerprint": "desc.fixture.v0",
+      "actuatorRef": "actuator.fixture",
+      "actuationClass": "model"
+    },
+    "responseSchema": {
+      "statuses": ["ok", "rejected", "failed"]
+    },
+    "payload": {
+      "nest": [[[[[[[[[[[[[[["too-deep"]]]]]]]]]]]]]]]
+    }
+  }
+}

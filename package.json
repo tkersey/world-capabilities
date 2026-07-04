@@ -1,0 +1,23 @@
+{
+  "name": "@tkersey/world-capabilities",
+  "version": "0.0.0-foundry-v0",
+  "private": true,
+  "type": "module",
+  "description": "Capability packs and conformance for the World agent runtime",
+  "scripts": {
+    "check": "bun run proof",
+    "proof": "bun run proof:packs && bun run proof:negative && bun run proof:sidecars && bun run proof:redaction && bun run proof:policy && bun run corpus:check",
+    "proof:packs": "bun harness/check-pack.mjs --all",
+    "proof:negative": "bun harness/run-negative.mjs",
+    "proof:sidecars": "bun harness/run-sidecar-conformance.mjs",
+    "proof:redaction": "bun harness/redaction-tests.mjs",
+    "proof:policy": "bun harness/policy-tests.mjs",
+    "corpus:check": "bun scripts/check-corpus.mjs",
+    "corpus:update": "bun scripts/update-corpus.mjs",
+    "packs:build": "bun scripts/build-packs.mjs",
+    "packs:verify": "bun scripts/verify-packs.mjs",
+    "test": "bun test"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

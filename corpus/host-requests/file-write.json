@@ -1,0 +1,17 @@
+{
+  "requestId": "hr-file-write",
+  "idempotencyKey": "world:idem:file-write",
+  "target": {
+    "descriptorFingerprint": "desc.sandbox-files.v0",
+    "actuatorRef": "actuator.sandbox-files",
+    "actuationClass": "file"
+  },
+  "responseSchema": {
+    "statuses": ["ok", "rejected", "failed"]
+  },
+  "payload": {
+    "operation": "write",
+    "path": "fixture.txt",
+    "bytes": "hello"
+  }
+}

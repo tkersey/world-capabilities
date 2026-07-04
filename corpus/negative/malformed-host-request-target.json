@@ -1,0 +1,11 @@
+{
+  "hostRequest": {
+    "requestId": "neg-malformed-target",
+    "idempotencyKey": "world:idem:neg",
+    "target": {},
+    "responseSchema": {
+      "statuses": ["ok", "rejected", "failed"]
+    },
+    "payload": {}
+  }
+}

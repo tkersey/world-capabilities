@@ -1,0 +1,30 @@
+{
+  "corpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverId": "local-memory-kv",
+  "vectors": [
+    {
+      "id": "get",
+      "passed": true
+    },
+    {
+      "id": "put",
+      "passed": true
+    },
+    {
+      "id": "missing-key",
+      "passed": true
+    },
+    {
+      "id": "size-limits",
+      "passed": true
+    },
+    {
+      "id": "no-persistence-claim",
+      "passed": true
+    },
+    {
+      "id": "no-world-evidence-output",
+      "passed": true
+    }
+  ]
+}

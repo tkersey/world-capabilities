@@ -1,0 +1,10 @@
+{
+  "requestId": "hr-ok",
+  "status": "ok",
+  "payload": {
+    "value": "fixture-ok"
+  },
+  "diagnostics": {
+    "redacted": true
+  }
+}

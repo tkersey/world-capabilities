@@ -1,0 +1,16 @@
+{
+  "requestId": "hr-http-json",
+  "idempotencyKey": "world:idem:http-json",
+  "target": {
+    "descriptorFingerprint": "desc.generic-http-json.v0",
+    "actuatorRef": "actuator.generic-http-json",
+    "actuationClass": "http"
+  },
+  "responseSchema": {
+    "statuses": ["ok", "rejected", "failed"]
+  },
+  "payload": {
+    "url": "https://example.invalid/fixture",
+    "method": "GET"
+  }
+}

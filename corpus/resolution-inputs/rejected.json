@@ -1,0 +1,7 @@
+{
+  "requestId": "hr-rejected",
+  "status": "rejected",
+  "payload": {
+    "reason": "policy_denied"
+  }
+}

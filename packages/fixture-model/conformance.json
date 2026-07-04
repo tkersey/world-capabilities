@@ -1,0 +1,34 @@
+{
+  "corpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "driverId": "fixture-model",
+  "vectors": [
+    {
+      "id": "skeleton-decision-path",
+      "passed": true
+    },
+    {
+      "id": "fixture-read-write-decision-path",
+      "passed": true
+    },
+    {
+      "id": "malformed-prompt-rejected",
+      "passed": true
+    },
+    {
+      "id": "unknown-tool-action-fixture",
+      "passed": true
+    },
+    {
+      "id": "no-world-evidence-output",
+      "passed": true
+    },
+    {
+      "id": "fixture-mode-no-live-policy",
+      "passed": true
+    },
+    {
+      "id": "fixture-mode-no-effect-journal",
+      "passed": true
+    }
+  ]
+}
