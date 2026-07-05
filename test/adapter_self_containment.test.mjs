@@ -114,6 +114,26 @@ test("covered extensionless import artifacts are scanned", async () => {
   }
 });
 
+test("explicit non-scannable local imports are rejected even when covered", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-non-scannable-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import \"./addon.node\";\nexport const result = true;\n");
+    await writeFile(join(dir, "addon.node"), "native fixture\n");
+    await expect(verifySelfContained({
+      name: "non-scannable-import-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "addon.node" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/local import \.\/addon\.node uses unsupported extension/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("extensionless imports cover every Bun runtime candidate", async () => {
   for (const ext of [".mjs", ".ts", ".tsx", ".mts", ".cts", ".json"]) {
     const root = await mkdtemp(join(tmpdir(), "world-extensionless-candidate-pack-"));

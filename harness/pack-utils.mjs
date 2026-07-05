@@ -128,6 +128,10 @@ function isScannableArtifact(artifactPath) {
   return EXECUTABLE_ARTIFACT.test(artifactPath) || !basename.includes(".");
 }
 
+function hasExplicitExtension(artifactPath) {
+  return (artifactPath.split(/[\\/]/).pop() ?? artifactPath).includes(".");
+}
+
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -324,9 +328,10 @@ function executableExtension(artifactPath) {
   return match?.[0] ?? ".mjs";
 }
 
-function localImportCandidates(artifactPath, specifier) {
+function localImportCandidates(pack, artifactPath, specifier) {
   const imported = normalize(join(artifactPath, "..", specifier));
   const importBase = specifier.endsWith("/") ? normalize(join(imported, "index")) : imported;
+  assert(!hasExplicitExtension(importBase) || EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json"), `${pack.name}: local import ${specifier} uses unsupported extension`);
   if (EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json")) return [importBase];
   const preferred = executableExtension(artifactPath);
   const extensions = [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
@@ -405,7 +410,7 @@ export async function verifySelfContained(pack) {
         assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
         assert(!await fileExists(resolved), `${pack.name}: package-backed directory import ${specifier} rejected`);
       }
-      const candidates = localImportCandidates(artifact.path, specifier)
+      const candidates = localImportCandidates(pack, artifact.path, specifier)
         .map((candidate) => {
           const resolved = resolve(root, candidate);
           return { resolved, artifactPath: relative(root, resolved) };
