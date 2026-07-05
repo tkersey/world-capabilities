@@ -122,6 +122,11 @@ const IMPORT_SCANNERS = {
   tsx: new Bun.Transpiler({ loader: "tsx" })
 };
 
+function isScannableArtifact(artifactPath) {
+  const basename = artifactPath.split(/[\\/]/).pop() ?? artifactPath;
+  return EXECUTABLE_ARTIFACT.test(artifactPath) || !basename.includes(".");
+}
+
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -371,7 +376,7 @@ export async function verifySelfContained(pack) {
   const root = resolve(pack.dir);
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
-    if (!EXECUTABLE_ARTIFACT.test(artifact.path)) continue;
+    if (!isScannableArtifact(artifact.path)) continue;
     const source = await readFile(full, "utf8");
     const loaderSource = loaderScanSource(source, artifact.path);
     const importEntries = scanImportEntries(source, artifact.path);

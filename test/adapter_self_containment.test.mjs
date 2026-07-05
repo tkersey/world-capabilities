@@ -94,6 +94,26 @@ test("extensionless imports reject uncovered runtime alternatives", async () => 
   }
 });
 
+test("covered extensionless import artifacts are scanned", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extensionless-helper-scan-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.js"), "import \"./helper\";\nexport const result = true;\n");
+    await writeFile(join(dir, "helper"), "process.stdout.write(\"leak\");\n");
+    await expect(verifySelfContained({
+      name: "extensionless-helper-scan-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected in helper/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("extensionless imports cover every Bun runtime candidate", async () => {
   for (const ext of [".mjs", ".ts", ".tsx", ".mts", ".cts", ".json"]) {
     const root = await mkdtemp(join(tmpdir(), "world-extensionless-candidate-pack-"));
