@@ -37,7 +37,7 @@ test("self-containment scanner supports TypeScript artifacts", async () => {
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.ts"), "import { helper } from \"./helper.ts\";\ntype Result = boolean;\nexport const result: Result = helper;\n");
+    await writeFile(join(dir, "adapter.ts"), "import { helper } from \"./helper\";\ntype Result = boolean;\nexport const result: Result = helper;\n");
     await writeFile(join(dir, "helper.ts"), "export const helper: boolean = true;\n");
     await verifySelfContained({
       name: "ts-pack",
@@ -511,6 +511,41 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
         metadata: {
           allowedBuiltins: [],
           sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sidecar IO allowance follows the declared runtime", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-runtime-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "Bun.stdin.stream();\nprocess.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "node-sidecar-bun-io-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Bun access rejected/);
+
+    await writeFile(join(dir, "sidecar.mjs"), "let text = \"\";\nfor await (const chunk of process.stdin) text += chunk;\nprocess.stdout.write(text);\nprocess.stderr.write(\"diag\");\n");
+    await verifySelfContained({
+      name: "node-sidecar-process-io-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
         }
       }
     });
