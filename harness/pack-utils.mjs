@@ -326,6 +326,10 @@ function localImportCandidates(artifactPath, specifier) {
   return extensions.map((ext) => `${importBase}${ext}`);
 }
 
+function directoryImportPackageJsonCandidate(artifactPath, specifier) {
+  return specifier.endsWith("/") ? normalize(join(artifactPath, "..", specifier, "package.json")) : null;
+}
+
 async function fileExists(path) {
   try {
     await realpath(path);
@@ -388,6 +392,12 @@ export async function verifySelfContained(pack) {
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
+      const packageJsonCandidate = directoryImportPackageJsonCandidate(artifact.path, specifier);
+      if (packageJsonCandidate) {
+        const resolved = resolve(root, packageJsonCandidate);
+        assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
+        assert(!await fileExists(resolved), `${pack.name}: package-backed directory import ${specifier} rejected`);
+      }
       const candidates = localImportCandidates(artifact.path, specifier)
         .map((candidate) => {
           const resolved = resolve(root, candidate);

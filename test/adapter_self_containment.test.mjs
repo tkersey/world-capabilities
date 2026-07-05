@@ -141,6 +141,17 @@ test("directory imports resolve against covered index candidates", async () => {
         metadata: { allowedBuiltins: [] }
       }
     });
+
+    await writeFile(join(dir, "helper", "package.json"), "{\"main\":\"main.js\"}\n");
+    await writeFile(join(dir, "helper", "main.js"), "export const helper = \"unchecked-main\";\n");
+    await expect(verifySelfContained({
+      name: "directory-import-package-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "helper/index.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/package-backed directory import \.\/helper\/ rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
