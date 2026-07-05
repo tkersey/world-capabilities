@@ -104,7 +104,7 @@ const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
-const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
+const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|\{\s*[^}\n]*\[[^\]]+\]\s*:|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
@@ -421,7 +421,7 @@ export function validateSidecarCommand(pack) {
   assert(!(runtime === "node" && args[0] === "--run"), `${pack.name}: node --run package runner rejected`);
   assert(!args.some((arg) => ["-e", "--eval", "eval"].includes(arg)), `${pack.name}: eval flag rejected`);
   assert(!args.some((arg) => ["--import", "--require", "--import-map"].includes(arg)), `${pack.name}: preload flag rejected`);
-  const entry = args.find((arg) => /\.(mjs|js|cjs|ts|tsx)$/.test(arg));
+  const entry = args.find((arg) => EXECUTABLE_ARTIFACT.test(arg));
   assert(entry, `${pack.name}: sidecar entrypoint missing`);
   assert(pack.manifest.artifacts.some((artifact) => artifact.path === entry), `${pack.name}: sidecar entrypoint not artifact-bound`);
   assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);

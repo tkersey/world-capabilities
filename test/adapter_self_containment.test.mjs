@@ -516,6 +516,25 @@ test("optional and destructured computed members are rejected", async () => {
   }
 });
 
+test("array literals are not treated as computed member access", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-array-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export const matrix = [[1], [2]];\n");
+    await verifySelfContained({
+      name: "array-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("process loader aliases are rejected while stdout sidecar remains allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-process-alias-pack-"));
   try {
@@ -693,6 +712,28 @@ test("sidecar IO allowance is bound to the declared entrypoint", async () => {
         }
       }
     })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sidecar command entrypoint follows the executable artifact extension set", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-extension-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mts"), "process.stdout.write(\"ok\");\n");
+    await verifySelfContained({
+      name: "sidecar-mts-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
