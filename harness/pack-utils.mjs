@@ -285,7 +285,7 @@ function sidecarEntrypoint(pack) {
 }
 
 function withoutAllowedProcessAccess(source, allowSidecarIo) {
-  if (allowSidecarIo) return source.replace(/\bprocess\s*\.\s*stdout\s*\.\s*write\b/g, "");
+  if (allowSidecarIo) return source.replace(/\bprocess\s*\.\s*(?:stdout|stderr)\s*\.\s*write\b/g, "");
   return source;
 }
 

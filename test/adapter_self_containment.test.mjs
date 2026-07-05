@@ -432,13 +432,13 @@ test("process loader aliases are rejected while stdout sidecar remains allowed",
   }
 });
 
-test("process stdout is allowed only for sidecar artifacts", async () => {
+test("process output is allowed only for sidecar artifacts", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-process-stdout-pack-"));
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "process.stdout.write(\"leak\");\n");
-    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"ok\");\nprocess.stdout.write(\"again\");\n");
+    await writeFile(join(dir, "adapter.mjs"), "process.stderr.write(\"leak\");\n");
+    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"ok\");\nprocess.stderr.write(\"diag\");\nprocess.stderr.write(\"again\");\n");
     await expect(verifySelfContained({
       name: "process-stdout-pack",
       dir,
