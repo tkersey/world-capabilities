@@ -107,6 +107,25 @@ test("symlink ancestors cannot escape the fixture root", async () => {
   }
 });
 
+test("sandbox paths allow in-root dot-dot-prefixed names", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-file-dotdot-prefix-"));
+  try {
+    const fixtureRoot = join(root, "fixture");
+    const cacheDir = join(fixtureRoot, "..cache");
+    await mkdir(fixtureRoot);
+    await mkdir(cacheDir);
+    await writeFile(join(cacheDir, "fixture.txt"), "inside");
+    const context = { fixtureRoot, effectAttempted: 0 };
+    const result = await resolveFile(context, fileRequest({
+      payload: { operation: "read", path: "..cache/fixture.txt" }
+    }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.bytes).toBe("inside");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("write authority is checked before filesystem path probing", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-file-write-policy-"));
   const fixtureRoot = join(root, "fixture");

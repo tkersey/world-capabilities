@@ -62,7 +62,7 @@ function hostilePayloadReason(value) {
 
 function pathInside(root, candidate) {
   const rel = relative(root, candidate);
-  return rel === "" || (!!rel && !rel.startsWith("..") && !isAbsolute(rel));
+  return rel === "" || (!!rel && rel.split(/[\\/]/, 1).join("") !== ".." && !isAbsolute(rel));
 }
 
 async function safePath(context, requested) {

@@ -717,6 +717,28 @@ test("pack artifacts and imports must stay inside the pack root", async () => {
   }
 });
 
+test("pack imports allow in-root dot-dot-prefixed names", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-pack-dotdot-prefix-"));
+  try {
+    const packDir = join(root, "pack");
+    const helperDir = join(packDir, "..helpers");
+    await mkdir(packDir);
+    await mkdir(helperDir);
+    await writeFile(join(packDir, "adapter.mjs"), "import \"./..helpers/helper.mjs\";\n");
+    await writeFile(join(helperDir, "helper.mjs"), "export const helper = true;\n");
+    await verifySelfContained({
+      name: "dotdot-prefix-pack",
+      dir: packDir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "..helpers/helper.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("symlinked pack artifacts must not point outside the pack root", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-pack-symlink-"));
   try {
