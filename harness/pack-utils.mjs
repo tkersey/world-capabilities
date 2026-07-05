@@ -105,14 +105,18 @@ const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
 const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
-const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|ts|tsx)$/;
-const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".ts", ".tsx"];
+const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
+const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
+const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
 const IMPORT_SCANNERS = {
   cjs: new Bun.Transpiler({ loader: "js" }),
+  cts: new Bun.Transpiler({ loader: "ts" }),
   js: new Bun.Transpiler({ loader: "js" }),
+  jsx: new Bun.Transpiler({ loader: "jsx" }),
   mjs: new Bun.Transpiler({ loader: "js" }),
+  mts: new Bun.Transpiler({ loader: "ts" }),
   ts: new Bun.Transpiler({ loader: "ts" }),
   tsx: new Bun.Transpiler({ loader: "tsx" })
 };
@@ -307,9 +311,9 @@ function executableExtension(artifactPath) {
 
 function localImportCandidates(artifactPath, specifier) {
   const imported = normalize(join(artifactPath, "..", specifier));
-  if (EXECUTABLE_ARTIFACT.test(imported)) return [imported];
+  if (EXECUTABLE_ARTIFACT.test(imported) || imported.endsWith(".json")) return [imported];
   const preferred = executableExtension(artifactPath);
-  const extensions = [preferred, ...EXECUTABLE_EXTENSIONS.filter((ext) => ext !== preferred)];
+  const extensions = [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
   return extensions.map((ext) => `${imported}${ext}`);
 }
 

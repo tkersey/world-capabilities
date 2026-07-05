@@ -79,7 +79,7 @@ test("extensionless imports reject uncovered runtime alternatives", async () => 
     await mkdir(dir);
     await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
     await writeFile(join(dir, "helper.js"), "export const helper = \"covered\";\n");
-    await writeFile(join(dir, "helper.mjs"), "export const helper = \"uncovered\";\n");
+    await writeFile(join(dir, "helper.jsx"), "export const helper = \"uncovered\";\n");
     await expect(verifySelfContained({
       name: "extensionless-shadow-pack",
       dir,
@@ -90,6 +90,29 @@ test("extensionless imports reject uncovered runtime alternatives", async () => 
     })).rejects.toThrow(/local import \.\/helper not checksum-covered/);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("extensionless imports cover every Bun runtime candidate", async () => {
+  for (const ext of [".mjs", ".ts", ".tsx", ".mts", ".cts", ".json"]) {
+    const root = await mkdtemp(join(tmpdir(), "world-extensionless-candidate-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
+      await writeFile(join(dir, "helper.js"), "export const helper = \"covered\";\n");
+      await writeFile(join(dir, `helper${ext}`), ext === ".json" ? "{\"helper\":\"uncovered\"}\n" : "export const helper = \"uncovered\";\n");
+      await expect(verifySelfContained({
+        name: `extensionless-${ext.slice(1)}-candidate-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.js" }, { path: "helper.js" }],
+          metadata: { allowedBuiltins: [] }
+        }
+      })).rejects.toThrow(/local import \.\/helper not checksum-covered/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 
