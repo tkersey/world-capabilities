@@ -69,11 +69,11 @@ function reason(context, hostRequest) {
   const statuses = hostRequest.responseSchema?.statuses;
   if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
   if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
+  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
-  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
-  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (!String(hostRequest.payload?.anchor ?? "").startsWith("world:host-request:")) return "missing_world_host_request_anchor";
   if (context?.policy?.auditOnly || context?.policy?.humanLive === false) return "policy_denied";
   return null;

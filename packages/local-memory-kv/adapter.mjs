@@ -69,11 +69,11 @@ function check(context, hostRequest) {
   const statuses = hostRequest.responseSchema?.statuses;
   if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
   if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
+  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
-  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
-  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (!["get", "put"].includes(hostRequest.payload?.operation)) return "unsupported_memory_operation";
   if (String(hostRequest.payload?.key ?? "").length > 128) return "key_too_large";
   if (String(hostRequest.payload?.value ?? "").length > 1024) return "value_too_large";

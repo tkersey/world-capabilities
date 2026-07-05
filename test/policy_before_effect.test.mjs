@@ -215,6 +215,13 @@ test("all adapters reject unsupported targets and status sets before effects", a
       expect(denied.payload.reason).toBe("package_denied");
       expect(deniedContext.effectAttempted).toBe(0);
       expect(deniedContext.kv).toBeUndefined();
+
+      const hostileDenied = await adapter.resolve({ ...deniedContext, effectAttempted: 0, kv: undefined }, {
+        ...request,
+        payload: { ...request.payload, worldAuthoredEvidence: true }
+      });
+      expect(hostileDenied.status).not.toBe("ok");
+      expect(hostileDenied.payload.reason).toBe("package_denied");
     }
   } finally {
     await rm(root, { recursive: true, force: true });

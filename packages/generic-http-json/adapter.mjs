@@ -74,11 +74,11 @@ function preEffectReason(context, hostRequest) {
   const statuses = hostRequest.responseSchema?.statuses;
   if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
   if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
+  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
-  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
-  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (!hostRequest.payload?.url || typeof hostRequest.payload.url !== "string") return "malformed_target";
   if (!["GET", "POST", "PUT", "DELETE"].includes(hostRequest.payload.method)) return "method_not_allowed";
   if (context?.policy?.auditOnly) return "audit_only";

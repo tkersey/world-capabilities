@@ -52,7 +52,7 @@ function hostilePayloadReason(value) {
   return null;
 }
 
-function baseCheck(hostRequest) {
+function baseCheck(context, hostRequest) {
   if (!hostRequest || typeof hostRequest !== "object") return "host_request_not_object";
   if (!hostRequest.requestId) return "missing_request_id";
   if (!hostRequest.idempotencyKey) return "missing_idempotency_key";
@@ -65,6 +65,8 @@ function baseCheck(hostRequest) {
   const statuses = hostRequest.responseSchema?.statuses;
   if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
   if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  const policyReason = packagePolicyReason(context);
+  if (policyReason) return policyReason;
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
@@ -87,10 +89,8 @@ export function manifest() {
 }
 
 export async function preflight(context, hostRequest) {
-  const reason = baseCheck(hostRequest);
+  const reason = baseCheck(context, hostRequest);
   if (reason) return rejection(hostRequest, reason);
-  const policyReason = packagePolicyReason(context);
-  if (policyReason) return rejection(hostRequest, policyReason);
   return { requestId: hostRequest.requestId, status: "ok", payload: { mode: "fixture" } };
 }
 
