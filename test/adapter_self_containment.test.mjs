@@ -438,7 +438,7 @@ test("process stdout is allowed only for sidecar artifacts", async () => {
     const dir = join(root, "pack");
     await mkdir(dir);
     await writeFile(join(dir, "adapter.mjs"), "process.stdout.write(\"leak\");\n");
-    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"ok\");\n");
+    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"ok\");\nprocess.stdout.write(\"again\");\n");
     await expect(verifySelfContained({
       name: "process-stdout-pack",
       dir,
@@ -472,7 +472,7 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
     const dir = join(root, "pack");
     await mkdir(dir);
     await writeFile(join(dir, "adapter.mjs"), "Bun.spawn([\"echo\", \"x\"]);\n");
-    await writeFile(join(dir, "sidecar.mjs"), "for await (const chunk of Bun.stdin.stream()) {}\n");
+    await writeFile(join(dir, "sidecar.mjs"), "Bun.stdin.stream();\nBun.stdin.stream();\n");
     await expect(verifySelfContained({
       name: "bun-global-pack",
       dir,

@@ -179,6 +179,12 @@ test("all adapters reject unsupported targets and status sets before effects", a
       expect(schemaContext.effectAttempted).toBe(0);
       expect(schemaContext.kv).toBeUndefined();
 
+      const supersetSchema = await adapter.preflight(context, {
+        ...request,
+        responseSchema: { statuses: [...pack.manifest.supportedResponseStatuses, "extra-compatible-status"] }
+      });
+      expect(supersetSchema.status).toBe("ok");
+
       const deniedContext = {
         ...context,
         policy: { ...context.policy, denyPackages: [pack.manifest.packageName] },

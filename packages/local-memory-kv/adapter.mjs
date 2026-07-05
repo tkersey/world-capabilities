@@ -68,7 +68,7 @@ function check(context, hostRequest) {
   if (!packManifest.supportedActuationClasses.includes(hostRequest.target.actuationClass)) return "unsupported_actuation_class";
   const statuses = hostRequest.responseSchema?.statuses;
   if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
-  if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item)) || statuses.some((item) => !packManifest.supportedResponseStatuses.includes(item))) return "unsupported_response_schema";
+  if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
