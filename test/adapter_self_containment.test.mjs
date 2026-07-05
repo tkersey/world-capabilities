@@ -739,6 +739,29 @@ test("sidecar command entrypoint follows the executable artifact extension set",
   }
 });
 
+test("sidecar command rejects preload arguments before entrypoint selection", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-preload-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "loader.jsx"), "export default true;\n");
+    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-preload-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "loader.jsx", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "--preload", "loader.jsx", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/preload flag rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Deno host globals are rejected in sidecar artifacts", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-deno-global-pack-"));
   try {

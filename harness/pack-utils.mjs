@@ -108,6 +108,7 @@ const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|\{\s*[^}\n]*\[[^\]]+\]\s*:|(?:\b[A-
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
+const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
 const IMPORT_SCANNERS = {
@@ -293,10 +294,17 @@ function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
 
+function isPreloadFlag(arg) {
+  if (typeof arg !== "string") return false;
+  return arg === "-r" || /^-r\S+/.test(arg) || PRELOAD_FLAGS.some((flag) => arg === flag || arg.startsWith(`${flag}=`));
+}
+
 function sidecarEntrypoint(pack) {
   const command = pack.manifest.metadata?.sidecar?.command;
   if (!Array.isArray(command)) return null;
-  return command.find((arg) => EXECUTABLE_ARTIFACT.test(arg)) ?? null;
+  assert(!command.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
+  const [, ...args] = command;
+  return args.find((arg) => EXECUTABLE_ARTIFACT.test(arg)) ?? null;
 }
 
 function sidecarRuntime(pack) {
@@ -420,8 +428,8 @@ export function validateSidecarCommand(pack) {
   assert(!(runtime === "npm" && args[0] === "exec"), `${pack.name}: npm exec package runner rejected`);
   assert(!(runtime === "node" && args[0] === "--run"), `${pack.name}: node --run package runner rejected`);
   assert(!args.some((arg) => ["-e", "--eval", "eval"].includes(arg)), `${pack.name}: eval flag rejected`);
-  assert(!args.some((arg) => ["--import", "--require", "--import-map"].includes(arg)), `${pack.name}: preload flag rejected`);
-  const entry = args.find((arg) => EXECUTABLE_ARTIFACT.test(arg));
+  assert(!args.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
+  const entry = sidecarEntrypoint(pack);
   assert(entry, `${pack.name}: sidecar entrypoint missing`);
   assert(pack.manifest.artifacts.some((artifact) => artifact.path === entry), `${pack.name}: sidecar entrypoint not artifact-bound`);
   assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);
