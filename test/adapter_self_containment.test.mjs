@@ -12,6 +12,46 @@ test("sidecar fixture imports are checksum covered", async () => {
   await verifySelfContained(await loadPack("sidecar-fixture"));
 });
 
+test("self-containment scanner supports shebang JavaScript", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-shebang-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.js"), "#!/usr/bin/env bun\nimport { helper } from \"./helper.js\";\nexport default helper;\n");
+    await writeFile(join(dir, "helper.js"), "export const helper = true;\n");
+    await verifySelfContained({
+      name: "shebang-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("self-containment scanner supports TypeScript artifacts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-ts-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.ts"), "import { helper } from \"./helper.ts\";\ntype Result = boolean;\nexport const result: Result = helper;\n");
+    await writeFile(join(dir, "helper.ts"), "export const helper: boolean = true;\n");
+    await verifySelfContained({
+      name: "ts-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.ts" }, { path: "helper.ts" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CommonJS requires are self-containment checked", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-cjs-pack-"));
   try {

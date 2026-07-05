@@ -97,7 +97,13 @@ const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|ts|tsx)$/;
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
-const IMPORT_SCANNER = new Bun.Transpiler({ loader: "js" });
+const IMPORT_SCANNERS = {
+  cjs: new Bun.Transpiler({ loader: "js" }),
+  js: new Bun.Transpiler({ loader: "js" }),
+  mjs: new Bun.Transpiler({ loader: "js" }),
+  ts: new Bun.Transpiler({ loader: "ts" }),
+  tsx: new Bun.Transpiler({ loader: "tsx" })
+};
 
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -240,8 +246,13 @@ export function parseImports(source) {
   return [...new Set(imports)];
 }
 
-export function scanImportEntries(source) {
-  return IMPORT_SCANNER.scanImports(source);
+export function scanImportEntries(source, artifactPath = "artifact.js") {
+  return scannerForPath(artifactPath).scanImports(stripShebang(source));
+}
+
+function scannerForPath(artifactPath) {
+  const ext = artifactPath.split(".").pop();
+  return IMPORT_SCANNERS[ext] ?? IMPORT_SCANNERS.js;
 }
 
 function stripScannedRequireCalls(source, importEntries) {
@@ -258,8 +269,12 @@ function stripScannedRequireCalls(source, importEntries) {
   });
 }
 
-function loaderScanSource(source) {
-  return IMPORT_SCANNER.transformSync(source).replace(/\/\*[\s\S]*?\*\//g, " ");
+function stripShebang(source) {
+  return source.startsWith("#!") ? source.replace(/^#![^\r\n]*(?:\r?\n|$)/, "") : source;
+}
+
+function loaderScanSource(source, artifactPath) {
+  return scannerForPath(artifactPath).transformSync(stripShebang(source)).replace(/\/\*[\s\S]*?\*\//g, " ");
 }
 
 function withoutAllowedProcessAccess(source, artifact) {
@@ -280,8 +295,8 @@ export async function verifySelfContained(pack) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!EXECUTABLE_ARTIFACT.test(artifact.path)) continue;
     const source = await readFile(full, "utf8");
-    const loaderSource = loaderScanSource(source);
-    const importEntries = scanImportEntries(source);
+    const loaderSource = loaderScanSource(source, artifact.path);
+    const importEntries = scanImportEntries(source, artifact.path);
     const specifiers = [...new Set(importEntries
       .map((entry) => entry.path)
       .filter((path) => typeof path === "string" && path.length > 0))];
