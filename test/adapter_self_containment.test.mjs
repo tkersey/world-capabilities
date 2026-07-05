@@ -78,6 +78,7 @@ test("extensionless imports reject uncovered runtime alternatives", async () => 
     const dir = join(root, "pack");
     await mkdir(dir);
     await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper"), "export const helper = \"uncovered-exact\";\n");
     await writeFile(join(dir, "helper.js"), "export const helper = \"covered\";\n");
     await writeFile(join(dir, "helper.jsx"), "export const helper = \"uncovered\";\n");
     await expect(verifySelfContained({

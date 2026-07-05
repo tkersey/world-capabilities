@@ -323,7 +323,7 @@ function localImportCandidates(artifactPath, specifier) {
   if (EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json")) return [importBase];
   const preferred = executableExtension(artifactPath);
   const extensions = [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
-  return extensions.map((ext) => `${importBase}${ext}`);
+  return [importBase, ...extensions.map((ext) => `${importBase}${ext}`)];
 }
 
 function directoryImportPackageJsonCandidate(artifactPath, specifier) {
