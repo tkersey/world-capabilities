@@ -303,8 +303,9 @@ function sidecarEntrypoint(pack) {
   const command = pack.manifest.metadata?.sidecar?.command;
   if (!Array.isArray(command)) return null;
   assert(!command.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
-  const [, ...args] = command;
-  return args.find((arg) => EXECUTABLE_ARTIFACT.test(arg)) ?? null;
+  const [runtime, ...args] = command;
+  const entry = runtime === "deno" && args[0] === "run" ? args[1] : args[0];
+  return typeof entry === "string" && EXECUTABLE_ARTIFACT.test(entry) ? entry : null;
 }
 
 function sidecarRuntime(pack) {

@@ -804,6 +804,33 @@ test("sidecar command rejects preload arguments before entrypoint selection", as
   }
 });
 
+test("sidecar command entrypoint is bound to the runtime target", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-runtime-target-pack-"));
+  try {
+    for (const [name, command] of [
+      ["bun-script", ["bun", "run", "script", "sidecar.mjs"]],
+      ["deno-package", ["deno", "run", "npm:example", "sidecar.mjs"]]
+    ]) {
+      const dir = join(root, name);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "sidecar.mjs"), "export default true;\n");
+      await expect(verifySelfContained({
+        name: `${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command, stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/sidecar entrypoint missing/);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Deno host globals are rejected in sidecar artifacts", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-deno-global-pack-"));
   try {
