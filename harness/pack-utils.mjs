@@ -278,19 +278,26 @@ function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source)).replace(/\/\*[\s\S]*?\*\//g, " ");
 }
 
-function withoutAllowedProcessAccess(source, artifact) {
-  if (artifact.role === "sidecar") return source.replace(/\bprocess\s*\.\s*stdout\s*\.\s*write\b/g, "");
+function sidecarEntrypoint(pack) {
+  const command = pack.manifest.metadata?.sidecar?.command;
+  if (!Array.isArray(command)) return null;
+  return command.find((arg) => EXECUTABLE_ARTIFACT.test(arg)) ?? null;
+}
+
+function withoutAllowedProcessAccess(source, allowSidecarIo) {
+  if (allowSidecarIo) return source.replace(/\bprocess\s*\.\s*stdout\s*\.\s*write\b/g, "");
   return source;
 }
 
-function withoutAllowedBunAccess(source, artifact) {
-  if (artifact.role === "sidecar") return source.replace(/\bBun\s*\.\s*stdin\s*\.\s*stream\b/g, "");
+function withoutAllowedBunAccess(source, allowSidecarIo) {
+  if (allowSidecarIo) return source.replace(/\bBun\s*\.\s*stdin\s*\.\s*stream\b/g, "");
   return source;
 }
 
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
+  const sidecarEntry = sidecarEntrypoint(pack);
   const root = resolve(pack.dir);
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
@@ -322,9 +329,10 @@ export async function verifySelfContained(pack) {
       assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
       assert(covered.has(relative(root, resolved)), `${pack.name}: local import ${specifier} not checksum-covered`);
     }
+    const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry;
     assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
-    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, artifact)), `${pack.name}: process access rejected in ${artifact.path}`);
-    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, artifact)), `${pack.name}: Bun access rejected in ${artifact.path}`);
+    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, allowSidecarIo)), `${pack.name}: process access rejected in ${artifact.path}`);
+    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, allowSidecarIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
     assert(!DENO_ACCESS.test(loaderSource), `${pack.name}: Deno access rejected in ${artifact.path}`);
   }
   validateSidecarCommand(pack);

@@ -444,7 +444,10 @@ test("process stdout is allowed only for sidecar artifacts", async () => {
       dir,
       manifest: {
         artifacts: [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }],
-        metadata: { allowedBuiltins: [] }
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
       }
     })).rejects.toThrow(/process access rejected/);
     await verifySelfContained({
@@ -452,7 +455,10 @@ test("process stdout is allowed only for sidecar artifacts", async () => {
       dir,
       manifest: {
         artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
-        metadata: { allowedBuiltins: [] }
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
       }
     });
   } finally {
@@ -472,7 +478,10 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
       dir,
       manifest: {
         artifacts: [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }],
-        metadata: { allowedBuiltins: [] }
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
       }
     })).rejects.toThrow(/Bun access rejected/);
     await verifySelfContained({
@@ -480,9 +489,35 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
       dir,
       manifest: {
         artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
-        metadata: { allowedBuiltins: [] }
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sidecar IO allowance is bound to the declared entrypoint", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-entrypoint-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "process.stdout.write(\"leak\");\n");
+    await writeFile(join(dir, "sidecar.mjs"), "export default true;\n");
+    await expect(verifySelfContained({
+      name: "sidecar-entrypoint-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs", role: "sidecar" }, { path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"] }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
