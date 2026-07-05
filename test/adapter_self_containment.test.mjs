@@ -280,6 +280,25 @@ test("comment-hidden dynamic imports are rejected", async () => {
   }
 });
 
+test("string-literal block comment markers cannot hide forbidden process access", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-comment-marker-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const open = \"/*\";\nprocess.getBuiltinModule(\"node:child_process\");\nconst close = \"*/\";\n");
+    await expect(verifySelfContained({
+      name: "comment-marker-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Bun import.meta.require loaders are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-import-meta-require-pack-"));
   try {

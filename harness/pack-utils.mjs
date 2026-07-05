@@ -275,7 +275,7 @@ function stripShebang(source) {
 }
 
 function loaderScanSource(source, artifactPath) {
-  return scannerForPath(artifactPath).transformSync(stripShebang(source)).replace(/\/\*[\s\S]*?\*\//g, " ");
+  return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
 
 function sidecarEntrypoint(pack) {
