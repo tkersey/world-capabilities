@@ -76,6 +76,7 @@ const DYNAMIC_IMPORT = /\bimport\s*\(/;
 const EVAL_PATTERNS = [
   /\beval\s*(?:\(|\)|\.|\?\.)/,
   /\bFunction\s*(?:\(|\.|\?\.)/,
+  /=\s*(?:eval|Function)\b/,
   /(?:\.|\?\.)\s*constructor\b/,
   /\[\s*["']constructor["']\s*\]/,
   /\[\s*["'][^"']*["']\s*\+/,

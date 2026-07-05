@@ -332,6 +332,25 @@ test("indirect eval and optional Function calls are rejected", async () => {
   }
 });
 
+test("aliased eval and Function loaders are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-aliased-eval-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const F = Function;\nconst run = eval;\nF(\"return this\")();\nrun(\"1 + 1\");\n");
+    await expect(verifySelfContained({
+      name: "aliased-eval-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("benign constructor methods and global names are allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-benign-loader-words-pack-"));
   try {
