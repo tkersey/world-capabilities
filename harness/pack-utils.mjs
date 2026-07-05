@@ -73,10 +73,11 @@ export const FORBIDDEN_EVIDENCE_KEYS = [
 ];
 
 const DYNAMIC_IMPORT = /\bimport\s*\(/;
+const DYNAMIC_LOADER_IDENTIFIERS = [
+  /\beval\b/,
+  /\bFunction\b/
+];
 const EVAL_PATTERNS = [
-  /\beval\s*(?:\(|\)|\.|\?\.)/,
-  /\bFunction\s*(?:\(|\.|\?\.)/,
-  /=\s*(?:eval|Function)\b/,
   /(?:\.|\?\.)\s*constructor\b/,
   /\[\s*["']constructor["']\s*\]/,
   /\[\s*["'][^"']*["']\s*\+/,
@@ -301,6 +302,10 @@ function stripShebang(source) {
   return source.startsWith("#!") ? source.replace(/^#![^\r\n]*(?:\r?\n|$)/, "") : source;
 }
 
+function withoutStringLiterals(source) {
+  return source.replace(/(["'`])(?:\\[\s\S]|(?!\1)[\s\S])*\1/g, "\"\"");
+}
+
 function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
@@ -386,12 +391,16 @@ export async function verifySelfContained(pack) {
     if (!isScannableArtifact(artifact.path)) continue;
     const source = await readFile(full, "utf8");
     const loaderSource = loaderScanSource(source, artifact.path);
+    const codeSource = withoutStringLiterals(loaderSource);
     const importEntries = scanImportEntries(source, artifact.path);
     const specifiers = [...new Set(importEntries
       .map((entry) => entry.path)
       .filter((path) => typeof path === "string" && path.length > 0))];
     assert(!importEntries.some((entry) => entry.kind === "dynamic-import"), `${pack.name}: dynamic import rejected in ${artifact.path}`);
     assert(!DYNAMIC_IMPORT.test(loaderSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+    for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
+      assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+    }
     for (const pattern of EVAL_PATTERNS) {
       assert(!pattern.test(loaderSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }

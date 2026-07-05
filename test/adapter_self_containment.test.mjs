@@ -337,7 +337,7 @@ test("aliased eval and Function loaders are rejected", async () => {
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "const F = Function;\nconst run = eval;\nF(\"return this\")();\nrun(\"1 + 1\");\n");
+    await writeFile(join(dir, "adapter.mjs"), "const F = Function;\nconst run = eval;\nconst o = { F: Function };\nF(\"return this\")();\nrun(\"1 + 1\");\no.F(\"return this\")();\n");
     await expect(verifySelfContained({
       name: "aliased-eval-pack",
       dir,
@@ -356,7 +356,7 @@ test("benign constructor methods and global names are allowed", async () => {
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "import \"./global-helper.mjs\";\nclass Safe { constructor() {} }\nexport default Safe;\n");
+    await writeFile(join(dir, "adapter.mjs"), "import \"./global-helper.mjs\";\nconst label = \"Function eval global\";\nclass Safe { constructor() {} }\nexport default { Safe, label };\n");
     await writeFile(join(dir, "global-helper.mjs"), "export const ok = true;\n");
     await verifySelfContained({
       name: "benign-loader-words-pack",
