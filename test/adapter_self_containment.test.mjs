@@ -351,6 +351,25 @@ test("aliased eval and Function loaders are rejected", async () => {
   }
 });
 
+test("descriptor-based Function recovery is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-descriptor-function-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export default Object.getOwnPropertyDescriptor(Object.getPrototypeOf(function(){}), \"constructor\").value(\"return this\")();\n");
+    await expect(verifySelfContained({
+      name: "descriptor-function-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("benign constructor methods and global names are allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-benign-loader-words-pack-"));
   try {
@@ -363,6 +382,25 @@ test("benign constructor methods and global names are allowed", async () => {
       dir,
       manifest: {
         artifacts: [{ path: "adapter.mjs" }, { path: "global-helper.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("host global names inside literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-benign-global-literals-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export const label = \"process Bun Deno\";\nexport const diagnostic = `process Bun Deno`;\nexport default { label, diagnostic };\n");
+    await verifySelfContained({
+      name: "benign-global-literals-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
         metadata: { allowedBuiltins: [] }
       }
     });

@@ -82,6 +82,8 @@ const EVAL_PATTERNS = [
   /\[\s*["']constructor["']\s*\]/,
   /\[\s*["'][^"']*["']\s*\+/,
   /\+\s*["'][^"']*["']\s*\]/,
+  /\bObject\s*(?:\.|\?\.)\s*getOwnPropertyDescriptor\b/,
+  /\bObject\s*(?:\.|\?\.)\s*getPrototypeOf\b/,
   /\bReflect\s*(?:\.|\[)/,
   /\bglobalThis\s*(?:\.|\[)/,
   /\bglobal\s*(?:\.|\[)/,
@@ -530,9 +532,9 @@ export async function verifySelfContained(pack) {
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
     assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
-    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
-    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
-    assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(loaderSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
+    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
+    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
+    assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
   }
   validateSidecarCommand(pack);
 }
