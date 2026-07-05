@@ -488,6 +488,25 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
   }
 });
 
+test("Deno host globals are rejected in sidecar artifacts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-deno-global-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "Deno.Command(\"sh\", { args: [\"-c\", \"echo pwn\"] });\n");
+    await expect(verifySelfContained({
+      name: "deno-global-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/Deno access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("optional-chained CommonJS globals are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-optional-cjs-pack-"));
   try {

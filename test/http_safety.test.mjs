@@ -94,6 +94,24 @@ test("package deny policy precedes secret lookup", async () => {
   expect(context.effectAttempted).toBe(0);
 });
 
+test("package deny policy precedes malformed HTTP payload details", async () => {
+  const context = {
+    policy: { networkLive: true, denyPackages: ["@tkersey/world-capabilities/generic-http-json"] },
+    effectAttempted: 0
+  };
+  const missingUrl = await resolve(context, request({
+    payload: { method: "GET" }
+  }));
+  expect(missingUrl.payload.reason).toBe("package_denied");
+  expect(context.effectAttempted).toBe(0);
+
+  const invalidMethod = await resolve(context, request({
+    payload: { url: "https://example.invalid/fixture", method: "TRACE" }
+  }));
+  expect(invalidMethod.payload.reason).toBe("package_denied");
+  expect(context.effectAttempted).toBe(0);
+});
+
 test("live policy precedes secret lookup", async () => {
   const context = { policy: { networkLive: false }, secrets: {}, effectAttempted: 0 };
   const result = await resolve(context, request({

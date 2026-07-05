@@ -93,6 +93,7 @@ const ANY_COMMONJS_REQUIRE = /\brequire\b/;
 const COMMONJS_MODULE_LOADER = /\b(?:module|exports)\b/;
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
+const DENO_ACCESS = /\bDeno\b/;
 const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|ts|tsx)$/;
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
@@ -324,6 +325,7 @@ export async function verifySelfContained(pack) {
     assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
     assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, artifact)), `${pack.name}: process access rejected in ${artifact.path}`);
     assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, artifact)), `${pack.name}: Bun access rejected in ${artifact.path}`);
+    assert(!DENO_ACCESS.test(loaderSource), `${pack.name}: Deno access rejected in ${artifact.path}`);
   }
   validateSidecarCommand(pack);
 }

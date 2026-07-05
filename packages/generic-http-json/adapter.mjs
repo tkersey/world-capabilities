@@ -77,10 +77,10 @@ function preEffectReason(context, hostRequest) {
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
-  if (!hostRequest.payload?.url || typeof hostRequest.payload.url !== "string") return "malformed_target";
-  if (!["GET", "POST", "PUT", "DELETE"].includes(hostRequest.payload.method)) return "method_not_allowed";
   if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
   if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
+  if (!hostRequest.payload?.url || typeof hostRequest.payload.url !== "string") return "malformed_target";
+  if (!["GET", "POST", "PUT", "DELETE"].includes(hostRequest.payload.method)) return "method_not_allowed";
   if (context?.policy?.auditOnly) return "audit_only";
   if (!context?.policy?.live && !context?.policy?.networkLive) return "network_denied";
   if (hostRequest.payload.requiresSecret && hostRequest.payload.requiresSecret !== "API_TOKEN") return "missing_secret";
