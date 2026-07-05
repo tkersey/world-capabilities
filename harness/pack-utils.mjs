@@ -74,15 +74,16 @@ export const FORBIDDEN_EVIDENCE_KEYS = [
 
 const DYNAMIC_IMPORT = /\bimport\s*\(/;
 const EVAL_PATTERNS = [
-  /\beval\b/,
-  /\bFunction\b/,
-  /\bconstructor\b/,
+  /\beval\s*(?:\(|\)|\.|\?\.)/,
+  /\bFunction\s*(?:\(|\.|\?\.)/,
+  /(?:\.|\?\.)\s*constructor\b/,
+  /\[\s*["']constructor["']\s*\]/,
   /\[\s*["'][^"']*["']\s*\+/,
   /\+\s*["'][^"']*["']\s*\]/,
-  /\bReflect\b/,
-  /\bglobalThis\b/,
-  /\bglobal\b/,
-  /\bself\b/,
+  /\bReflect\s*(?:\.|\[)/,
+  /\bglobalThis\s*(?:\.|\[)/,
+  /\bglobal\s*(?:\.|\[)/,
+  /\bself\s*(?:\.|\[)/,
   /globalThis\s*\[\s*["']Function["']\s*\]/,
   /import\s*\.\s*meta\b/,
   /process\s*\[/,

@@ -312,6 +312,26 @@ test("indirect eval and optional Function calls are rejected", async () => {
   }
 });
 
+test("benign constructor methods and global names are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-benign-loader-words-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import \"./global-helper.mjs\";\nclass Safe { constructor() {} }\nexport default Safe;\n");
+    await writeFile(join(dir, "global-helper.mjs"), "export const ok = true;\n");
+    await verifySelfContained({
+      name: "benign-loader-words-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "global-helper.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("node module loader builtin is rejected even with computed access", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-node-module-pack-"));
   try {
