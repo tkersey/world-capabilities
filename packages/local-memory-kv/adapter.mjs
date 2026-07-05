@@ -82,7 +82,7 @@ function check(context, hostRequest) {
 }
 
 export function manifest() {
-  return packManifest;
+  return structuredClone(packManifest);
 }
 
 export async function preflight(context, hostRequest) {
