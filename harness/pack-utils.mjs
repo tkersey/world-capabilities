@@ -326,6 +326,15 @@ function withoutAllowedBunAccess(source, allowSidecarIo) {
   return source;
 }
 
+function withoutAllowedDenoAccess(source, allowSidecarIo) {
+  if (allowSidecarIo) {
+    return source
+      .replace(/\bDeno\s*\.\s*stdin\b/g, "")
+      .replace(/\bDeno\s*\.\s*(?:stdout|stderr)\s*\.\s*write\b/g, "");
+  }
+  return source;
+}
+
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
@@ -374,10 +383,11 @@ export async function verifySelfContained(pack) {
     const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry;
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
+    const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
     assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
     assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(loaderSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
     assert(!BUN_ACCESS.test(withoutAllowedBunAccess(loaderSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
-    assert(!DENO_ACCESS.test(loaderSource), `${pack.name}: Deno access rejected in ${artifact.path}`);
+    assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(loaderSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
   }
   validateSidecarCommand(pack);
 }

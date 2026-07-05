@@ -610,6 +610,31 @@ test("sidecar IO allowance follows the declared runtime", async () => {
         }
       }
     });
+
+    await writeFile(join(dir, "sidecar.mjs"), "await Deno.stdout.write(new Uint8Array());\nawait Deno.stderr.write(new Uint8Array());\nDeno.stdin.readable;\n");
+    await expect(verifySelfContained({
+      name: "bun-sidecar-deno-io-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Deno access rejected/);
+
+    await verifySelfContained({
+      name: "deno-sidecar-stdio-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["deno", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -650,6 +675,18 @@ test("Deno host globals are rejected in sidecar artifacts", async () => {
       manifest: {
         artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
         metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/Deno access rejected/);
+
+    await expect(verifySelfContained({
+      name: "deno-command-sidecar-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["deno", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
       }
     })).rejects.toThrow(/Deno access rejected/);
   } finally {
