@@ -116,6 +116,36 @@ test("extensionless imports cover every Bun runtime candidate", async () => {
   }
 });
 
+test("directory imports resolve against covered index candidates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-directory-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(join(dir, "helper"), { recursive: true });
+    await writeFile(join(dir, "adapter.mjs"), "import { helper } from \"./helper/\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper", "index.js"), "export const helper = \"unchecked\";\n");
+    await writeFile(join(dir, "helper", ".js"), "export const helper = \"covered-shadow\";\n");
+    await expect(verifySelfContained({
+      name: "directory-import-shadow-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "helper/.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/local import \.\/helper\/ not checksum-covered/);
+
+    await verifySelfContained({
+      name: "directory-import-index-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "helper/index.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CommonJS requires are self-containment checked", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-cjs-pack-"));
   try {

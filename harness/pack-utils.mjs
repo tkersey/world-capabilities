@@ -319,10 +319,11 @@ function executableExtension(artifactPath) {
 
 function localImportCandidates(artifactPath, specifier) {
   const imported = normalize(join(artifactPath, "..", specifier));
-  if (EXECUTABLE_ARTIFACT.test(imported) || imported.endsWith(".json")) return [imported];
+  const importBase = specifier.endsWith("/") ? normalize(join(imported, "index")) : imported;
+  if (EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json")) return [importBase];
   const preferred = executableExtension(artifactPath);
   const extensions = [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
-  return extensions.map((ext) => `${imported}${ext}`);
+  return extensions.map((ext) => `${importBase}${ext}`);
 }
 
 async function fileExists(path) {
