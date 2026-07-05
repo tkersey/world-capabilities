@@ -319,6 +319,14 @@ function withoutStringLiterals(source) {
       i = stripped.end;
       continue;
     }
+    if (ch === "/" && isRegexLiteralStart(result)) {
+      const end = skipRegexLiteral(source, i);
+      if (end > i) {
+        result += "/ /";
+        i = end;
+        continue;
+      }
+    }
     result += ch;
     i += 1;
   }
@@ -398,6 +406,43 @@ function skipTemplateLiteral(source, start) {
   return i;
 }
 
+function isRegexLiteralStart(result) {
+  const trimmed = result.trimEnd();
+  if (!trimmed) return true;
+  if (/[\(\{\[=,:;!&|?+\-*~^<>%]$/.test(trimmed)) return true;
+  return /(?:=>|\b(?:return|throw|case|delete|void|typeof|yield|await))\s*$/.test(trimmed);
+}
+
+function skipRegexLiteral(source, start) {
+  let i = start + 1;
+  let inClass = false;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === "\n" || ch === "\r") return start;
+    if (ch === "[") {
+      inClass = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "]" && inClass) {
+      inClass = false;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && !inClass) {
+      i += 1;
+      while (/[A-Za-z]/.test(source[i] ?? "")) i += 1;
+      return i;
+    }
+    i += 1;
+  }
+  return start;
+}
+
 function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
@@ -407,11 +452,16 @@ function isPreloadFlag(arg) {
   return arg === "-r" || /^-r\S+/.test(arg) || PRELOAD_FLAGS.some((flag) => arg === flag || arg.startsWith(`${flag}=`));
 }
 
+function isSidecarOptionArg(arg) {
+  return typeof arg === "string" && arg.startsWith("-");
+}
+
 function sidecarEntrypoint(pack) {
   const command = pack.manifest.metadata?.sidecar?.command;
   if (!Array.isArray(command)) return null;
   assert(!command.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
   const [runtime, ...args] = command;
+  assert(!args.some(isSidecarOptionArg), `${pack.name}: sidecar option argument rejected`);
   const entry = runtime === "deno" && args[0] === "run" ? args[1] : args[0];
   return typeof entry === "string" && EXECUTABLE_ARTIFACT.test(entry) ? entry : null;
 }

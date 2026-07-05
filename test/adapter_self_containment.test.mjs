@@ -409,6 +409,44 @@ test("host global names inside literals are allowed", async () => {
   }
 });
 
+test("host global names inside regex literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-benign-global-regex-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export const labels = [/process/, /Function/, /Bun|Deno/];\nexport default labels;\n");
+    await verifySelfContained({
+      name: "benign-global-regex-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("host global names in executable code are still rejected after regex stripping", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-global-code-after-regex-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export const label = /safe/;\nexport const leaked = 1 / process.pid;\n");
+    await expect(verifySelfContained({
+      name: "global-code-after-regex-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("node module loader builtin is rejected even with computed access", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-node-module-pack-"));
   try {
@@ -916,6 +954,33 @@ test("sidecar command rejects preload arguments before entrypoint selection", as
         }
       }
     })).rejects.toThrow(/preload flag rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sidecar command rejects option-like arguments before entrypoint selection", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-option-pack-"));
+  try {
+    for (const [name, command, optionArtifact] of [
+      ["node-conditions", ["node", "--conditions=sidecar.jsx", "../evil.mjs"], "--conditions=sidecar.jsx"],
+      ["deno-allow-read", ["deno", "run", "--allow-read=sidecar.mts", "unchecked.mjs"], "--allow-read=sidecar.mts"]
+    ]) {
+      const dir = join(root, name);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, optionArtifact), "export default true;\n");
+      await expect(verifySelfContained({
+        name: `${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: optionArtifact, role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command, stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/sidecar option argument rejected/);
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }
