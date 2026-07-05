@@ -9,7 +9,7 @@
     "network.http"
   ],
   "checksums": {
-    "adapter.mjs": "83012a7f6561392ebe8502cac026a66745fa416cebf63592d80cc99a69a37c0b"
+    "adapter.mjs": "512d4f7ca15da0e87898e68ea58d05d2ba6f8d01e51c58b129c9f6fb95e6da58"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
@@ -23,7 +23,7 @@
   },
   "packageName": "@tkersey/world-capabilities/generic-http-json",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "73e1665b672201be5b8f12b0688396a97a2d50b31df7f4fda90ac15bed251a00",
+  "packFingerprint": "727bec4ac60fa88abdc8271f6aeba294c8226d4ada6270f31015ab8ffb65f078",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",

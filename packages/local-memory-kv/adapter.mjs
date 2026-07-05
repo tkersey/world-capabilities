@@ -4,7 +4,8 @@ const packManifest = {
   supportedActuationClasses: ["memory"],
   supportedActuatorRefs: ["actuator.local-memory-kv"],
   supportedDescriptorFingerprints: ["desc.local-memory-kv.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "failed"]
+  supportedResponseStatuses: ["ok", "rejected", "failed"],
+  secretRequirements: []
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

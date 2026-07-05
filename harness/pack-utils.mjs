@@ -46,6 +46,16 @@ export const REQUIRED_MANIFEST_FIELDS = [
   "metadata"
 ];
 
+export const ADAPTER_MANIFEST_PARITY_FIELDS = [
+  "packageName",
+  "driverId",
+  "supportedActuationClasses",
+  "supportedActuatorRefs",
+  "supportedDescriptorFingerprints",
+  "supportedResponseStatuses",
+  "secretRequirements"
+];
+
 export const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes",
   "archiveAppendBatchBytes",
@@ -399,6 +409,7 @@ export function validateSidecarCommand(pack) {
   assert(Array.isArray(command) && command.length >= 2, `${pack.name}: sidecar command required`);
   const [runtime, ...args] = command;
   assert(["node", "bun", "deno"].includes(runtime), `${pack.name}: sidecar bare executable rejected`);
+  assert(runtime !== "deno" || args[0] === "run", `${pack.name}: deno run subcommand required`);
   assert(!command.some((part) => /^https?:\/\//.test(part)), `${pack.name}: remote sidecar entrypoint rejected`);
   assert(!["bunx", "npx"].includes(runtime), `${pack.name}: package runner rejected`);
   assert(!(runtime === "bun" && args[0] === "x"), `${pack.name}: bun package runner rejected`);
@@ -412,6 +423,17 @@ export function validateSidecarCommand(pack) {
   assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);
   assert(sidecar.stderrBytes <= 8192, `${pack.name}: stderr bound too high`);
   assert(sidecar.timeoutMs > 0 && sidecar.timeoutMs <= 5000, `${pack.name}: timeout bound missing`);
+}
+
+export function assertAdapterManifestParity(pack, adapterManifest) {
+  assert(adapterManifest && typeof adapterManifest === "object", `${pack.name}: adapter manifest must be an object`);
+  for (const field of ADAPTER_MANIFEST_PARITY_FIELDS) {
+    assert(Object.prototype.hasOwnProperty.call(adapterManifest, field), `${pack.name}: adapter manifest missing ${field}`);
+    assert(
+      stableStringify(adapterManifest[field]) === stableStringify(pack.manifest[field]),
+      `${pack.name}: adapter manifest ${field} mismatch`
+    );
+  }
 }
 
 export async function verifyPack(pack) {
@@ -436,7 +458,7 @@ export async function verifyPack(pack) {
   for (const name of ["manifest", "preflight", "resolve", "dryRun"]) {
     assert(typeof adapter[name] === "function", `${pack.name}: adapter missing export ${name}`);
   }
-  assert(adapter.manifest().driverId === pack.manifest.driverId, `${pack.name}: adapter manifest mismatch`);
+  assertAdapterManifestParity(pack, adapter.manifest());
 }
 
 export async function expectedPackFingerprint(pack) {

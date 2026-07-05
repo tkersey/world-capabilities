@@ -4,7 +4,8 @@ const packManifest = {
   supportedActuationClasses: ["sidecar"],
   supportedActuatorRefs: ["actuator.sidecar-fixture"],
   supportedDescriptorFingerprints: ["desc.sidecar-fixture.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "failed"]
+  supportedResponseStatuses: ["ok", "rejected", "failed"],
+  secretRequirements: []
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

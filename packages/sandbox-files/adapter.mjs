@@ -7,7 +7,8 @@ const packManifest = {
   supportedActuationClasses: ["file"],
   supportedActuatorRefs: ["actuator.sandbox-files"],
   supportedDescriptorFingerprints: ["desc.sandbox-files.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "failed"]
+  supportedResponseStatuses: ["ok", "rejected", "failed"],
+  secretRequirements: []
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

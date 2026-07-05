@@ -4,7 +4,8 @@ const packManifest = {
   supportedActuationClasses: ["model"],
   supportedActuatorRefs: ["actuator.fixture-model"],
   supportedDescriptorFingerprints: ["desc.fixture-model.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "failed"]
+  supportedResponseStatuses: ["ok", "rejected", "failed"],
+  secretRequirements: []
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

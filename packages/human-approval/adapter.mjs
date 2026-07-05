@@ -4,7 +4,8 @@ const packManifest = {
   supportedActuationClasses: ["approval"],
   supportedActuatorRefs: ["actuator.human-approval"],
   supportedDescriptorFingerprints: ["desc.human-approval.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "deferred"]
+  supportedResponseStatuses: ["ok", "rejected", "deferred"],
+  secretRequirements: []
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

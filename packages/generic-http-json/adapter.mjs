@@ -4,7 +4,8 @@ const packManifest = {
   supportedActuationClasses: ["http"],
   supportedActuatorRefs: ["actuator.generic-http-json"],
   supportedDescriptorFingerprints: ["desc.generic-http-json.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "failed"]
+  supportedResponseStatuses: ["ok", "rejected", "failed"],
+  secretRequirements: [{ name: "API_TOKEN", requiredByDefault: false }]
 };
 
 const FORBIDDEN_EVIDENCE_KEYS = [

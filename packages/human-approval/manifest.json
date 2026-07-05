@@ -9,7 +9,7 @@
     "human.approval"
   ],
   "checksums": {
-    "adapter.mjs": "7649197ff20ce44965e133f226b12b251e0367715cb9f30916d6b179def90bde"
+    "adapter.mjs": "f55397f041d93c25131503e0961d3f76f25f9f52cf8c633156230f0f4a05fc34"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
@@ -27,7 +27,7 @@
   },
   "packageName": "@tkersey/world-capabilities/human-approval",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "40a6dc64e1f5329bb013b7c47f9af2447a1a54753a3f85981e25f0b6b6a1814a",
+  "packFingerprint": "b2ee91cf3c94aaeb226b8d655ac1f08e00e8176a2a9579db560a60c0eba96ef4",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",

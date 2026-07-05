@@ -624,6 +624,18 @@ test("sidecar IO allowance follows the declared runtime", async () => {
       }
     })).rejects.toThrow(/Deno access rejected/);
 
+    await expect(verifySelfContained({
+      name: "deno-sidecar-without-run-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["deno", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/deno run subcommand required/);
+
     await verifySelfContained({
       name: "deno-sidecar-stdio-pack",
       dir,
@@ -631,7 +643,7 @@ test("sidecar IO allowance follows the declared runtime", async () => {
         artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
         metadata: {
           allowedBuiltins: [],
-          sidecar: { command: ["deno", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          sidecar: { command: ["deno", "run", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
         }
       }
     });
@@ -685,7 +697,7 @@ test("Deno host globals are rejected in sidecar artifacts", async () => {
         artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
         metadata: {
           allowedBuiltins: [],
-          sidecar: { command: ["deno", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          sidecar: { command: ["deno", "run", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
         }
       }
     })).rejects.toThrow(/Deno access rejected/);
