@@ -303,6 +303,15 @@ function localImportCandidates(artifactPath, specifier) {
   return extensions.map((ext) => `${imported}${ext}`);
 }
 
+async function fileExists(path) {
+  try {
+    await realpath(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function withoutAllowedProcessAccess(source, allowSidecarIo) {
   if (allowSidecarIo) {
     return source
@@ -355,7 +364,12 @@ export async function verifySelfContained(pack) {
       for (const candidate of candidates) {
         assert(pathInside(root, candidate.resolved), `${pack.name}: host path import ${specifier}`);
       }
-      assert(candidates.some((candidate) => covered.has(candidate.artifactPath)), `${pack.name}: local import ${specifier} not checksum-covered`);
+      const existingCandidates = [];
+      for (const candidate of candidates) {
+        if (await fileExists(candidate.resolved)) existingCandidates.push(candidate);
+      }
+      const coverageCandidates = existingCandidates.length > 0 ? existingCandidates : candidates;
+      assert(coverageCandidates.every((candidate) => covered.has(candidate.artifactPath)), `${pack.name}: local import ${specifier} not checksum-covered`);
     }
     const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry;
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);

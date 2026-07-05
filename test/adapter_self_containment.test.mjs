@@ -72,6 +72,27 @@ test("extensionless JavaScript imports resolve against covered helpers", async (
   }
 });
 
+test("extensionless imports reject uncovered runtime alternatives", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extensionless-shadow-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper.js"), "export const helper = \"covered\";\n");
+    await writeFile(join(dir, "helper.mjs"), "export const helper = \"uncovered\";\n");
+    await expect(verifySelfContained({
+      name: "extensionless-shadow-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/local import \.\/helper not checksum-covered/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CommonJS requires are self-containment checked", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-cjs-pack-"));
   try {
