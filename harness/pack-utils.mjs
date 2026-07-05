@@ -90,12 +90,13 @@ const EVAL_PATTERNS = [
 ];
 const COMMONJS_REQUIRE = /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g;
 const ANY_COMMONJS_REQUIRE = /\brequire\b/;
-const COMMONJS_MODULE_LOADER = /\b(?:module|exports)\b/;
+const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)\b/;
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
 const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|[,{]\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|ts|tsx)$/;
+const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".ts", ".tsx"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
 const IMPORT_SCANNERS = {
@@ -289,9 +290,17 @@ function sidecarRuntime(pack) {
   return Array.isArray(command) ? command[0] : null;
 }
 
-function defaultImportExtension(artifactPath) {
-  const match = artifactPath.match(/\.(ts|tsx)$/);
+function executableExtension(artifactPath) {
+  const match = artifactPath.match(/\.(mjs|js|cjs|ts|tsx)$/);
   return match?.[0] ?? ".mjs";
+}
+
+function localImportCandidates(artifactPath, specifier) {
+  const imported = normalize(join(artifactPath, "..", specifier));
+  if (EXECUTABLE_ARTIFACT.test(imported)) return [imported];
+  const preferred = executableExtension(artifactPath);
+  const extensions = [preferred, ...EXECUTABLE_EXTENSIONS.filter((ext) => ext !== preferred)];
+  return extensions.map((ext) => `${imported}${ext}`);
 }
 
 function withoutAllowedProcessAccess(source, allowSidecarIo) {
@@ -338,11 +347,15 @@ export async function verifySelfContained(pack) {
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
-      const imported = normalize(join(artifact.path, "..", specifier));
-      const normalized = EXECUTABLE_ARTIFACT.test(imported) ? imported : `${imported}${defaultImportExtension(artifact.path)}`;
-      const resolved = resolve(root, normalized);
-      assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
-      assert(covered.has(relative(root, resolved)), `${pack.name}: local import ${specifier} not checksum-covered`);
+      const candidates = localImportCandidates(artifact.path, specifier)
+        .map((candidate) => {
+          const resolved = resolve(root, candidate);
+          return { resolved, artifactPath: relative(root, resolved) };
+        });
+      for (const candidate of candidates) {
+        assert(pathInside(root, candidate.resolved), `${pack.name}: host path import ${specifier}`);
+      }
+      assert(candidates.some((candidate) => covered.has(candidate.artifactPath)), `${pack.name}: local import ${specifier} not checksum-covered`);
     }
     const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry;
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);

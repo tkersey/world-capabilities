@@ -52,6 +52,26 @@ test("self-containment scanner supports TypeScript artifacts", async () => {
   }
 });
 
+test("extensionless JavaScript imports resolve against covered helpers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-js-extensionless-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper.js"), "export const helper = true;\n");
+    await verifySelfContained({
+      name: "js-extensionless-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CommonJS requires are self-containment checked", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-cjs-pack-"));
   try {
@@ -66,6 +86,26 @@ test("CommonJS requires are self-containment checked", async () => {
         metadata: { allowedBuiltins: [] }
       }
     })).rejects.toThrow(/unchecked builtin node:child_process/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CommonJS artifacts can use covered helpers with ordinary exports", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-covered-helper-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.cjs"), "const helper = require(\"./helper\");\nmodule.exports = helper;\n");
+    await writeFile(join(dir, "helper.cjs"), "exports.helper = true;\n");
+    await verifySelfContained({
+      name: "cjs-covered-helper-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }, { path: "helper.cjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
