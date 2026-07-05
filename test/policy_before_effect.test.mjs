@@ -57,6 +57,36 @@ test("sandbox dry run applies pre-effect validation", async () => {
   }
 });
 
+test("sandbox write dry run does not require file write policy", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-file-dry-run-write-"));
+  try {
+    const context = { fixtureRoot: root, policy: {}, effectAttempted: 0 };
+    const result = await dryRunFile(context, fileRequest({
+      payload: { operation: "write", path: "would-write.txt", bytes: "dry" }
+    }));
+    expect(result.status).toBe("ok");
+    expect(result.payload).toEqual({ wouldTouch: "would-write.txt", effect: false });
+    expect(context.effectAttempted).toBe(0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sandbox write dry run does not require write approval", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-file-dry-run-approval-"));
+  try {
+    const context = { fixtureRoot: root, policy: { approvalRequired: true }, effectAttempted: 0 };
+    const result = await dryRunFile(context, fileRequest({
+      payload: { operation: "write", path: "approval-write.txt", bytes: "dry" }
+    }));
+    expect(result.status).toBe("ok");
+    expect(result.payload).toEqual({ wouldTouch: "approval-write.txt", effect: false });
+    expect(context.effectAttempted).toBe(0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("symlink ancestors cannot escape the fixture root", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-file-root-"));
   const fixtureRoot = join(root, "fixture");

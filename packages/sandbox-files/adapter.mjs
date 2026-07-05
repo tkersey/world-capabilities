@@ -92,7 +92,8 @@ async function safePath(context, requested) {
   return { ok: true, full, display: relative(root, full) };
 }
 
-async function preEffectReason(context, hostRequest) {
+async function preEffectReason(context, hostRequest, options = {}) {
+  const enforceWriteAuthority = options.enforceWriteAuthority ?? true;
   if (!hostRequest?.requestId) return "missing_request_id";
   if (!hostRequest?.target?.descriptorFingerprint) return "missing_descriptor_fingerprint";
   if (!hostRequest?.idempotencyKey) return "missing_idempotency_key";
@@ -110,8 +111,8 @@ async function preEffectReason(context, hostRequest) {
   if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
   if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (!["read", "write"].includes(hostRequest.payload?.operation)) return "unsupported_file_operation";
-  if (hostRequest.payload?.operation === "write" && !context?.policy?.fileWrite) return "write_policy_required";
-  if (hostRequest.payload?.operation === "write" && context?.policy?.approvalRequired && !context?.approval?.approved) return "approval_required";
+  if (enforceWriteAuthority && hostRequest.payload?.operation === "write" && !context?.policy?.fileWrite) return "write_policy_required";
+  if (enforceWriteAuthority && hostRequest.payload?.operation === "write" && context?.policy?.approvalRequired && !context?.approval?.approved) return "approval_required";
   const path = await safePath(context, hostRequest.payload?.path);
   if (!path.ok) return path.reason;
   return null;
@@ -145,7 +146,7 @@ export async function resolve(context, hostRequest) {
 }
 
 export async function dryRun(context, hostRequest) {
-  const reason = await preEffectReason(context, hostRequest);
+  const reason = await preEffectReason(context, hostRequest, { enforceWriteAuthority: false });
   if (reason) return out(hostRequest, "rejected", reason);
   const path = await safePath(context, hostRequest.payload.path);
   return { requestId: hostRequest.requestId, status: "ok", payload: { wouldTouch: path.display, effect: false } };
