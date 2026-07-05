@@ -303,7 +303,97 @@ function stripShebang(source) {
 }
 
 function withoutStringLiterals(source) {
-  return source.replace(/(["'`])(?:\\[\s\S]|(?!\1)[\s\S])*\1/g, "\"\"");
+  let result = "";
+  for (let i = 0; i < source.length;) {
+    const ch = source[i];
+    if (ch === "\"" || ch === "'") {
+      i = skipQuoted(source, i, ch);
+      result += "\"\"";
+      continue;
+    }
+    if (ch === "`") {
+      const stripped = stripTemplateLiteral(source, i);
+      result += stripped.text;
+      i = stripped.end;
+      continue;
+    }
+    result += ch;
+    i += 1;
+  }
+  return result;
+}
+
+function skipQuoted(source, start, quote) {
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (source[i] === quote) return i + 1;
+    i += 1;
+  }
+  return i;
+}
+
+function stripTemplateLiteral(source, start) {
+  let result = "`";
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (source[i] === "`") return { text: `${result}\``, end: i + 1 };
+    if (source[i] === "$" && source[i + 1] === "{") {
+      const expression = readTemplateExpression(source, i + 2);
+      result += `\${${withoutStringLiterals(expression.text)}}`;
+      i = expression.end;
+      continue;
+    }
+    i += 1;
+  }
+  return { text: result, end: i };
+}
+
+function readTemplateExpression(source, start) {
+  let depth = 1;
+  let i = start;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === "\"" || ch === "'") {
+      i = skipQuoted(source, i, ch);
+      continue;
+    }
+    if (ch === "`") {
+      i = skipTemplateLiteral(source, i);
+      continue;
+    }
+    if (ch === "{") depth += 1;
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return { text: source.slice(start, i), end: i + 1 };
+    }
+    i += 1;
+  }
+  return { text: source.slice(start), end: i };
+}
+
+function skipTemplateLiteral(source, start) {
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (source[i] === "`") return i + 1;
+    if (source[i] === "$" && source[i + 1] === "{") {
+      i = readTemplateExpression(source, i + 2).end;
+      continue;
+    }
+    i += 1;
+  }
+  return i;
 }
 
 function loaderScanSource(source, artifactPath) {
