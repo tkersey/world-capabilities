@@ -1050,6 +1050,7 @@ export async function verifySelfContained(pack) {
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
+    const artifactReal = await realpath(full);
     const source = await readFile(full, "utf8");
     const loaderSource = loaderScanSource(source, artifact.path);
     const codeSource = withoutStringLiterals(loaderSource);
@@ -1092,6 +1093,11 @@ export async function verifySelfContained(pack) {
       const existingCandidates = [];
       for (const candidate of candidates) {
         if (await fileExists(candidate.resolved)) existingCandidates.push(candidate);
+      }
+      if (sidecarEntryReal && artifactReal !== sidecarEntryReal) {
+        for (const candidate of existingCandidates) {
+          assert(await realpath(candidate.resolved) !== sidecarEntryReal, `${pack.name}: sidecar entrypoint import rejected in ${artifact.path}`);
+        }
       }
       const coverageCandidates = existingCandidates.length > 0 ? existingCandidates : candidates;
       assert(coverageCandidates.every((candidate) => covered.has(candidate.artifactPath)), `${pack.name}: local import ${specifier} not checksum-covered`);

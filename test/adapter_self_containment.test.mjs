@@ -1961,6 +1961,29 @@ test("sidecar IO allowance rejects adapter path aliases", async () => {
   }
 });
 
+test("adapter imports cannot execute sidecar entrypoints in-process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import \"./sidecar.mjs\";\nexport const manifest = () => ({});\n");
+    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"sidecar only\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-import-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/sidecar entrypoint import rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("sidecar command entrypoint follows the executable artifact extension set", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-extension-pack-"));
   try {
