@@ -294,6 +294,25 @@ test("folded CommonJS require specifiers are rejected", async () => {
   }
 });
 
+test("require-looking string and regex literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-require-literal-text-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const msg = \"require is unavailable\";\nconst regex = /require/;\nexport default regex.test(msg);\n");
+    await verifySelfContained({
+      name: "require-literal-text-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("createRequire alias loaders are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-create-require-pack-"));
   try {
@@ -803,6 +822,25 @@ test("computed reflective loader access is rejected", async () => {
         metadata: { allowedBuiltins: [] }
       }
     })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unicode computed loader access is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-unicode-computed-loader-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const \u03c0 = () => {};\nexport default \u03c0[\"constructor\"](\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "unicode-computed-loader-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

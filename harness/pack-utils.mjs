@@ -109,7 +109,7 @@ const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
-const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
+const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|(?:[#A-Za-z_$\u0080-\uFFFF][\w$#\u0080-\uFFFF]*|\)|\]|\})\s*\[)/;
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
@@ -1003,7 +1003,7 @@ export async function verifySelfContained(pack) {
     for (const pattern of EVAL_PATTERNS) {
       assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }
-    assert(!ANY_COMMONJS_REQUIRE.test(stripScannedRequireCalls(loaderSource, importEntries)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+    assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
     assert(!COMPUTED_MEMBER_ACCESS.test(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
