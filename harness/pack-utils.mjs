@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, realpath } from "node:fs/promises";
+import { realpathSync, statSync } from "node:fs";
+import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, fail, stableStringify } from "./assertions.mjs";
@@ -73,18 +74,22 @@ export const FORBIDDEN_EVIDENCE_KEYS = [
 ];
 
 const DYNAMIC_IMPORT = /\bimport\s*\(/;
+const OPTIMIZER_NODE_ENV_ACCESS =
+  /\bprocess\s*(?:\.\s*env|\[\s*["'`]env["'`]\s*\])\s*(?:\.\s*NODE_ENV\b|\[\s*["'`]NODE_ENV["'`]\s*\])/g;
 const DYNAMIC_LOADER_IDENTIFIERS = [
   /\beval\b/,
-  /\bFunction\b/
+  /\bFunction\b/,
+  /\b(?:globalThis|global|self)\b/
 ];
 const EVAL_PATTERNS = [
   /(?:\.|\?\.)\s*constructor\b/,
+  /\bwith\s*\(/,
   /\[\s*["']constructor["']\s*\]/,
   /\[\s*["'][^"']*["']\s*\+/,
   /\+\s*["'][^"']*["']\s*\]/,
-  /\bObject\s*(?:\.|\?\.)\s*getOwnPropertyDescriptor\b/,
+  /\bObject\s*(?:\.|\?\.)\s*getOwnPropertyDescriptors?\b/,
   /\bObject\s*(?:\.|\?\.)\s*getPrototypeOf\b/,
-  /\b(?:getOwnPropertyDescriptor|getPrototypeOf)\b/,
+  /\b(?:getOwnPropertyDescriptors?|getPrototypeOf)\b/,
   /\bReflect\b/,
   /\bReflect\s*(?:\.|\[)/,
   /\bglobalThis\s*(?:\.|\[)/,
@@ -105,7 +110,7 @@ const EVAL_PATTERNS = [
   /\bcreateRequire\b/,
   /\bnew\s+Worker\s*\(/
 ];
-const COMMONJS_REQUIRE = /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g;
+const COMMONJS_REQUIRE = /\brequire\s*\(\s*(["'`])([^"'`]+)\1\s*\)/g;
 const ANY_COMMONJS_REQUIRE = /\brequire\b/;
 const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)\b/;
 const PROCESS_ACCESS = /\bprocess\b/;
@@ -113,8 +118,18 @@ const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
 const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "yield", "await", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
+const PLAIN_JAVASCRIPT_ARTIFACT = /\.(mjs|js|cjs)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
+const UNSUPPORTED_RUNTIME_IMPORT_EXTENSIONS = [".node"];
+const NODE_TYPESCRIPT_ARTIFACT = /\.(ts|mts|cts)$/;
+const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
+  /\benum\s+[A-Za-z_$]/,
+  /\b(?:namespace|module)\s+[A-Za-z_$]/,
+  /^\s*@/m,
+  /constructor\s*\([^)]*\b(?:public|private|protected|readonly)\s+[A-Za-z_$]/,
+  /\bimport\s+(?!type\b)[A-Za-z_$][\w$]*\s*=/
+];
 const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module", "node:process"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
@@ -136,6 +151,14 @@ function isScannableArtifact(artifactPath) {
 
 function hasExplicitExtension(artifactPath) {
   return (artifactPath.split(/[\\/]/).pop() ?? artifactPath).includes(".");
+}
+
+function hasSupportedImportExtension(artifactPath) {
+  return EXECUTABLE_ARTIFACT.test(artifactPath) || artifactPath.endsWith(".json");
+}
+
+function hasUnsupportedExactImportExtension(artifactPath) {
+  return hasExplicitExtension(artifactPath) && !hasSupportedImportExtension(artifactPath);
 }
 
 export function sha256Bytes(bytes) {
@@ -294,12 +317,87 @@ function stripScannedRequireCalls(source, importEntries) {
     if (entry.kind !== "require-call" || typeof entry.path !== "string") continue;
     requireCounts.set(entry.path, (requireCounts.get(entry.path) ?? 0) + 1);
   }
-  return source.replace(COMMONJS_REQUIRE, (match, specifier) => {
+  return source.replace(COMMONJS_REQUIRE, (match, _quote, specifier, offset) => {
+    if (!isExecutableSourceOffset(source, offset)) return match;
     const count = requireCounts.get(specifier) ?? 0;
     if (count <= 0) return match;
     requireCounts.set(specifier, count - 1);
     return "";
   });
+}
+
+function isExecutableSourceOffset(source, offset) {
+  let result = "";
+  for (let i = 0; i < source.length && i <= offset;) {
+    const ch = source[i];
+    if (ch === "\"" || ch === "'") {
+      const end = skipQuoted(source, i, ch);
+      if (offset < end) return false;
+      result += "\"\"";
+      i = end;
+      continue;
+    }
+    if (ch === "`") {
+      const executable = templateOffsetExecutable(source, i, offset);
+      if (executable !== null) return executable;
+      const end = skipTemplateLiteral(source, i);
+      result += "``";
+      i = end;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "/") {
+      const end = skipLineComment(source, i);
+      if (offset < end) return false;
+      result += "\n";
+      i = end;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      const end = skipBlockComment(source, i);
+      if (offset < end) return false;
+      result += " ";
+      i = end;
+      continue;
+    }
+    if (ch === "/" && isRegexLiteralStart(result)) {
+      const end = skipRegexLiteral(source, i);
+      if (end > i) {
+        if (offset < end) return false;
+        result += "/ /";
+        i = end;
+        continue;
+      }
+    }
+    result += ch;
+    i += 1;
+  }
+  return true;
+}
+
+function templateOffsetExecutable(source, start, offset) {
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      if (offset < i + 2) return false;
+      i += 2;
+      continue;
+    }
+    if (source[i] === "`") return offset < i + 1 ? false : null;
+    if (source[i] === "$" && source[i + 1] === "{") {
+      const expressionStart = i + 2;
+      const expression = readTemplateExpression(source, expressionStart);
+      const expressionEnd = expression.end - 1;
+      if (offset >= expressionStart && offset < expressionEnd) {
+        return isExecutableSourceOffset(expression.text, offset - expressionStart);
+      }
+      if (offset < expression.end) return false;
+      i = expression.end;
+      continue;
+    }
+    if (offset === i) return false;
+    i += 1;
+  }
+  return offset < source.length ? false : null;
 }
 
 function stripShebang(source) {
@@ -319,6 +417,16 @@ function withoutStringLiterals(source, stripRegex = true) {
       const stripped = stripTemplateLiteral(source, i, stripRegex);
       result += stripped.text;
       i = stripped.end;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "/") {
+      i = skipLineComment(source, i);
+      result += "\n";
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      i = skipBlockComment(source, i);
+      result += " ";
       continue;
     }
     if (stripRegex && ch === "/" && isRegexLiteralStart(result)) {
@@ -346,6 +454,21 @@ function skipQuoted(source, start, quote) {
     i += 1;
   }
   return i;
+}
+
+function skipLineComment(source, start) {
+  let i = start + 2;
+  while (i < source.length && !isLineTerminator(source[i])) i += 1;
+  return i;
+}
+
+function isLineTerminator(ch) {
+  return ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029";
+}
+
+function skipBlockComment(source, start) {
+  const end = source.indexOf("*/", start + 2);
+  return end === -1 ? source.length : end + 2;
 }
 
 function stripTemplateLiteral(source, start, stripRegex = true) {
@@ -382,6 +505,16 @@ function readTemplateExpression(source, start) {
     if (ch === "`") {
       i = skipTemplateLiteral(source, i);
       prefix += "``";
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "/") {
+      i = skipLineComment(source, i);
+      prefix += "\n";
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      i = skipBlockComment(source, i);
+      prefix += " ";
       continue;
     }
     if (ch === "/" && isRegexLiteralStart(prefix)) {
@@ -432,7 +565,7 @@ function isRegexLiteralStart(result) {
   if (/=>\s*$/.test(trimmed)) return true;
   if (isAfterControlStatementHead(trimmed)) return true;
   const token = trimmed.match(/([A-Za-z_$#][\w$#]*)\s*$/);
-  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "yield", "await", "instanceof", "in", "of", "do", "else", "extends", "new"].includes(token[1])) return false;
+  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "yield", "await", "instanceof", "in", "of", "do", "else", "extends", "new", "default"].includes(token[1])) return false;
   const tokenStart = token.index ?? 0;
   if (tokenStart > 0 && isIdentifierPartChar(trimmed[tokenStart - 1])) return false;
   const beforeKeyword = trimmed.slice(0, tokenStart).trimEnd();
@@ -483,6 +616,7 @@ function isForOfOperatorPrefix(prefix) {
     }
     const headPrefix = prefix.slice(i + 1);
     if (headPrefix.includes(";")) return false;
+    if (hasTopLevelOfToken(headPrefix)) return false;
     const previous = previousSignificant(prefix, prefix.length);
     if (!previous || /[\(\{\[=,:;!&|?+\-*~^<>%\/]/.test(previous.ch)) return false;
     if (["await", "delete", "in", "instanceof", "new", "typeof", "void", "yield"].includes(identifierEndingAt(prefix, previous.index))) return false;
@@ -525,6 +659,49 @@ function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
 
+function loaderScanInputs(source, artifactPath) {
+  const transformed = loaderScanSource(source, artifactPath);
+  const optimizerResistant = optimizerResistantLoaderScanSource(source, artifactPath);
+  return [...new Set([transformed, optimizerResistant])].map((loaderSource) => ({
+    loaderSource,
+    codeSource: executableCodeSource(loaderSource)
+  }));
+}
+
+function optimizerResistantLoaderScanSource(source, artifactPath) {
+  const raw = withoutOptimizerInputs(stripShebang(source));
+  if (!hasExplicitExtension(artifactPath) || PLAIN_JAVASCRIPT_ARTIFACT.test(artifactPath)) return raw;
+  return scannerForPath(artifactPath).transformSync(raw);
+}
+
+function executableCodeSource(source) {
+  return normalizeIdentifierEscapes(withoutStringLiterals(source));
+}
+
+function withoutOptimizerPragmas(source) {
+  return source.replace(/([@#])__(?:PURE|NO_SIDE_EFFECTS)__/g, "$1__WORLD_DISABLED_OPTIMIZER_PRAGMA__");
+}
+
+function withoutOptimizerInputs(source) {
+  return withoutOptimizerConstants(withoutOptimizerPragmas(source));
+}
+
+function withoutOptimizerConstants(source) {
+  return source.replace(OPTIMIZER_NODE_ENV_ACCESS, "process.env.__WORLD_NODE_ENV__");
+}
+
+function normalizeIdentifierEscapes(source) {
+  return source.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g, (match, braced, fixed) => {
+    const codePoint = Number.parseInt(braced ?? fixed, 16);
+    if (!Number.isFinite(codePoint)) return match;
+    try {
+      return String.fromCodePoint(codePoint);
+    } catch {
+      return match;
+    }
+  });
+}
+
 function isPreloadFlag(arg) {
   if (typeof arg !== "string") return false;
   return arg === "-r" || /^-r\S+/.test(arg) || PRELOAD_FLAGS.some((flag) => arg === flag || arg.startsWith(`${flag}=`));
@@ -545,9 +722,12 @@ function sidecarEntrypoint(pack) {
 }
 
 function isLocalSidecarEntrypoint(entry) {
+  const normalized = typeof entry === "string" ? normalize(entry) : "";
   return typeof entry === "string" &&
     EXECUTABLE_ARTIFACT.test(entry) &&
-    entry !== "adapter.mjs" &&
+    normalized !== "adapter.mjs" &&
+    !entry.split(/[\\/]/).includes("..") &&
+    !normalized.split(/[\\/]/).includes("..") &&
     !isAbsolute(entry) &&
     !entry.includes("://") &&
     !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(entry);
@@ -559,28 +739,89 @@ function sidecarRuntime(pack) {
 }
 
 function executableExtension(artifactPath) {
-  const match = artifactPath.match(/\.(mjs|js|cjs|ts|tsx)$/);
+  const match = artifactPath.match(/\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/);
   return match?.[0] ?? ".mjs";
 }
 
-function localImportCandidates(pack, artifactPath, specifier) {
-  const imported = normalize(join(artifactPath, "..", specifier));
-  const importBase = specifier.endsWith("/") ? normalize(join(imported, "index")) : imported;
-  assert(!hasExplicitExtension(importBase) || EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json"), `${pack.name}: local import ${specifier} uses unsupported extension`);
-  if (EXECUTABLE_ARTIFACT.test(importBase) || importBase.endsWith(".json")) return [importBase];
+function localImportExtensions(artifactPath) {
   const preferred = executableExtension(artifactPath);
-  const extensions = [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
-  return [importBase, ...extensions.map((ext) => `${importBase}${ext}`)];
+  return [preferred, ...LOCAL_IMPORT_EXTENSIONS.filter((ext) => ext !== preferred)];
+}
+
+function hasEncodedDotSegment(specifier) {
+  return specifier.split(/[\\/]/).some((segment) => encodedSegmentIsDotSegment(segment));
+}
+
+function encodedSegmentIsDotSegment(segment) {
+  if (!/%2e/i.test(segment)) return false;
+  try {
+    const decoded = decodeURIComponent(segment);
+    return decoded === "." || decoded === "..";
+  } catch {
+    return true;
+  }
+}
+
+function localImportDirectCandidates(pack, artifactPath, specifier) {
+  const imported = normalize(join(artifactPath, "..", specifier));
+  if (specifier.endsWith("/")) return [];
+  if (hasSupportedImportExtension(imported)) return [imported];
+  return [imported, ...localImportExtensions(artifactPath).map((ext) => `${imported}${ext}`)];
+}
+
+function localImportDirectoryIndexCandidates(artifactPath, specifier) {
+  const imported = normalize(join(artifactPath, "..", specifier));
+  if (!specifier.endsWith("/") && hasSupportedImportExtension(imported)) return [];
+  const indexBase = normalize(join(imported, "index"));
+  return [indexBase, ...localImportExtensions(artifactPath).map((ext) => `${indexBase}${ext}`)];
+}
+
+function localImportCandidates(pack, artifactPath, specifier) {
+  return [...new Set([
+    ...localImportDirectCandidates(pack, artifactPath, specifier),
+    ...localImportDirectoryIndexCandidates(artifactPath, specifier)
+  ])];
+}
+
+function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, artifact) {
+  return ["node", "deno"].includes(sidecarRuntimeName) && artifact.role !== "adapter";
+}
+
+function nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact) {
+  return sidecarRuntimeName === "node" && artifact.role !== "adapter" && NODE_TYPESCRIPT_ARTIFACT.test(artifact.path);
+}
+
+function nodeStripOnlyTypeScriptSyntaxSource(source) {
+  return withoutStringLiterals(stripShebang(source))
+    .replace(/\bdeclare\s+(?:const\s+)?(?:enum|namespace|module)\b/g, "declare __world_erased_type");
+}
+
+function specifierUsesRuntimeResolution(artifactPath, specifier) {
+  const imported = normalize(join(artifactPath, "..", specifier));
+  return specifier.endsWith("/") || !hasSupportedImportExtension(imported);
+}
+
+function unsupportedRuntimeImportCandidates(artifactPath, specifier) {
+  const imported = normalize(join(artifactPath, "..", specifier));
+  const candidates = [];
+  if (!specifier.endsWith("/") && !hasSupportedImportExtension(imported)) {
+    candidates.push(...UNSUPPORTED_RUNTIME_IMPORT_EXTENSIONS.map((ext) => `${imported}${ext}`));
+  }
+  if (!hasSupportedImportExtension(imported)) {
+    const indexBase = normalize(join(imported, "index"));
+    candidates.push(...UNSUPPORTED_RUNTIME_IMPORT_EXTENSIONS.map((ext) => `${indexBase}${ext}`));
+  }
+  return candidates;
 }
 
 function directoryImportPackageJsonCandidate(artifactPath, specifier) {
-  return specifier.endsWith("/") ? normalize(join(artifactPath, "..", specifier, "package.json")) : null;
+  const imported = normalize(join(artifactPath, "..", specifier));
+  return !hasSupportedImportExtension(imported) ? normalize(join(imported, "package.json")) : null;
 }
 
 async function fileExists(path) {
   try {
-    await realpath(path);
-    return true;
+    return (await stat(path)).isFile();
   } catch {
     return false;
   }
@@ -640,8 +881,10 @@ function hasComputedMemberAccess(source) {
     if (source[i] !== "[") continue;
     const previous = previousSignificant(source, i);
     if (!previous) continue;
+    if (enclosingArrayPatternContext(source, i, false, delimiterPairs)) continue;
     if (previous.ch === "." && source[previous.index - 1] === "?") return true;
     if ([")", "]", "}"].includes(previous.ch)) return true;
+    if (literalReceiverBeforeComputedAccess(source, previous)) return true;
     const identifier = identifierEndingAt(source, previous.index);
     if (!identifier) continue;
     const start = previous.index - identifier.length + 1;
@@ -652,12 +895,98 @@ function hasComputedMemberAccess(source) {
   return false;
 }
 
+function literalReceiverBeforeComputedAccess(source, previous) {
+  if (previous.ch === "\"" || previous.ch === "'" || previous.ch === "`") return true;
+  if (/[0-9]/.test(previous.ch)) return true;
+  if (previous.ch === "n" && /[0-9]/.test(source[previous.index - 1] ?? "")) return true;
+  return previous.ch === "/" && previousSignificant(source, previous.index)?.ch === "/";
+}
+
 function identifierLooksLikeForOfKeyword(source, start, delimiterPairs) {
   const parenStart = enclosingDelimiterStart(source, start, "(", ")", delimiterPairs);
   if (parenStart < 0) return false;
   const previous = previousSignificant(source, parenStart);
-  if (identifierEndingAt(source, previous?.index ?? -1) !== "for") return false;
-  return !source.slice(parenStart + 1, start).includes(";");
+  const previousWord = identifierEndingAt(source, previous?.index ?? -1);
+  if (!isForHeadPrefix(source, parenStart, previousWord)) return false;
+  const headPrefix = source.slice(parenStart + 1, start);
+  return !headPrefix.includes(";") && !hasTopLevelOfToken(headPrefix) && !hasTopLevelAssignmentToken(headPrefix);
+}
+
+function hasTopLevelOfToken(source) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+    if (braceDepth > 0 || bracketDepth > 0 || parenDepth > 0) continue;
+    if (source.slice(i, i + 2) !== "of") continue;
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + 2])) continue;
+    return true;
+  }
+  return false;
+}
+
+function hasTopLevelAssignmentToken(source) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+    if (braceDepth > 0 || bracketDepth > 0 || parenDepth > 0 || ch !== "=") continue;
+    const previous = source[i - 1] ?? "";
+    const next = source[i + 1] ?? "";
+    if (next === ">" || next === "=" || ["=", "!", "<", ">"].includes(previous)) continue;
+    return true;
+  }
+  return false;
 }
 
 function buildDelimiterPairs(source) {
@@ -934,6 +1263,8 @@ function enclosingArrayPatternContext(source, start, inheritedPattern, delimiter
   if (end < 0) return false;
   if (isSingleAssignmentAt(source, nextSignificant(source, end + 1)?.index ?? -1)) return true;
   const previous = previousSignificant(source, start);
+  const previousWord = previous ? identifierEndingAt(source, previous.index) : "";
+  if (["const", "let", "var"].includes(previousWord)) return true;
   if (previous?.ch === "(" && enclosingParameterPatternContext(source, previous.index, end, delimiterPairs)) return true;
   if (previous?.ch === "[" && enclosingArrayPatternContext(source, previous.index, inheritedPattern, delimiterPairs)) return true;
   if (previous?.ch === "." && source.slice(previous.index - 2, previous.index + 1) === "...") return spreadPatternContext(source, previous.index, end, inheritedPattern, delimiterPairs);
@@ -1044,30 +1375,38 @@ export async function verifySelfContained(pack) {
   const sidecarRuntimeName = sidecarRuntime(pack);
   const root = resolve(pack.dir);
   const adapterReal = await optionalRealpath(resolve(root, "adapter.mjs"));
-  const sidecarEntryReal = sidecarEntry && pack.manifest.artifacts.some((artifact) => artifact.path === sidecarEntry)
-    ? await realpath(await resolvePackPath(pack, sidecarEntry))
+  const sidecarEntryPath = sidecarEntry && pack.manifest.artifacts.some((artifact) => artifact.path === sidecarEntry)
+    ? await resolvePackPath(pack, sidecarEntry)
     : null;
+  const sidecarEntryReal = sidecarEntryPath ? await realpath(sidecarEntryPath) : null;
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
     const artifactReal = await realpath(full);
     const source = await readFile(full, "utf8");
-    const loaderSource = loaderScanSource(source, artifact.path);
-    const codeSource = withoutStringLiterals(loaderSource);
+    if (nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact)) {
+      const syntaxSource = nodeStripOnlyTypeScriptSyntaxSource(source);
+      for (const pattern of NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX) {
+        assert(!pattern.test(syntaxSource), `${pack.name}: Node sidecar unsupported TypeScript syntax rejected in ${artifact.path}`);
+      }
+    }
+    const scanInputs = loaderScanInputs(source, artifact.path);
     const importEntries = scanImportEntries(source, artifact.path);
     const specifiers = [...new Set(importEntries
       .map((entry) => entry.path)
       .filter((path) => typeof path === "string" && path.length > 0))];
     assert(!importEntries.some((entry) => entry.kind === "dynamic-import"), `${pack.name}: dynamic import rejected in ${artifact.path}`);
-    assert(!DYNAMIC_IMPORT.test(loaderSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
-    for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
-      assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+    for (const { loaderSource, codeSource } of scanInputs) {
+      assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+      for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
+        assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+      }
+      for (const pattern of EVAL_PATTERNS) {
+        assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+      }
+      assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+      assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     }
-    for (const pattern of EVAL_PATTERNS) {
-      assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
-    }
-    assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
-    assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
@@ -1076,6 +1415,31 @@ export async function verifySelfContained(pack) {
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
+      assert(!hasEncodedDotSegment(specifier), `${pack.name}: encoded dot segment import ${specifier} rejected`);
+      assert(
+        !sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, artifact) ||
+          !specifierUsesRuntimeResolution(artifact.path, specifier),
+        `${pack.name}: non-Bun sidecar extensionless local import ${specifier} rejected`
+      );
+      const directCandidates = localImportDirectCandidates(pack, artifact.path, specifier)
+        .map((candidate) => {
+          const resolved = resolve(root, candidate);
+          return { resolved, artifactPath: relative(root, resolved) };
+        });
+      for (const candidate of directCandidates) {
+        assert(pathInside(root, candidate.resolved), `${pack.name}: host path import ${specifier}`);
+      }
+      const importedDirect = normalize(join(artifact.path, "..", specifier));
+      if (!specifier.endsWith("/") && hasUnsupportedExactImportExtension(importedDirect)) {
+        const resolved = resolve(root, importedDirect);
+        assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
+        assert(!await fileExists(resolved), `${pack.name}: local import ${specifier} uses unsupported extension`);
+      }
+      for (const candidate of unsupportedRuntimeImportCandidates(artifact.path, specifier)) {
+        const resolved = resolve(root, candidate);
+        assert(pathInside(root, resolved), `${pack.name}: host path import ${specifier}`);
+        assert(!await fileExists(resolved), `${pack.name}: local import ${specifier} uses unsupported runtime extension`);
+      }
       const packageJsonCandidate = directoryImportPackageJsonCandidate(artifact.path, specifier);
       if (packageJsonCandidate) {
         const resolved = resolve(root, packageJsonCandidate);
@@ -1094,9 +1458,13 @@ export async function verifySelfContained(pack) {
       for (const candidate of candidates) {
         if (await fileExists(candidate.resolved)) existingCandidates.push(candidate);
       }
-      if (sidecarEntryReal && artifactReal !== sidecarEntryReal) {
+      if (sidecarEntryPath && !(await sameFilePathIdentity(full, sidecarEntryPath))) {
         for (const candidate of existingCandidates) {
-          assert(await realpath(candidate.resolved) !== sidecarEntryReal, `${pack.name}: sidecar entrypoint import rejected in ${artifact.path}`);
+          assert(
+            await realpath(candidate.resolved) !== sidecarEntryReal &&
+              !(await sameFilePathIdentity(candidate.resolved, sidecarEntryPath)),
+            `${pack.name}: sidecar entrypoint import rejected in ${artifact.path}`
+          );
         }
       }
       const coverageCandidates = existingCandidates.length > 0 ? existingCandidates : candidates;
@@ -1106,12 +1474,19 @@ export async function verifySelfContained(pack) {
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
-    assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
-    assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
-    assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
-    assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
+    for (const { codeSource } of scanInputs) {
+      assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
+      assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
+      assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
+      assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
+    }
   }
   validateSidecarCommand(pack);
+}
+
+async function sameFilePathIdentity(left, right) {
+  const [leftStat, rightStat] = await Promise.all([stat(left), stat(right)]);
+  return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino;
 }
 
 export function validateSidecarCommand(pack) {
@@ -1132,9 +1507,25 @@ export function validateSidecarCommand(pack) {
   const entry = sidecarEntrypoint(pack);
   assert(entry, `${pack.name}: sidecar entrypoint missing`);
   assert(pack.manifest.artifacts.some((artifact) => artifact.path === entry), `${pack.name}: sidecar entrypoint not artifact-bound`);
+  assert(!sidecarEntrypointAliasesAdapter(pack, entry), `${pack.name}: sidecar adapter entrypoint rejected`);
   assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);
   assert(sidecar.stderrBytes <= 8192, `${pack.name}: stderr bound too high`);
   assert(sidecar.timeoutMs > 0 && sidecar.timeoutMs <= 5000, `${pack.name}: timeout bound missing`);
+}
+
+function sidecarEntrypointAliasesAdapter(pack, entry) {
+  const root = resolve(pack.dir);
+  const adapterPath = resolve(root, "adapter.mjs");
+  const entryPath = resolve(root, entry);
+  if (!pathInside(root, entryPath)) return false;
+  try {
+    const entryStat = statSync(entryPath);
+    const adapterStat = statSync(adapterPath);
+    return realpathSync(entryPath) === realpathSync(adapterPath) ||
+      (entryStat.dev === adapterStat.dev && entryStat.ino === adapterStat.ino);
+  } catch {
+    return normalize(entry) === "adapter.mjs";
+  }
 }
 
 export function assertAdapterManifestParity(pack, adapterManifest) {

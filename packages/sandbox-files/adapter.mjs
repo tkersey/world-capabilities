@@ -66,7 +66,7 @@ function pathInside(root, candidate) {
   return rel === "" || (!!rel && rel.split(/[\\/]/, 1).join("") !== ".." && !isAbsolute(rel));
 }
 
-async function safePath(context, requested) {
+async function safePath(context, requested, options = {}) {
   if (!context?.fixtureRoot) return { ok: false, reason: "missing_allowed_root" };
   if (!requested || typeof requested !== "string") return { ok: false, reason: "missing_path" };
   if (isAbsolute(requested)) return { ok: false, reason: "absolute_path_rejected" };
@@ -89,7 +89,10 @@ async function safePath(context, requested) {
   try {
     const stat = await lstat(full);
     if (stat.isSymbolicLink()) return { ok: false, reason: "final_symlink_rejected" };
-  } catch {}
+    if (options.requireFile && !stat.isFile()) return { ok: false, reason: "file_read_target_not_file" };
+  } catch {
+    if (options.requireFile) return { ok: false, reason: "file_read_target_missing" };
+  }
   return { ok: true, full, display: relative(root, full) };
 }
 
@@ -114,7 +117,7 @@ async function preEffectReason(context, hostRequest, options = {}) {
   if (!["read", "write"].includes(hostRequest.payload?.operation)) return "unsupported_file_operation";
   if (enforceWriteAuthority && hostRequest.payload?.operation === "write" && !context?.policy?.fileWrite) return "write_policy_required";
   if (enforceWriteAuthority && hostRequest.payload?.operation === "write" && context?.policy?.approvalRequired && !context?.approval?.approved) return "approval_required";
-  const path = await safePath(context, hostRequest.payload?.path);
+  const path = await safePath(context, hostRequest.payload?.path, { requireFile: hostRequest.payload?.operation === "read" });
   if (!path.ok) return path.reason;
   return null;
 }
@@ -132,7 +135,7 @@ export async function preflight(context, hostRequest) {
 export async function resolve(context, hostRequest) {
   const reason = await preEffectReason(context, hostRequest);
   if (reason) return out(hostRequest, "rejected", reason);
-  const path = await safePath(context, hostRequest.payload.path);
+  const path = await safePath(context, hostRequest.payload.path, { requireFile: hostRequest.payload.operation === "read" });
   if (hostRequest.payload.operation === "read") {
     context.effectAttempted = (context.effectAttempted ?? 0) + 1;
     const bytes = await readFile(path.full, "utf8");

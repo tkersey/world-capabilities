@@ -107,6 +107,35 @@ test("symlink ancestors cannot escape the fixture root", async () => {
   }
 });
 
+test("missing sandbox reads fail before effects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-file-missing-read-"));
+  try {
+    const context = { fixtureRoot: root, effectAttempted: 0 };
+    const result = await resolveFile(context, fileRequest({
+      payload: { operation: "read", path: "missing.txt" }
+    }));
+    expect(result.payload.reason).toBe("file_read_target_missing");
+    expect(context.effectAttempted).toBe(0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sandbox directory reads fail before effects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-file-directory-read-"));
+  try {
+    await mkdir(join(root, "directory"));
+    const context = { fixtureRoot: root, effectAttempted: 0 };
+    const result = await resolveFile(context, fileRequest({
+      payload: { operation: "read", path: "directory" }
+    }));
+    expect(result.payload.reason).toBe("file_read_target_not_file");
+    expect(context.effectAttempted).toBe(0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("sandbox paths allow in-root dot-dot-prefixed names", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-file-dotdot-prefix-"));
   try {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadPack, verifyPack, verifySelfContained } from "../harness/pack-utils.mjs";
@@ -64,6 +64,46 @@ test("extensionless JavaScript imports resolve against covered helpers", async (
       dir,
       manifest: {
         artifacts: [{ path: "adapter.js" }, { path: "helper.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dotted extensionless imports resolve against covered helpers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-dotted-extensionless-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper.v1\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper.v1.js"), "export const helper = true;\n");
+    await verifySelfContained({
+      name: "dotted-extensionless-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper.v1.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dotted extensionless directory imports resolve against covered index candidates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-dotted-directory-index-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(join(dir, "helper.v1"), { recursive: true });
+    await writeFile(join(dir, "adapter.js"), "import { helper } from \"./helper.v1\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "helper.v1", "index.js"), "export const helper = true;\n");
+    await verifySelfContained({
+      name: "dotted-directory-index-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.js" }, { path: "helper.v1/index.js" }],
         metadata: { allowedBuiltins: [] }
       }
     });
@@ -163,6 +203,7 @@ test("directory imports resolve against covered index candidates", async () => {
     const dir = join(root, "pack");
     await mkdir(join(dir, "helper"), { recursive: true });
     await writeFile(join(dir, "adapter.mjs"), "import { helper } from \"./helper/\";\nexport const result = helper;\n");
+    await writeFile(join(dir, "adapter-no-slash.mjs"), "import { helper } from \"./helper\";\nexport const result = helper;\n");
     await writeFile(join(dir, "helper", "index.js"), "export const helper = \"unchecked\";\n");
     await writeFile(join(dir, "helper", ".js"), "export const helper = \"covered-shadow\";\n");
     await expect(verifySelfContained({
@@ -183,6 +224,15 @@ test("directory imports resolve against covered index candidates", async () => {
       }
     });
 
+    await verifySelfContained({
+      name: "directory-import-extensionless-index-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter-no-slash.mjs" }, { path: "helper/index.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+
     await writeFile(join(dir, "helper", "package.json"), "{\"main\":\"main.js\"}\n");
     await writeFile(join(dir, "helper", "main.js"), "export const helper = \"unchecked-main\";\n");
     await expect(verifySelfContained({
@@ -193,6 +243,14 @@ test("directory imports resolve against covered index candidates", async () => {
         metadata: { allowedBuiltins: [] }
       }
     })).rejects.toThrow(/package-backed directory import \.\/helper\/ rejected/);
+    await expect(verifySelfContained({
+      name: "extensionless-directory-import-package-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter-no-slash.mjs" }, { path: "helper/index.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/package-backed directory import \.\/helper rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -232,6 +290,132 @@ test("CommonJS artifacts can use covered helpers with ordinary exports", async (
         metadata: { allowedBuiltins: [] }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CommonJS extensionless requires reject package-backed directories even with covered direct candidates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-package-backed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(join(dir, "helper"), { recursive: true });
+    await writeFile(join(dir, "adapter.cjs"), "const helper = require(\"./helper\");\nmodule.exports = helper;\n");
+    await writeFile(join(dir, "helper.cjs"), "module.exports = \"covered\";\n");
+    await writeFile(join(dir, "helper", "package.json"), "{\"main\":\"main.cjs\"}\n");
+    await writeFile(join(dir, "helper", "main.cjs"), "module.exports = \"unchecked\";\n");
+    await expect(verifySelfContained({
+      name: "cjs-package-backed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }, { path: "helper.cjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/package-backed directory import \.\/helper rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CommonJS extensionless requires reject native addon candidates", async () => {
+  for (const [name, specifier, helperPath, nativePath, expectedImport] of [
+    ["direct", "./helper", "helper.cjs", "helper.node", /local import \.\/helper uses unsupported runtime extension/],
+    ["index", "./helper", "helper.cjs", "helper/index.node", /local import \.\/helper uses unsupported runtime extension/],
+    ["dotted", "./helper.v1", "helper.v1.cjs", "helper.v1.node", /local import \.\/helper\.v1 uses unsupported runtime extension/]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-cjs-native-candidate-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir, { recursive: true });
+      if (nativePath.includes("/")) {
+        await mkdir(join(dir, nativePath.split("/").slice(0, -1).join("/")), { recursive: true });
+      }
+      await writeFile(join(dir, "adapter.cjs"), `const helper = require("${specifier}");\nmodule.exports = helper;\n`);
+      await writeFile(join(dir, helperPath), "module.exports = \"covered\";\n");
+      await writeFile(join(dir, nativePath), "native fixture\n");
+      await expect(verifySelfContained({
+        name: `cjs-native-${name}-candidate-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.cjs" }, { path: helperPath }],
+          metadata: { allowedBuiltins: [] }
+        }
+      })).rejects.toThrow(expectedImport);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("non-Bun sidecars require explicit local specifiers", async () => {
+  for (const [name, artifact, source, metadata] of [
+    [
+      "node-cjs",
+      { path: "sidecar.cjs", role: "sidecar" },
+      "const helper = require(\"./helper\");\nprocess.stdout.write(String(helper));\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-esm",
+      { path: "sidecar.mjs", role: "sidecar" },
+      "import \"./helper\";\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-dotted",
+      { path: "sidecar.cjs", role: "sidecar" },
+      "const helper = require(\"./helper.v1\");\nprocess.stdout.write(String(helper));\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "deno",
+      { path: "sidecar.mjs", role: "sidecar" },
+      "import \"./helper\";\nawait Deno.stdout.write(new Uint8Array());\n",
+      { allowedBuiltins: [], sidecar: { command: ["deno", "run", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-explicit-sidecar-import-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, artifact.path), source);
+      await writeFile(join(dir, "helper.mjs"), "export default true;\n");
+      await writeFile(join(dir, "helper.cjs"), "module.exports = true;\n");
+      await expect(verifySelfContained({
+        name: `explicit-sidecar-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [artifact, { path: "helper.mjs", role: "helper" }, { path: "helper.cjs", role: "helper" }],
+          metadata
+        }
+      })).rejects.toThrow(/non-Bun sidecar extensionless local import \.\/helper(?:\.v1)? rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("non-Bun sidecars reject encoded parent-segment imports even when covered", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-encoded-parent-sidecar-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(join(dir, "%2e%2e"), { recursive: true });
+    await writeFile(join(dir, "sidecar.mjs"), "import { marker } from \"./%2e%2e/evil.mjs\";\nprocess.stdout.write(marker);\n");
+    await writeFile(join(dir, "%2e%2e", "evil.mjs"), "export const marker = \"covered\";\n");
+    await expect(verifySelfContained({
+      name: "encoded-parent-sidecar-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "sidecar.mjs", role: "sidecar" },
+          { path: "%2e%2e/evil.mjs", role: "helper" }
+        ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/encoded dot segment import \.\/%2e%2e\/evil\.mjs rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -306,6 +490,72 @@ test("require-looking string and regex literals are allowed", async () => {
       manifest: {
         artifacts: [{ path: "adapter.mjs" }],
         metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("require-looking string literals do not consume scanned CommonJS requires", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-require-literal-before-static-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.cjs"),
+      "const msg = 'require(\"node:crypto\")';\nconst crypto = require(\"node:crypto\");\nmodule.exports = Boolean(crypto.randomUUID && msg);\n"
+    );
+    await verifySelfContained({
+      name: "cjs-require-literal-before-static-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: ["node:crypto"] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("require-looking comments do not consume scanned CommonJS requires", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-require-comment-before-static-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.cjs"),
+      "//! require(\"node:crypto\")\nconst crypto = require(\"node:crypto\");\nmodule.exports = Boolean(crypto.randomUUID);\n"
+    );
+    await verifySelfContained({
+      name: "cjs-require-comment-before-static-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: ["node:crypto"] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("template-form static CommonJS requires are stripped", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-template-require-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.cjs"),
+      "const diagnostic = `require(\"node:crypto\")`;\nconst crypto = require(`node:crypto`);\nconst id = `${require(\"node:crypto\").randomUUID}`;\nmodule.exports = Boolean(crypto.randomUUID && id && diagnostic);\n"
+    );
+    await verifySelfContained({
+      name: "cjs-template-require-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: ["node:crypto"] }
       }
     });
   } finally {
@@ -523,6 +773,25 @@ test("host global names inside regex literals are allowed", async () => {
   }
 });
 
+test("host global names inside preserved comments are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-benign-global-comment-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "//! process require Function\nexport default 1;\n");
+    await verifySelfContained({
+      name: "benign-global-comment-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("host global names in executable code are still rejected after regex stripping", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-global-code-after-regex-pack-"));
   try {
@@ -713,6 +982,33 @@ test("string-literal block comment markers cannot hide forbidden process access"
   }
 });
 
+test("Unicode line separators terminate line comments before optimizer-resistant scans", async () => {
+  for (const [name, terminator] of [
+    ["line", String.fromCharCode(0x2028)],
+    ["paragraph", String.fromCharCode(0x2029)]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-unicode-line-comment-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(
+        join(dir, "adapter.mjs"),
+        `if (false) {// hide${terminator}Function("return process")();\n}\nexport default 1;\n`
+      );
+      await expect(verifySelfContained({
+        name: `unicode-line-comment-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.mjs" }],
+          metadata: { allowedBuiltins: [] }
+        }
+      })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("property names before division do not hide host globals", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-property-division-pack-"));
   try {
@@ -797,6 +1093,25 @@ test("classic for of identifier divisions do not hide host globals", async () =>
     await writeFile(join(dir, "adapter.mjs"), "const of = 1;\nfor (let x = of / process.env / 1; false; ) {}\nfor (of / process.env / 1; false; ) {}\nexport default of;\n");
     await expect(verifySelfContained({
       name: "for-of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("for-of RHS of identifiers do not hide divisions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-of-rhs-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const of = 1;\nfor (const x of of / process.env / 1 || []) {}\nexport default of;\n");
+    await expect(verifySelfContained({
+      name: "for-of-rhs-of-division-pack",
       dir,
       manifest: {
         artifacts: [{ path: "adapter.mjs" }],
@@ -1188,6 +1503,32 @@ test("computed-looking string and regex literals are allowed", async () => {
   }
 });
 
+test("computed member access on literal receivers is rejected", async () => {
+  for (const [name, source] of [
+    ["string", "const key = \"constructor\";\nexport default \"abc\"[key];\n"],
+    ["number", "const key = \"constructor\";\nexport default 0[key];\n"],
+    ["bigint", "const key = \"constructor\";\nexport default 1n[key];\n"],
+    ["regex", "const key = \"constructor\";\nexport default /abc/[key];\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-literal-receiver-computed-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "adapter.mjs"), source);
+      await expect(verifySelfContained({
+        name: `literal-receiver-${name}-computed-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.mjs" }],
+          metadata: { allowedBuiltins: [] }
+        }
+      })).rejects.toThrow(/computed member access rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("unsafe-loader-looking string and regex literals are allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-loader-literal-text-pack-"));
   try {
@@ -1473,6 +1814,25 @@ test("array literals are not treated as computed member access", async () => {
   }
 });
 
+test("array binding patterns are not treated as computed member access", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-array-binding-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const tuple = [1, 2];\nconst [first] = tuple;\nlet total = first;\nfor (const [row] of [[2]]) total += row;\nexport default total;\n");
+    await verifySelfContained({
+      name: "array-binding-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("contextual of computed member access is rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-contextual-of-computed-pack-"));
   try {
@@ -1487,6 +1847,63 @@ test("contextual of computed member access is rejected", async () => {
         metadata: { allowedBuiltins: [] }
       }
     })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("classic for initializer of computed member access is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-initializer-of-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nconst of = function() {};\nfor (let x = of[key](\"return process\")(); false;) {}\nexport default true;\n");
+    await expect(verifySelfContained({
+      name: "for-initializer-of-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("for-of RHS of computed member access is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-of-rhs-of-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"safe\";\nconst of = { safe: [] };\nfor (const value of of[key]) {}\nexport default true;\n");
+    await expect(verifySelfContained({
+      name: "for-of-rhs-of-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("for-await RHS array literals are not treated as computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-await-array-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "let value = 0;\nfor await (const item of [Promise.resolve(1)]) value += item;\nexport default value;\n");
+    await verifySelfContained({
+      name: "for-await-array-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -1741,6 +2158,151 @@ test("process loader aliases are rejected while stdout sidecar remains allowed",
   }
 });
 
+test("bare global object recovery is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-bare-global-recovery-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.mjs"),
+      "const descriptors = Object.values(Object.getOwnPropertyDescriptors(globalThis));\nexport default descriptors.find((d) => d.get?.()?.versions?.node || d.value?.versions?.node);\n"
+    );
+    await expect(verifySelfContained({
+      name: "bare-global-recovery-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("plural descriptor Function recovery is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-plural-descriptor-function-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.mjs"),
+      "const descriptors = Object.values(Object.getOwnPropertyDescriptors(function(){}.__proto__));\nconst F = descriptors.find((descriptor) => descriptor.value?.name === \"Function\").value;\nexport default F(\"return process\")();\n"
+    );
+    await expect(verifySelfContained({
+      name: "plural-descriptor-function-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CJS with-scope Function recovery is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-with-constructor-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.cjs"),
+      "with (function(){}.__proto__) {\n  module.exports = constructor(\"return process\")();\n}\n"
+    );
+    await expect(verifySelfContained({
+      name: "cjs-with-constructor-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("security scans reject optimizer-folded environment branches", async () => {
+  for (const [name, artifact, source, metadata] of [
+    [
+      "adapter",
+      { path: "adapter.mjs", role: "adapter" },
+      "if (process.env.NODE_ENV === \"production\") Function(\"return process\")().exit(7);\nexport default true;\n",
+      { allowedBuiltins: [] }
+    ],
+    [
+      "node-sidecar",
+      { path: "sidecar.mts", role: "sidecar" },
+      "type Handler = Function;\nif (process.env.NODE_ENV === \"production\") Function(\"return process\")().exit(7);\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-sidecar-bracket-env",
+      { path: "sidecar.mts", role: "sidecar" },
+      "type Handler = Function;\nif (process['env'].NODE_ENV === \"production\") Function(\"return process\")().exit(7);\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-sidecar-bracket-node-env",
+      { path: "sidecar.mts", role: "sidecar" },
+      "type Handler = Function;\nif (process.env[\"NODE_ENV\"] === \"production\") Function(\"return process\")().exit(7);\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-optimizer-env-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, artifact.path), source);
+      await expect(verifySelfContained({
+        name: `optimizer-env-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [artifact],
+          metadata
+        }
+      })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("template expression comments cannot hide optimizer-erased sidecar loaders", async () => {
+  for (const [name, comment] of [
+    ["line-comment", "// }}\n"],
+    ["block-comment", "/* }} */\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-template-comment-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "sidecar.mjs"), [
+        `const value = \`${"${"}(() => { ${comment}`,
+        "/* @__PURE__ */ Function(\"return process\")().exit(7);",
+        "return \"ok\";",
+        "})()}`;",
+        "process.stdout.write(value);"
+      ].join("\n"));
+      await expect(verifySelfContained({
+        name: `sidecar-template-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("process output is allowed only for sidecar artifacts", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-process-stdout-pack-"));
   try {
@@ -1804,6 +2366,237 @@ test("Bun and global host aliases are rejected outside sidecar stdin", async () 
         }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun sidecar scans reject optimizer-erased calls", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-optimizer-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "/* @__PURE__ */ process.exit(7);\n");
+    await expect(verifySelfContained({
+      name: "sidecar-optimizer-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun TypeScript sidecar type-only syntax is ignored by raw scans", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-type-only-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "sidecar.mts"),
+      "import type { Stats as FsStats } from \"node:fs\";\nexport type { Stats } from \"node:fs\";\ntype Handler = Function;\ntype ReadStats = import(\"node:fs\").Stats | FsStats;\nprocess.stdout.write(\"ok\");\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-type-only-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun TypeScript sidecar multiline type aliases are ignored by raw scans", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-multiline-type-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "sidecar.mts"),
+      "type Handler = {\n  run: () => Function;\n  stats: import(\"node:fs\").Stats;\n};\nprocess.stdout.write(\"ok\");\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-multiline-type-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun TypeScript sidecar erased annotations are ignored by raw scans", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-erased-annotations-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "sidecar.mts"),
+      "function inspect(cb: Function): import(\"node:fs\").Stats | undefined {\n  void cb;\n  return undefined;\n}\nconst cast = ({}) as import(\"node:fs\").Stats;\nconst ok = cast satisfies import(\"node:fs\").Stats;\nvoid ok;\nprocess.stdout.write(\"ok\");\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-erased-annotations-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Node TypeScript sidecar syntax checks ignore inert and erased text", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-inert-syntax-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "sidecar.mts"),
+      [
+        "declare const enum E { A }",
+        "declare namespace Host { type File = string }",
+        "import type File = Host.File;",
+        "const text = \"enum Foo\";",
+        "const pattern = /namespace Bar|constructor(public x: number)|import Foo = Bar.Baz/;",
+        "// module Hidden { export const x = 1 }",
+        "void pattern;",
+        "process.stdout.write(text);"
+      ].join("\n")
+    );
+    await verifySelfContained({
+      name: "sidecar-node-ts-inert-syntax-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Node TypeScript sidecars reject transform-only syntax", async () => {
+  for (const [name, source] of [
+    ["parameter-property", "class Box { constructor(public x: number) {} }\nprocess.stdout.write(\"ok\");\n"],
+    ["enum", "enum E { A }\nprocess.stdout.write(\"ok\");\n"],
+    ["namespace", "namespace N { export const x = 1 }\nprocess.stdout.write(\"ok\");\n"],
+    ["import-equals", "import Foo = require(\"node:fs\");\nprocess.stdout.write(\"ok\");\n"],
+    ["decorator", "function deco(value: unknown) { return value; }\n@deco\nclass Box {}\nprocess.stdout.write(\"ok\");\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-transform-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "sidecar.mts"), source);
+      await expect(verifySelfContained({
+        name: `sidecar-node-ts-transform-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/Node sidecar unsupported TypeScript syntax rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("non-Bun TypeScript sidecar scans still reject optimizer-erased runtime calls", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-ts-optimizer-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mts"), "type Handler = Function;\n/* @__PURE__ */ process.exit(7);\n");
+    await expect(verifySelfContained({
+      name: "sidecar-ts-optimizer-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun sidecar raw scans normalize escaped runtime identifiers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-escaped-runtime-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "/* @__PURE__ */ pro\\u0063ess.exit(7);\n");
+    await expect(verifySelfContained({
+      name: "sidecar-escaped-runtime-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("non-Bun sidecar helper scans reject optimizer-erased calls", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-helper-optimizer-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "import \"./helper.mjs\";\n");
+    await writeFile(join(dir, "helper.mjs"), "/* @__PURE__ */ process.getBuiltinModule(\"node:fs\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-helper-optimizer-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "sidecar.mjs", role: "sidecar" },
+          { path: "helper.mjs", role: "helper" }
+        ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -1973,6 +2766,34 @@ test("adapter imports cannot execute sidecar entrypoints in-process", async () =
       dir,
       manifest: {
         artifacts: [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/sidecar entrypoint import rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("adapter imports cannot execute hard-linked sidecar entrypoints in-process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-hardlink-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import \"./sidecar-link.mjs\";\nexport const manifest = () => ({});\n");
+    await writeFile(join(dir, "sidecar.mjs"), "process.stdout.write(\"sidecar only\");\n");
+    await link(join(dir, "sidecar.mjs"), join(dir, "sidecar-link.mjs"));
+    await expect(verifySelfContained({
+      name: "sidecar-hardlink-import-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "adapter.mjs", role: "adapter" },
+          { path: "sidecar.mjs", role: "sidecar" },
+          { path: "sidecar-link.mjs", role: "helper" }
+        ],
         metadata: {
           allowedBuiltins: [],
           sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
