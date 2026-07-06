@@ -389,6 +389,44 @@ test("descriptor-based Function recovery is rejected", async () => {
   }
 });
 
+test("aliased reflective Function recovery is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-aliased-reflective-function-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const { getOwnPropertyDescriptor, getPrototypeOf } = Object;\nconst R = Reflect;\nconst F = getOwnPropertyDescriptor(getPrototypeOf(function(){}), \"constructor\").value;\nexport default R.get({ F }, \"F\")(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "aliased-reflective-function-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("literal constructor destructuring is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-constructor-destructure-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const { constructor: F } = function() {};\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "constructor-destructure-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("benign constructor methods and global names are allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-benign-loader-words-pack-"));
   try {

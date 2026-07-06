@@ -84,6 +84,8 @@ const EVAL_PATTERNS = [
   /\+\s*["'][^"']*["']\s*\]/,
   /\bObject\s*(?:\.|\?\.)\s*getOwnPropertyDescriptor\b/,
   /\bObject\s*(?:\.|\?\.)\s*getPrototypeOf\b/,
+  /\b(?:getOwnPropertyDescriptor|getPrototypeOf)\b/,
+  /\bReflect\b/,
   /\bReflect\s*(?:\.|\[)/,
   /\bglobalThis\s*(?:\.|\[)/,
   /\bglobal\s*(?:\.|\[)/,
@@ -692,6 +694,17 @@ function objectBodyHasComputedKey(source, start, end, delimiterPairs) {
       if ((previous?.ch === "{" || previous?.ch === ",") && next?.ch === ":") return true;
       i = close + 1;
       continue;
+    }
+    if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      const identifier = identifierStartingAt(source, i);
+      if (identifier === "constructor") {
+        const next = nextSignificant(source, i + identifier.length, end);
+        if (next?.ch === ":") return true;
+      }
+      if (identifier) {
+        i += identifier.length;
+        continue;
+      }
     }
     if (ch === "[") {
       bracketDepth += 1;
