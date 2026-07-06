@@ -1907,6 +1907,41 @@ test("sidecar IO allowance cannot apply to the adapter artifact", async () => {
   }
 });
 
+test("sidecar IO allowance rejects adapter path aliases", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-adapter-alias-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "process.stdout.write(\"not a sidecar\");\nexport const manifest = () => ({});\n");
+    await expect(verifySelfContained({
+      name: "sidecar-adapter-dot-entrypoint-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "./adapter.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "./adapter.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
+
+    await symlink(join(dir, "adapter.mjs"), join(dir, "adapter-link.mjs"));
+    await expect(verifySelfContained({
+      name: "sidecar-adapter-symlink-entrypoint-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter-link.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "adapter-link.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("sidecar command entrypoint follows the executable artifact extension set", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-extension-pack-"));
   try {

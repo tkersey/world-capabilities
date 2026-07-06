@@ -586,6 +586,15 @@ async function fileExists(path) {
   }
 }
 
+async function optionalRealpath(path) {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function withoutAllowedProcessAccess(source, allowSidecarIo) {
   if (allowSidecarIo) {
     return source
@@ -1008,6 +1017,10 @@ export async function verifySelfContained(pack) {
   const sidecarEntry = sidecarEntrypoint(pack);
   const sidecarRuntimeName = sidecarRuntime(pack);
   const root = resolve(pack.dir);
+  const adapterReal = await optionalRealpath(resolve(root, "adapter.mjs"));
+  const sidecarEntryReal = sidecarEntry && pack.manifest.artifacts.some((artifact) => artifact.path === sidecarEntry)
+    ? await realpath(await resolvePackPath(pack, sidecarEntry))
+    : null;
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
@@ -1057,7 +1070,7 @@ export async function verifySelfContained(pack) {
       const coverageCandidates = existingCandidates.length > 0 ? existingCandidates : candidates;
       assert(coverageCandidates.every((candidate) => covered.has(candidate.artifactPath)), `${pack.name}: local import ${specifier} not checksum-covered`);
     }
-    const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry;
+    const allowSidecarIo = artifact.role === "sidecar" && artifact.path === sidecarEntry && (!adapterReal || sidecarEntryReal !== adapterReal);
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
