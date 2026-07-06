@@ -1017,6 +1017,25 @@ test("regex defaults with computed-looking text do not create computed patterns"
   }
 });
 
+test("computed-looking string and regex literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-computed-literal-text-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const text = \"object[key]\";\nconst regex = /name[abc]/;\nexport default regex.test(text);\n");
+    await verifySelfContained({
+      name: "computed-literal-text-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assignment destructured computed members are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
   try {

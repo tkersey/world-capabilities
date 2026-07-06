@@ -1004,7 +1004,7 @@ export async function verifySelfContained(pack) {
       assert(!pattern.test(loaderSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }
     assert(!ANY_COMMONJS_REQUIRE.test(stripScannedRequireCalls(loaderSource, importEntries)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
-    assert(!COMPUTED_MEMBER_ACCESS.test(loaderSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+    assert(!COMPUTED_MEMBER_ACCESS.test(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
