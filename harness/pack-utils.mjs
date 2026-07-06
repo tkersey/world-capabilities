@@ -545,6 +545,7 @@ function sidecarEntrypoint(pack) {
 function isLocalSidecarEntrypoint(entry) {
   return typeof entry === "string" &&
     EXECUTABLE_ARTIFACT.test(entry) &&
+    entry !== "adapter.mjs" &&
     !isAbsolute(entry) &&
     !entry.includes("://") &&
     !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(entry);

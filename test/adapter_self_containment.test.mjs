@@ -1809,6 +1809,28 @@ test("sidecar IO allowance is bound to the declared entrypoint", async () => {
   }
 });
 
+test("sidecar IO allowance cannot apply to the adapter artifact", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-adapter-entrypoint-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "process.stdout.write(\"not a sidecar\");\nexport const manifest = () => ({});\n");
+    await expect(verifySelfContained({
+      name: "sidecar-adapter-entrypoint-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["bun", "adapter.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/process access rejected|sidecar entrypoint missing/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("sidecar command entrypoint follows the executable artifact extension set", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-extension-pack-"));
   try {
