@@ -698,8 +698,9 @@ function objectBodyHasComputedKey(source, start, end, delimiterPairs) {
     if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
       const identifier = identifierStartingAt(source, i);
       if (identifier === "constructor") {
+        const previous = previousSignificant(source, i, start - 1);
         const next = nextSignificant(source, i + identifier.length, end);
-        if (next?.ch === ":") return true;
+        if ((previous?.ch === "{" || previous?.ch === ",") && (!next || [":", ",", "="].includes(next.ch))) return true;
       }
       if (identifier) {
         i += identifier.length;

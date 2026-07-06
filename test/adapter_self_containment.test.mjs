@@ -427,6 +427,44 @@ test("literal constructor destructuring is rejected", async () => {
   }
 });
 
+test("shorthand constructor destructuring is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-shorthand-constructor-destructure-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const { constructor } = function() {};\nexport default constructor(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "shorthand-constructor-destructure-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("default constructor destructuring is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-default-constructor-destructure-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const { constructor = function noop() {} } = function() {};\nexport default constructor(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "default-constructor-destructure-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("benign constructor methods and global names are allowed", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-benign-loader-words-pack-"));
   try {
