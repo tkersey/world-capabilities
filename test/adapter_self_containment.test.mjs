@@ -1459,7 +1459,7 @@ test("array literals are not treated as computed member access", async () => {
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "export const matrix = [[1], [2]];\n");
+    await writeFile(join(dir, "adapter.mjs"), "export const matrix = [[1], [2]];\nexport function values() {\n  for (const value of []) if (value) return [];\n  return [];\n}\n");
     await verifySelfContained({
       name: "array-literal-pack",
       dir,
@@ -1468,6 +1468,25 @@ test("array literals are not treated as computed member access", async () => {
         metadata: { allowedBuiltins: [] }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("contextual of computed member access is rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-contextual-of-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"safe\";\nconst of = { safe: true };\nexport default of[key];\n");
+    await expect(verifySelfContained({
+      name: "contextual-of-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

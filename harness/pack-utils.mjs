@@ -111,7 +111,7 @@ const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
-const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|(?:[#A-Za-z_$\u0080-\uFFFF][\w$#\u0080-\uFFFF]*|\)|\]|\})\s*\[)/;
+const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "yield", "await", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
@@ -634,6 +634,32 @@ function hasComputedObjectPattern(source, start = 0, end = source.length, inheri
   return false;
 }
 
+function hasComputedMemberAccess(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  for (let i = 0; i < source.length; i += 1) {
+    if (source[i] !== "[") continue;
+    const previous = previousSignificant(source, i);
+    if (!previous) continue;
+    if (previous.ch === "." && source[previous.index - 1] === "?") return true;
+    if ([")", "]", "}"].includes(previous.ch)) return true;
+    const identifier = identifierEndingAt(source, previous.index);
+    if (!identifier) continue;
+    const start = previous.index - identifier.length + 1;
+    if (ARRAY_LITERAL_PREFIX_KEYWORDS.has(identifier)) continue;
+    if (identifier === "of" && identifierLooksLikeForOfKeyword(source, start, delimiterPairs)) continue;
+    return true;
+  }
+  return false;
+}
+
+function identifierLooksLikeForOfKeyword(source, start, delimiterPairs) {
+  const parenStart = enclosingDelimiterStart(source, start, "(", ")", delimiterPairs);
+  if (parenStart < 0) return false;
+  const previous = previousSignificant(source, parenStart);
+  if (identifierEndingAt(source, previous?.index ?? -1) !== "for") return false;
+  return !source.slice(parenStart + 1, start).includes(";");
+}
+
 function buildDelimiterPairs(source) {
   const stacks = new Map([
     ["{", []],
@@ -1040,7 +1066,7 @@ export async function verifySelfContained(pack) {
       assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }
     assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
-    assert(!COMPUTED_MEMBER_ACCESS.test(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+    assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
