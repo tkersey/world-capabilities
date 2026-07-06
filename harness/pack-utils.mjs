@@ -539,7 +539,15 @@ function sidecarEntrypoint(pack) {
   const [runtime, ...args] = command;
   assert(!args.some(isSidecarOptionArg), `${pack.name}: sidecar option argument rejected`);
   const entry = runtime === "deno" && args[0] === "run" ? args[1] : args[0];
-  return typeof entry === "string" && EXECUTABLE_ARTIFACT.test(entry) ? entry : null;
+  return isLocalSidecarEntrypoint(entry) ? entry : null;
+}
+
+function isLocalSidecarEntrypoint(entry) {
+  return typeof entry === "string" &&
+    EXECUTABLE_ARTIFACT.test(entry) &&
+    !isAbsolute(entry) &&
+    !entry.includes("://") &&
+    !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(entry);
 }
 
 function sidecarRuntime(pack) {
@@ -1038,7 +1046,7 @@ export async function verifySelfContained(pack) {
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
-    assert(!COMMONJS_MODULE_LOADER.test(loaderSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
+    assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
     assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
     assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
     assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);

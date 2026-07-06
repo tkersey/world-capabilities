@@ -504,6 +504,25 @@ test("CommonJS module loader aliases are rejected", async () => {
   }
 });
 
+test("CommonJS module-loader-looking string and regex literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-cjs-module-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.cjs"), "const msg = \"module.constructor\";\nconst regex = /module.constructor/;\nmodule.exports = regex.test(msg);\n");
+    await verifySelfContained({
+      name: "cjs-module-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("literal CommonJS requires still honor allowed builtins", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-literal-cjs-pack-"));
   try {
