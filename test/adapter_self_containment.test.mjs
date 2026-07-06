@@ -561,6 +561,25 @@ test("code execution builtins are rejected even when allowlisted", async () => {
   }
 });
 
+test("process builtin aliases are rejected even when allowlisted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-process-builtin-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import { getBuiltinModule } from \"node:process\";\nexport default getBuiltinModule(\"node:child_process\");\n");
+    await expect(verifySelfContained({
+      name: "process-builtin-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: ["node:process"] }
+      }
+    })).rejects.toThrow(/loader builtin node:process rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("process spawning builtins are rejected even when allowlisted", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-process-spawn-builtin-pack-"));
   try {

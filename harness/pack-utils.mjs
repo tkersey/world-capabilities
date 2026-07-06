@@ -114,7 +114,7 @@ const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
 const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
-const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module"]);
+const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module", "node:process"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
 const IMPORT_SCANNERS = {
   cjs: new Bun.Transpiler({ loader: "js" }),
