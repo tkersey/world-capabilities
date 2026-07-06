@@ -109,7 +109,7 @@ const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)
 const PROCESS_ACCESS = /\bprocess\b/;
 const BUN_ACCESS = /\bBun\b/;
 const DENO_ACCESS = /\bDeno\b/;
-const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|\{\s*[^}\n]*\[[^\]]+\]\s*:|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
+const COMPUTED_MEMBER_ACCESS = /(?:\?\.\s*\[|(?:\b[A-Za-z_$][\w$]*|\)|\]|\})\s*\[)/;
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
@@ -304,7 +304,7 @@ function stripShebang(source) {
   return source.startsWith("#!") ? source.replace(/^#![^\r\n]*(?:\r?\n|$)/, "") : source;
 }
 
-function withoutStringLiterals(source) {
+function withoutStringLiterals(source, stripRegex = true) {
   let result = "";
   for (let i = 0; i < source.length;) {
     const ch = source[i];
@@ -314,12 +314,12 @@ function withoutStringLiterals(source) {
       continue;
     }
     if (ch === "`") {
-      const stripped = stripTemplateLiteral(source, i);
+      const stripped = stripTemplateLiteral(source, i, stripRegex);
       result += stripped.text;
       i = stripped.end;
       continue;
     }
-    if (ch === "/" && isRegexLiteralStart(result)) {
+    if (stripRegex && ch === "/" && isRegexLiteralStart(result)) {
       const end = skipRegexLiteral(source, i);
       if (end > i) {
         result += "/ /";
@@ -346,7 +346,7 @@ function skipQuoted(source, start, quote) {
   return i;
 }
 
-function stripTemplateLiteral(source, start) {
+function stripTemplateLiteral(source, start, stripRegex = true) {
   let result = "`";
   let i = start + 1;
   while (i < source.length) {
@@ -357,7 +357,7 @@ function stripTemplateLiteral(source, start) {
     if (source[i] === "`") return { text: `${result}\``, end: i + 1 };
     if (source[i] === "$" && source[i + 1] === "{") {
       const expression = readTemplateExpression(source, i + 2);
-      result += `\${${withoutStringLiterals(expression.text)}}`;
+      result += `\${${withoutStringLiterals(expression.text, stripRegex)}}`;
       i = expression.end;
       continue;
     }
@@ -369,21 +369,37 @@ function stripTemplateLiteral(source, start) {
 function readTemplateExpression(source, start) {
   let depth = 1;
   let i = start;
+  let prefix = "";
   while (i < source.length) {
     const ch = source[i];
     if (ch === "\"" || ch === "'") {
       i = skipQuoted(source, i, ch);
+      prefix += "\"\"";
       continue;
     }
     if (ch === "`") {
       i = skipTemplateLiteral(source, i);
+      prefix += "``";
       continue;
     }
-    if (ch === "{") depth += 1;
+    if (ch === "/" && isRegexLiteralStart(prefix)) {
+      const end = skipRegexLiteral(source, i);
+      if (end > i) {
+        prefix += "/ /";
+        i = end;
+        continue;
+      }
+    }
+    if (ch === "{") {
+      depth += 1;
+      prefix += ch;
+    }
     if (ch === "}") {
       depth -= 1;
       if (depth === 0) return { text: source.slice(start, i), end: i + 1 };
+      prefix += ch;
     }
+    if (ch !== "{" && ch !== "}") prefix += ch;
     i += 1;
   }
   return { text: source.slice(start), end: i };
@@ -409,8 +425,68 @@ function skipTemplateLiteral(source, start) {
 function isRegexLiteralStart(result) {
   const trimmed = result.trimEnd();
   if (!trimmed) return true;
+  if (/\+\+$|--$/.test(trimmed)) return false;
   if (/[\(\{\[=,:;!&|?+\-*~^<>%]$/.test(trimmed)) return true;
-  return /(?:=>|\b(?:return|throw|case|delete|void|typeof|yield|await))\s*$/.test(trimmed);
+  if (/=>\s*$/.test(trimmed)) return true;
+  if (isAfterControlStatementHead(trimmed)) return true;
+  const token = trimmed.match(/([A-Za-z_$#][\w$#]*)\s*$/);
+  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "yield", "await", "instanceof", "in", "of", "do", "else", "extends", "new"].includes(token[1])) return false;
+  const tokenStart = token.index ?? 0;
+  if (tokenStart > 0 && isIdentifierPartChar(trimmed[tokenStart - 1])) return false;
+  const beforeKeyword = trimmed.slice(0, tokenStart).trimEnd();
+  if (beforeKeyword.endsWith(".")) return false;
+  return token[1] !== "of" || isForOfOperatorPrefix(beforeKeyword);
+}
+
+function isAfterControlStatementHead(prefix) {
+  if (!prefix.endsWith(")")) return false;
+  let depth = 0;
+  for (let i = prefix.length - 1; i >= 0; i -= 1) {
+    if (prefix[i] === ")") {
+      depth += 1;
+      continue;
+    }
+    if (prefix[i] !== "(") continue;
+    depth -= 1;
+    if (depth > 0) continue;
+    const head = prefix.slice(0, i).trimEnd();
+    const token = head.match(/([A-Za-z_$#][\w$#]*)$/);
+    if (!token || !["if", "while", "for", "with"].includes(token[1])) return false;
+    const tokenStart = token.index ?? 0;
+    if (tokenStart > 0 && isIdentifierPartChar(head[tokenStart - 1])) return false;
+    return head[tokenStart - 1] !== ".";
+  }
+  return false;
+}
+
+function isIdentifierPartChar(ch) {
+  return !!ch && (/[\w$#]/.test(ch) || ch.charCodeAt(0) > 127);
+}
+
+function isIdentifierStartChar(ch) {
+  return !!ch && (/[A-Za-z_$#]/.test(ch) || ch.charCodeAt(0) > 127);
+}
+
+function isForOfOperatorPrefix(prefix) {
+  let depth = 0;
+  for (let i = prefix.length - 1; i >= 0; i -= 1) {
+    if (prefix[i] === ")") {
+      depth += 1;
+      continue;
+    }
+    if (prefix[i] !== "(") continue;
+    if (depth > 0) {
+      depth -= 1;
+      continue;
+    }
+    const headPrefix = prefix.slice(i + 1);
+    if (headPrefix.includes(";")) return false;
+    const previous = previousSignificant(prefix, prefix.length);
+    if (!previous || /[\(\{\[=,:;!&|?+\-*~^<>%\/]/.test(previous.ch)) return false;
+    if (["await", "delete", "in", "instanceof", "new", "typeof", "void", "yield"].includes(identifierEndingAt(prefix, previous.index))) return false;
+    return /\bfor(?:\s+await)?$/.test(prefix.slice(0, i).trimEnd());
+  }
+  return false;
 }
 
 function skipRegexLiteral(source, start) {
@@ -522,6 +598,387 @@ function withoutAllowedDenoAccess(source, allowSidecarIo) {
   return source;
 }
 
+function hasComputedObjectPattern(source, start = 0, end = source.length, inheritedPattern = false) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  const stack = [];
+  for (let i = start; i < end; i += 1) {
+    while (stack.length > 0 && i > stack[stack.length - 1].close) stack.pop();
+    if (source[i] !== "{") continue;
+    const close = findMatchingDelimiter(source, i, "{", "}", delimiterPairs);
+    if (close < 0 || close > end) continue;
+    const parentPattern = stack.length > 0 ? stack[stack.length - 1].objectPattern : inheritedPattern;
+    const objectPattern = isObjectPatternContext(source, i, close, parentPattern, delimiterPairs);
+    if (objectPattern && objectBodyHasComputedKey(source, i + 1, close, delimiterPairs)) return true;
+    stack.push({ close, objectPattern });
+  }
+  return false;
+}
+
+function buildDelimiterPairs(source) {
+  const stacks = new Map([
+    ["{", []],
+    ["[", []],
+    ["(", []]
+  ]);
+  const closeToOpen = new Map([
+    ["}", "{"],
+    ["]", "["],
+    [")", "("]
+  ]);
+  const pairs = new Map();
+  const enclosingStarts = new Map([
+    ["[", new Int32Array(source.length).fill(-1)],
+    ["(", new Int32Array(source.length).fill(-1)]
+  ]);
+  for (let i = 0; i < source.length; i += 1) {
+    for (const [open, starts] of enclosingStarts) {
+      const stack = stacks.get(open) ?? [];
+      starts[i] = stack.at(-1) ?? -1;
+    }
+    const openStack = stacks.get(source[i]);
+    if (openStack) {
+      openStack.push(i);
+      continue;
+    }
+    const open = closeToOpen.get(source[i]);
+    if (!open) continue;
+    const start = stacks.get(open)?.pop();
+    if (start !== undefined) pairs.set(start, i);
+  }
+  pairs.enclosingStarts = enclosingStarts;
+  return pairs;
+}
+
+function objectBodyHasComputedKey(source, start, end, delimiterPairs) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = start; i < end;) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      i += 1;
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      i += 1;
+      continue;
+    }
+    if (ch === "[" && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      const previous = previousSignificant(source, i, start - 1);
+      const close = findMatchingDelimiter(source, i, "[", "]", delimiterPairs);
+      if (close < 0 || close > end) return false;
+      const next = nextSignificant(source, close + 1, end);
+      if ((previous?.ch === "{" || previous?.ch === ",") && next?.ch === ":") return true;
+      i = close + 1;
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      i += 1;
+      continue;
+    }
+    i += 1;
+  }
+  return false;
+}
+
+function isObjectPatternContext(source, start, end, inheritedPattern, delimiterPairs) {
+  if (isSingleAssignmentAt(source, nextSignificant(source, end + 1)?.index ?? -1)) return true;
+  const previous = previousSignificant(source, start);
+  if (!previous) return false;
+  if (previous.ch === "(") return enclosingParameterPatternContext(source, previous.index, end, delimiterPairs);
+  if (previous.ch === "[") return enclosingArrayPatternContext(source, previous.index, inheritedPattern, delimiterPairs);
+  if (previous.ch === "." && source.slice(previous.index - 2, previous.index + 1) === "...") return spreadPatternContext(source, previous.index, end, inheritedPattern, delimiterPairs);
+  if (previous.ch === ",") return commaPatternContext(source, previous.index, end, inheritedPattern, delimiterPairs);
+  if (inheritedPattern && (previous.ch === "{" || previous.ch === "," || (previous.ch === ":" && colonLooksLikePatternProperty(source, previous.index)))) return true;
+  return ["const", "let", "var"].includes(identifierEndingAt(source, previous.index));
+}
+
+function enclosingParameterPatternContext(source, start, objectEnd, delimiterPairs) {
+  const end = findMatchingDelimiter(source, start, "(", ")", delimiterPairs);
+  if (end < 0) return false;
+  const next = nextSignificant(source, end + 1);
+  if (next && source.slice(next.index, next.index + 2) === "=>") return true;
+  const previous = previousSignificant(source, start);
+  const previousWord = previous ? identifierEndingAt(source, previous.index) : "";
+  if (next?.ch === "{" && keywordNamedMethodContext(source, previous, previousWord, delimiterPairs)) return true;
+  if (isForHeadPrefix(source, start, previousWord)) {
+    if (["of", "in"].includes(identifierStartingAt(source, nextSignificant(source, objectEnd + 1)?.index ?? -1))) return true;
+    return false;
+  }
+  if (previousWord === "catch") return true;
+  if (["if", "while", "switch", "with"].includes(previousWord)) return false;
+  if (next?.ch === "{" && isFunctionParameterPrefix(source, start)) return true;
+  if (next?.ch === "{" && isExtendsExpressionContext(source, start)) return false;
+  return next?.ch === "{";
+}
+
+function isForHeadPrefix(source, parenStart, previousWord) {
+  return previousWord === "for" || (previousWord === "await" && /\bfor\s+await\s*$/.test(source.slice(0, parenStart)));
+}
+
+function isExtendsExpressionContext(source, parenStart) {
+  const prefix = source.slice(0, parenStart);
+  const extendsIndex = lastKeywordIndex(prefix, "extends");
+  if (extendsIndex < 0) return false;
+  return heritageExpressionContinues(source, extendsIndex + "extends".length, parenStart);
+}
+
+function heritageExpressionContinues(source, start, end) {
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+  for (let i = start; i < end; i += 1) {
+    const ch = source[i];
+    if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "{" && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+      const bodyEnd = heritageExpressionBodyEnd(source, start, i);
+      if (bodyEnd >= 0) {
+        i = bodyEnd;
+        continue;
+      }
+      return false;
+    }
+    else if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === ";" && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) return false;
+  }
+  return true;
+}
+
+function heritageExpressionBodyEnd(source, heritageStart, braceIndex) {
+  if (!braceStartsFunctionExpressionBody(source, braceIndex) && !braceStartsClassExpressionBody(source, heritageStart, braceIndex)) return -1;
+  return findMatchingDelimiter(source, braceIndex, "{", "}");
+}
+
+function braceStartsFunctionExpressionBody(source, braceIndex) {
+  const previous = previousSignificant(source, braceIndex);
+  if (previous?.ch !== ")") return false;
+  const paramsStart = findOpeningDelimiter(source, previous.index, "(", ")");
+  return paramsStart >= 0 && isFunctionParameterPrefix(source, paramsStart);
+}
+
+function braceStartsClassExpressionBody(source, heritageStart, braceIndex) {
+  return lastKeywordIndex(source.slice(heritageStart, braceIndex), "class") >= 0;
+}
+
+function isFunctionParameterPrefix(source, parenStart) {
+  const prefix = source.slice(0, parenStart).trimEnd();
+  if (/\bfunction\s*\*?\s*$/.test(prefix)) return true;
+  const name = identifierEndingAt(prefix, prefix.length - 1);
+  if (!name) return false;
+  return /\bfunction\s*\*?\s*$/.test(prefix.slice(0, -name.length).trimEnd());
+}
+
+function colonLooksLikePatternProperty(source, colonIndex) {
+  for (let i = colonIndex - 1; i >= 0; i -= 1) {
+    const ch = source[i];
+    if (ch === "?") return false;
+    if (ch === "=") return false;
+    if (ch === "{" || ch === ",") return true;
+    if (ch === ";" || ch === "(" || ch === "[") return false;
+  }
+  return false;
+}
+
+function keywordNamedMethodContext(source, previous, previousWord, delimiterPairs) {
+  if (previous?.ch === "]") {
+    const computedStart = enclosingDelimiterStart(source, previous.index, "[", "]", delimiterPairs);
+    return computedStart >= 0 && methodBoundaryContext(source, computedStart);
+  }
+  if (!previousWord) return literalNamedMethodContext(source, previous);
+  const wordStart = previous.index - previousWord.length + 1;
+  if (previousWord === "n" && /[0-9]/.test(source[wordStart - 1] ?? "")) return literalNamedMethodContext(source, previous);
+  const nameStart = source[wordStart - 1] === "#" ? wordStart - 1 : wordStart;
+  return methodBoundaryContext(source, nameStart);
+}
+
+function literalNamedMethodContext(source, previous) {
+  if (!previous) return false;
+  if (previous.ch === "\"" || previous.ch === "'" || previous.ch === "`") {
+    const literalStart = stringLiteralStart(source, previous.index);
+    return literalStart >= 0 && methodBoundaryContext(source, literalStart);
+  }
+  if (!/[0-9]/.test(previous.ch) && !(previous.ch === "n" && /[0-9]/.test(source[previous.index - 1] ?? ""))) return false;
+  let start = previous.index;
+  while (start > 0 && /[0-9A-Za-z_$._]/.test(source[start - 1])) start -= 1;
+  return methodBoundaryContext(source, start);
+}
+
+function stringLiteralStart(source, end) {
+  const quote = source[end];
+  for (let i = end - 1; i >= 0; i -= 1) {
+    if (source[i] !== quote) continue;
+    let slashes = 0;
+    for (let j = i - 1; j >= 0 && source[j] === "\\"; j -= 1) slashes += 1;
+    if (slashes % 2 === 0) return i;
+  }
+  return -1;
+}
+
+function methodBoundaryContext(source, nameStart) {
+  let beforeName = previousSignificant(source, nameStart);
+  for (;;) {
+    if (beforeName?.ch === "*") {
+      beforeName = previousSignificant(source, beforeName.index);
+      continue;
+    }
+    const modifier = beforeName ? identifierEndingAt(source, beforeName.index) : "";
+    if (!["async", "get", "set", "static"].includes(modifier)) break;
+    beforeName = previousSignificant(source, beforeName.index - modifier.length + 1);
+  }
+  if (beforeName?.ch === ",") return true;
+  if (beforeName?.ch !== "{") return false;
+  const beforeBrace = previousSignificant(source, beforeName.index);
+  if (!beforeBrace) return false;
+  if (beforeBrace.ch === ")") return braceStartsClassBody(source, beforeName.index);
+  return beforeBrace.ch === "=" || beforeBrace.ch === "(" || beforeBrace.ch === "[" || beforeBrace.ch === ":" || /[A-Za-z_$\]]/.test(beforeBrace.ch);
+}
+
+function braceStartsClassBody(source, braceIndex) {
+  const prefix = source.slice(0, braceIndex);
+  const classIndex = lastKeywordIndex(prefix, "class");
+  if (classIndex < 0) return false;
+  const boundary = Math.max(prefix.lastIndexOf(";"), prefix.lastIndexOf("{"), prefix.lastIndexOf("}"));
+  return classIndex > boundary;
+}
+
+function lastKeywordIndex(source, keyword) {
+  let result = -1;
+  for (let index = source.indexOf(keyword); index >= 0; index = source.indexOf(keyword, index + 1)) {
+    if (!isIdentifierPartChar(source[index - 1]) && !isIdentifierPartChar(source[index + keyword.length])) result = index;
+  }
+  return result;
+}
+
+function enclosingArrayPatternContext(source, start, inheritedPattern, delimiterPairs) {
+  const end = findMatchingDelimiter(source, start, "[", "]", delimiterPairs);
+  if (end < 0) return false;
+  if (isSingleAssignmentAt(source, nextSignificant(source, end + 1)?.index ?? -1)) return true;
+  const previous = previousSignificant(source, start);
+  if (previous?.ch === "(" && enclosingParameterPatternContext(source, previous.index, end, delimiterPairs)) return true;
+  if (previous?.ch === "[" && enclosingArrayPatternContext(source, previous.index, inheritedPattern, delimiterPairs)) return true;
+  if (previous?.ch === "." && source.slice(previous.index - 2, previous.index + 1) === "...") return spreadPatternContext(source, previous.index, end, inheritedPattern, delimiterPairs);
+  if (previous?.ch === ",") return commaPatternContext(source, previous.index, end, inheritedPattern, delimiterPairs);
+  if (!inheritedPattern) return false;
+  return previous?.ch === "{" || previous?.ch === "," || (previous?.ch === ":" && colonLooksLikePatternProperty(source, previous.index));
+}
+
+function spreadPatternContext(source, spreadEnd, patternEnd, inheritedPattern, delimiterPairs) {
+  const previous = previousSignificant(source, spreadEnd - 2);
+  if (previous?.ch === "[") return enclosingArrayPatternContext(source, previous.index, inheritedPattern, delimiterPairs);
+  if (previous?.ch === "(") return enclosingParameterPatternContext(source, previous.index, patternEnd, delimiterPairs);
+  if (previous?.ch === ",") return commaPatternContext(source, previous.index, patternEnd, inheritedPattern, delimiterPairs);
+  if (!inheritedPattern) return false;
+  return previous?.ch === "{" || previous?.ch === "," || (previous?.ch === ":" && colonLooksLikePatternProperty(source, previous.index));
+}
+
+function commaPatternContext(source, commaIndex, objectEnd, inheritedPattern, delimiterPairs) {
+  const arrayStart = enclosingDelimiterStart(source, commaIndex, "[", "]", delimiterPairs);
+  const parenStart = enclosingDelimiterStart(source, commaIndex, "(", ")", delimiterPairs);
+  if (parenStart > arrayStart) return enclosingParameterPatternContext(source, parenStart, objectEnd, delimiterPairs);
+  if (arrayStart >= 0) return enclosingArrayPatternContext(source, arrayStart, inheritedPattern, delimiterPairs);
+  if (parenStart >= 0) return enclosingParameterPatternContext(source, parenStart, objectEnd, delimiterPairs);
+  return false;
+}
+
+function enclosingDelimiterStart(source, index, open, close, delimiterPairs) {
+  const start = delimiterPairs?.enclosingStarts?.get(open)?.[index] ?? -1;
+  if (start >= 0) {
+    const end = findMatchingDelimiter(source, start, open, close, delimiterPairs);
+    if (end >= index) return start;
+  }
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (source[i] !== open) continue;
+    const end = findMatchingDelimiter(source, i, open, close, delimiterPairs);
+    if (end >= index) return i;
+  }
+  return -1;
+}
+
+function isSingleAssignmentAt(source, index) {
+  return source[index] === "=" && source[index + 1] !== "=" && source[index + 1] !== ">";
+}
+
+function findMatchingDelimiter(source, start, open, close, delimiterPairs) {
+  const paired = delimiterPairs?.get(start);
+  if (paired !== undefined && source[start] === open && source[paired] === close) return paired;
+  let depth = 0;
+  for (let i = start; i < source.length; i += 1) {
+    if (source[i] === open) {
+      depth += 1;
+      continue;
+    }
+    if (source[i] !== close) continue;
+    depth -= 1;
+    if (depth === 0) return i;
+  }
+  return -1;
+}
+
+function findOpeningDelimiter(source, end, open, close) {
+  let depth = 0;
+  for (let i = end; i >= 0; i -= 1) {
+    if (source[i] === close) {
+      depth += 1;
+      continue;
+    }
+    if (source[i] !== open) continue;
+    depth -= 1;
+    if (depth === 0) return i;
+  }
+  return -1;
+}
+
+function previousSignificant(source, start, min = 0) {
+  for (let i = start - 1; i >= min; i -= 1) {
+    if (!/\s/.test(source[i])) return { ch: source[i], index: i };
+  }
+  return null;
+}
+
+function nextSignificant(source, start, max = source.length) {
+  for (let i = start; i < max; i += 1) {
+    if (!/\s/.test(source[i])) return { ch: source[i], index: i };
+  }
+  return null;
+}
+
+function identifierEndingAt(source, end) {
+  if (!isIdentifierPartChar(source[end])) return "";
+  let start = end;
+  while (start > 0 && isIdentifierPartChar(source[start - 1])) start -= 1;
+  if (!isIdentifierStartChar(source[start])) return "";
+  return source.slice(start, end + 1);
+}
+
+function identifierStartingAt(source, start) {
+  if (!isIdentifierStartChar(source[start])) return "";
+  let end = start + 1;
+  while (end < source.length && isIdentifierPartChar(source[end])) end += 1;
+  return source.slice(start, end);
+}
+
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
@@ -547,7 +1004,7 @@ export async function verifySelfContained(pack) {
       assert(!pattern.test(loaderSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
     }
     assert(!ANY_COMMONJS_REQUIRE.test(stripScannedRequireCalls(loaderSource, importEntries)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
-    assert(!COMPUTED_MEMBER_ACCESS.test(loaderSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+    assert(!COMPUTED_MEMBER_ACCESS.test(loaderSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);

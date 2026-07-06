@@ -580,6 +580,177 @@ test("string-literal block comment markers cannot hide forbidden process access"
   }
 });
 
+test("property names before division do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-property-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const obj = { in: 1, instanceof: 1 };\nexport default obj.in / process.env / 1 || obj.instanceof / Function(\"return process\")() / 1;\n");
+    await expect(verifySelfContained({
+      name: "property-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bare of before division does not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const of = 1;\nexport default of / process.env / 1;\n");
+    await expect(verifySelfContained({
+      name: "of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("keyword-suffixed identifiers before division do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-keyword-suffix-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const $in = 1;\nexport default $in / process.env / 1;\n");
+    await expect(verifySelfContained({
+      name: "keyword-suffix-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unicode identifiers ending with keywords before division do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-unicode-keyword-suffix-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const \\u03c0in = 1;\nexport default \\u03c0in / Function(\"return process\")() / 1;\n");
+    await expect(verifySelfContained({
+      name: "unicode-keyword-suffix-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("classic for of identifier divisions do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const of = 1;\nfor (let x = of / process.env / 1; false; ) {}\nfor (of / process.env / 1; false; ) {}\nexport default of;\n");
+    await expect(verifySelfContained({
+      name: "for-of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("word operators before of divisions do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-instanceof-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const of = function() {};\nfor (let ok = ({} instanceof of / Function(\"return process\")() / 1); false; ) {}\nexport default of;\n");
+    await expect(verifySelfContained({
+      name: "instanceof-of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/unsafe loader rejected|process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unary word operators before of divisions do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-typeof-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const of = 1;\nfor (typeof of / process.env / 1; false; ) {}\nexport default of;\n");
+    await expect(verifySelfContained({
+      name: "typeof-of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("slash operators before of divisions do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-slash-of-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "let x = 1;\nconst of = 1;\nfor (x / of / process.env / 1; false; ) {}\nexport default of;\n");
+    await expect(verifySelfContained({
+      name: "slash-of-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("property calls ending with control keywords before division do not hide host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-property-control-call-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const obj = { if: () => 1 };\nexport default obj.if() / process.env / 1;\n");
+    await expect(verifySelfContained({
+      name: "property-control-call-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Bun import.meta.require loaders are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-import-meta-require-pack-"));
   try {
@@ -713,6 +884,386 @@ test("optional and destructured computed members are rejected", async () => {
   }
 });
 
+test("multiline destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-multiline-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nconst { safe,\n  [key]: F } = function() {};\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "multiline-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("regex braces before destructuring do not hide computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-regex-brace-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nconst foo = {};\nlet F;\nif (Math.random()) /{/.test(\"\");\nconst { a = foo instanceof /}/,\n  [key]: G } = function() {};\nconst { a: { b = (() => { for (const x of /}/) {} })(), [key]: H } } = { a: function() {} };\n({ [key]: F } = function() {});\nexport default (F || G || H)(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "regex-brace-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("regex literals in parameter defaults do not hide computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-default-regex-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nfunction run({ a = (() => { do /{/.test(\"\"); while(false); })(), [key]: F }) { return F(\"return process\")(); }\nexport default run(function() {});\n");
+    await expect(verifySelfContained({
+      name: "default-regex-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("template regex braces do not hide computed destructuring", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-template-regex-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\n`${/}/.test(\"}\") && ({ [key]: F } = function() {})}`;\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "template-regex-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("template control-body regex braces do not hide computed destructuring", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-template-control-regex-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\nconst fn = function() {};\n`${(() => { if (true) /}/.test(\"\"); })(), ({ [key]: F } = fn)}`;\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "template-control-regex-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("template new-regex braces do not hide computed destructuring", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-template-new-regex-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\n`${new /}/, ({ [key]: F } = function() {})}`;\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "template-new-regex-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("regex defaults with computed-looking text do not create computed patterns", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-regex-default-text-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const { y, x = /,[a]:/ } = {};\nexport default x.test(y ?? \"\");\n");
+    await verifySelfContained({
+      name: "regex-default-text-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("assignment destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F, target;\ntarget = { [key]: F } = function() {};\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "assignment-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("division before assignment destructured computed members does not hide them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-division-assignment-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet n = 1;\nlet F;\nn++ / ({ [key]: F } = function() {}) / 1;\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "division-assignment-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("identifier calls ending with control keywords before division do not hide computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-identifier-control-call-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nconst fn = function() {};\nconst $if = () => 1;\nlet F;\n$if() / ({ [key]: F } = fn) / 1;\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "identifier-control-call-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("keyword-like identifiers before sequence methods do not hide computed destructuring", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-keyword-identifier-sequence-method-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nconst $extends = 1;\nlet leaked;\n($extends, class {}, { m({ [key]: F }) { leaked = F(\"return process\")(); } }).m(function() {});\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "keyword-identifier-sequence-method-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("nested destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-nested-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\n([{ [key]: F }] = [function() {}]);\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "nested-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("expression destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-expression-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\nexport default function run() {\n  return { [key]: F } = function() {}, F(\"return process\")();\n}\n");
+    await expect(verifySelfContained({
+      name: "expression-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("parameter destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-parameter-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nfunction extendsWrapper({ [key]: F }) { return F(\"return process\")(); }\nconst o = { for({ [key]: F }) { return F(\"return process\")(); } };\nclass C { if({ [key]: F }) { return F(\"return process\")(); } extends({ [key]: F }) { return F(\"return process\")(); } }\nexport default (({ [key]: F }) => F(\"return process\")())(function() {}) || extendsWrapper(function() {}) || o.for(function() {}) || new C().if(function() {}) || new C().extends(function() {});\n");
+    await expect(verifySelfContained({
+      name: "parameter-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("array parameter destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-array-parameter-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nexport default (([{ [key]: F }]) => F(\"return process\")())([function() {}]) || ((x, [{ [key]: F }]) => F(\"return process\")())(null, [function() {}]);\n");
+    await expect(verifySelfContained({
+      name: "array-parameter-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deep array destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-deep-array-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F, x;\n([[{ [key]: F }]] = [[function() {}]]);\n([x, [{ [key]: F }]] = [null, [function() {}]]);\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "deep-array-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("array rest target destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-array-rest-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\n[...{ [key]: F }] = [function() {}];\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "array-rest-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("for-await destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-for-await-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\nconst xs = [function() {}];\nfor await ({ [key]: F } of xs);\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "for-await-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("comma-list destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-comma-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\n((_, { [key]: G }) => { F = G; })(null, function() {});\n[_, { [key]: F }] = [null, function() {}];\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "comma-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("rest parameter array destructured computed members are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-rest-parameter-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet F;\nfunction run(...[{ [key]: G }]) { F = G; }\nfunction runObjectRest(first, ...{ [key]: G }) { F = G; }\nfunction runArrayRest(first, ...[{ [key]: G }]) { F = G; }\nrun(function() {});\nrunObjectRest(null, function() {});\nrunArrayRest(null, function() {});\nexport default F(\"return process\")();\n");
+    await expect(verifySelfContained({
+      name: "rest-parameter-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("array literals are not treated as computed member access", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-array-literal-pack-"));
   try {
@@ -727,6 +1278,236 @@ test("array literals are not treated as computed member access", async () => {
         metadata: { allowedBuiltins: [] }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ternary array literals inside blocks are not treated as computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-ternary-array-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export function result(ok) {\n  return ok ? [\"ok\"] : [\"failed\"];\n}\n");
+    await verifySelfContained({
+      name: "ternary-array-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deep nested safe blocks do not overflow computed object scanning", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-deep-safe-block-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    const depth = 2500;
+    await writeFile(join(dir, "adapter.mjs"), `let ok = 0;\n${"{\n".repeat(depth)}ok += 1;\n${"}\n".repeat(depth)}export default ok;\n`);
+    await verifySelfContained({
+      name: "deep-safe-block-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("computed-key object literals in expression positions are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-computed-object-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"label\";\nconst other = {};\nconst mixin = (value) => class { static value = value; };\nconst make = () => mixin;\nconst foo = () => ({ bar: mixin });\nfor ({ safe: 0, [key]: 11 }; false; ) {}\nexport const direct = { [key]: 1 };\nexport const fromCall = Object.freeze({ [key]: 2 });\nexport const fromArray = [{ [key]: 3 }];\nexport const fromDefault = (({ x = { [key]: 4 } } = {}) => x)();\nexport const fromTernaryDefault = (({ ok, x = ok ? null : { [key]: 5 } } = { ok: false }) => x)();\nexport const fromTernaryArrayDefault = (({ ok, x = ok ? null : [{ [key]: 12 }] } = { ok: false }) => x)();\nexport const same = ({ [key]: 6 } === other);\nexport const nestedCallDefault = ([x = make(null, { [key]: 10 })] = []) => x;\nexport class Mixed extends mixin({ [key]: 7 }) {}\nexport class ChainedMixed extends make()({ [key]: 8 }) {}\nexport class HeritageChainMixed extends foo({}).bar({ [key]: 9 }) {}\n");
+    await verifySelfContained({
+      name: "computed-object-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("large comma-separated object literal lists scan without rescans", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-large-comma-object-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    const args = Array.from({ length: 2000 }, (_, index) => `({ value: ${index} })`).join(", ");
+    await writeFile(join(dir, "adapter.mjs"), `const count = (...values) => values.length;\nexport default count(${args});\n`);
+    await verifySelfContained({
+      name: "large-comma-object-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("computed-key object literals in control conditions are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-control-condition-object-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"label\";\nexport function result(value) {\n  if ({ safe: 0, [key]: 1 }) {}\n  while (value && { safe: 1, [key]: 2 }) break;\n  switch ({ safe: 2, [key]: 3 }) { default: break; }\n  return true;\n}\n");
+    await verifySelfContained({
+      name: "control-condition-object-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("nested semicolons in extends expressions keep computed object literals allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-nested-semicolon-object-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"label\";\nconst mixin = (options) => class { static options = options; };\nexport class C extends (function() { const x = 1; return mixin; })()({ [key]: 1 }) {}\nexport class D extends (class { static { const y = 1; } static make() { return mixin; } }).make()({ [key]: 2 }) {}\n");
+    await verifySelfContained({
+      name: "extends-nested-semicolon-object-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("function parameters inside extends still reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-function-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nconst mixin = (value) => class {};\nexport class C extends (function({ [key]: F }) { leaked = F(\"return process\")(); return class {}; })(function() {}) {}\nexport class G extends (function* ({ [key]: F }) { leaked = F(\"return process\")(); yield class {}; })(function() {}).next().value {}\nexport class M extends mixin({ m({ [key]: F }) { leaked = F(\"return process\")(); } }) {}\nexport class AM extends mixin({ async m({ safe, [key]: F }) { leaked = F(\"return process\")(); }, *g({ [key]: G }) { leaked = G(\"return process\")(); }, [key]({ [key]: H }) { leaked = H(\"return process\")(); }, 0({ [key]: Z }) { leaked = Z(\"return process\")(); }, \"not id\"({ [key]: Q }) { leaked = Q(\"return process\")(); } }) {}\nexport class NM extends mixin([{ m({ [key]: F }) { leaked = F(\"return process\")(); } }, { nested: { async n({ [key]: N }) { leaked = N(\"return process\")(); } } }]) {}\nexport class S extends class {} { static { try { class D extends class {} {} } catch ({ [key]: F }) { leaked = F(\"return process\")(); } const o = { async m({ safe, [key]: F }) { leaked = F(\"return process\")(); }, *g({ [key]: G }) { leaked = G(\"return process\")(); }, [key]({ [key]: H }) { leaked = H(\"return process\")(); } }; void o; } }\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-function-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unicode-named function parameters inside extends reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-unicode-function-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nexport class C extends (function π({ [key]: F }) { leaked = F(\"return process\")(); return class {}; })(function() {}) {}\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-unicode-function-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("nested class methods inside extends reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-class-method-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nconst mixin = (value) => class {};\nexport class C extends mixin(class { static async m({ [key]: F }) { leaked = F(\"return process\")(); } }) {}\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-class-method-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unicode-named methods inside extends reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-unicode-method-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nconst mixin = (value) => class {};\nconst methods = { π({ [key]: F }) { leaked = F(\"return process\")(); } };\nexport class C extends mixin(methods.π(function() {})) {}\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-unicode-method-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bigint-named methods inside extends reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-bigint-method-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nconst mixin = (value) => class {};\nconst run = (o) => { const { 1: m } = o; return m(function() {}); };\nexport class C extends mixin(run({ 1n({ [key]: F }) { leaked = F(\"return process\")(); } })) {}\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-bigint-method-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("private class methods inside extends reject destructured computed members", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-extends-private-method-computed-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const key = \"constructor\";\nlet leaked;\nconst mixin = (value) => class {};\nexport class C extends mixin(class { #m({ [key]: F }) { leaked = F(\"return process\")(); } call(v) { return this.#m(v); } }) {}\nexport default leaked;\n");
+    await expect(verifySelfContained({
+      name: "extends-private-method-computed-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/computed member access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
