@@ -1036,6 +1036,25 @@ test("computed-looking string and regex literals are allowed", async () => {
   }
 });
 
+test("unsafe-loader-looking string and regex literals are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-loader-literal-text-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const label = \"import.meta globalThis object.constructor process.getBuiltinModule\";\nconst regex = /globalThis|object\\.constructor|import\\.meta/;\nexport default regex.test(label);\n");
+    await verifySelfContained({
+      name: "loader-literal-text-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assignment destructured computed members are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
   try {
