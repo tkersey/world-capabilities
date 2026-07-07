@@ -486,6 +486,34 @@ test("Node sidecar entrypoints cannot import adapter modules", async () => {
   }
 });
 
+test("Node sidecar helpers cannot import adapter modules", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-node-sidecar-helper-adapter-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "import \"./helper.mjs\";\nprocess.stdout.write(\"ok\");\n");
+    await writeFile(join(dir, "helper.mjs"), "import \"./adapter.mjs\";\nexport default true;\n");
+    await writeFile(join(dir, "adapter.mjs"), "export default true;\n");
+    await expect(verifySelfContained({
+      name: "node-sidecar-helper-adapter-import-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "sidecar.mjs", role: "sidecar" },
+          { path: "helper.mjs", role: "helper" },
+          { path: "adapter.mjs", role: "adapter" }
+        ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/sidecar adapter import rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node sidecar package type must be checksum covered", async () => {
   for (const [name, packageJsonDir] of [
     ["pack", "pack"],

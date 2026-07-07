@@ -1029,11 +1029,10 @@ function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, isAd
   return ["node", "deno"].includes(sidecarRuntimeName) && !isAdapterArtifact;
 }
 
-function sidecarArtifactCannotImportAdapter(sidecarRuntimeName, artifactReal, sidecarEntryReal, adapterReal) {
+function sidecarRuntimeDisallowsAdapterImport(sidecarRuntimeName, isAdapterArtifact, adapterReal) {
   return ["node", "deno"].includes(sidecarRuntimeName) &&
     adapterReal !== null &&
-    sidecarEntryReal !== null &&
-    artifactReal === sidecarEntryReal;
+    !isAdapterArtifact;
 }
 
 function nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact, isAdapterArtifact) {
@@ -2052,7 +2051,7 @@ export async function verifySelfContained(pack) {
           );
         }
       }
-      if (sidecarArtifactCannotImportAdapter(sidecarRuntimeName, artifactReal, sidecarEntryReal, adapterReal)) {
+      if (sidecarRuntimeDisallowsAdapterImport(sidecarRuntimeName, isAdapterArtifact, adapterReal)) {
         for (const candidate of existingCandidates) {
           assert(
             await realpath(candidate.resolved) !== adapterReal &&
