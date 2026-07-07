@@ -1,6 +1,7 @@
 const packManifest = {
   driverId: "generic-http-json",
   packageName: "@tkersey/world-capabilities/generic-http-json",
+  authorityLabels: ["network.http"],
   supportedActuationClasses: ["http"],
   supportedActuatorRefs: ["actuator.generic-http-json"],
   supportedDescriptorFingerprints: ["desc.generic-http-json.v0"],

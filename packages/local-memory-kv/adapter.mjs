@@ -1,6 +1,7 @@
 const packManifest = {
   driverId: "local-memory-kv",
   packageName: "@tkersey/world-capabilities/local-memory-kv",
+  authorityLabels: ["memory.fixture"],
   supportedActuationClasses: ["memory"],
   supportedActuatorRefs: ["actuator.local-memory-kv"],
   supportedDescriptorFingerprints: ["desc.local-memory-kv.v0"],

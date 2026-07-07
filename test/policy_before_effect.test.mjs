@@ -35,6 +35,28 @@ test("human approval rejection fallback stays schema compatible", async () => {
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
+test("human approval resolve does not require dry-run-only statuses", async () => {
+  const request = {
+    requestId: "human-resolve-schema",
+    idempotencyKey: "world:idem:human-resolve-schema",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["ok", "rejected"] },
+    payload: { anchor: "world:host-request:1" }
+  };
+
+  const allowed = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "allow" }, request);
+  expect(allowed.status).toBe("ok");
+  expect(allowed.payload).toEqual({ approved: true });
+
+  const denied = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, request);
+  expect(denied.status).toBe("rejected");
+  expect(denied.payload).toEqual({ approved: false });
+});
+
 function fileRequest(overrides = {}) {
   return {
     requestId: "file-policy",

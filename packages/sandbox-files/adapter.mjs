@@ -4,6 +4,7 @@ import { join, resolve as pathResolve, relative, isAbsolute } from "node:path";
 const packManifest = {
   driverId: "sandbox-files",
   packageName: "@tkersey/world-capabilities/sandbox-files",
+  authorityLabels: ["file.fixture"],
   supportedActuationClasses: ["file"],
   supportedActuatorRefs: ["actuator.sandbox-files"],
   supportedDescriptorFingerprints: ["desc.sandbox-files.v0"],

@@ -54,6 +54,7 @@ export const ADAPTER_MANIFEST_PARITY_FIELDS = [
   "supportedActuatorRefs",
   "supportedDescriptorFingerprints",
   "supportedResponseStatuses",
+  "authorityLabels",
   "secretRequirements"
 ];
 

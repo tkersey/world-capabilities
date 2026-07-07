@@ -1,6 +1,7 @@
 const packManifest = {
   driverId: "human-approval",
   packageName: "@tkersey/world-capabilities/human-approval",
+  authorityLabels: ["human.approval"],
   supportedActuationClasses: ["approval"],
   supportedActuatorRefs: ["actuator.human-approval"],
   supportedDescriptorFingerprints: ["desc.human-approval.v0"],
@@ -44,6 +45,11 @@ function reject(hostRequest, reason) {
   return { requestId: hostRequest?.requestId ?? "unknown", status: status(hostRequest, "rejected"), payload: { reason } };
 }
 
+function responseSchemaSupports(hostRequest, requiredStatuses) {
+  const statuses = hostRequest.responseSchema?.statuses;
+  return Array.isArray(statuses) && statuses.length > 0 && requiredStatuses.every((item) => statuses.includes(item));
+}
+
 function hostilePayloadReason(value) {
   if (!value || typeof value !== "object") return null;
   for (const key of FORBIDDEN_EVIDENCE_KEYS) {
@@ -60,7 +66,7 @@ function hostilePayloadReason(value) {
   return null;
 }
 
-function reason(context, hostRequest) {
+function reason(context, hostRequest, requiredStatuses = packManifest.supportedResponseStatuses) {
   if (!hostRequest?.requestId) return "missing_request_id";
   if (!hostRequest?.target?.descriptorFingerprint) return "missing_descriptor_fingerprint";
   if (!hostRequest?.idempotencyKey) return "missing_idempotency_key";
@@ -69,9 +75,7 @@ function reason(context, hostRequest) {
   if (!packManifest.supportedActuatorRefs.includes(hostRequest.target.actuatorRef)) return "unsupported_actuator_ref";
   if (!hostRequest.target.actuationClass) return "missing_actuation_class";
   if (!packManifest.supportedActuationClasses.includes(hostRequest.target.actuationClass)) return "unsupported_actuation_class";
-  const statuses = hostRequest.responseSchema?.statuses;
-  if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
-  if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  if (!responseSchemaSupports(hostRequest, requiredStatuses)) return "unsupported_response_schema";
   if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
   if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
@@ -87,13 +91,13 @@ export function manifest() {
 }
 
 export async function preflight(context, hostRequest) {
-  const denied = reason(context, hostRequest);
+  const denied = reason(context, hostRequest, ["ok", "rejected"]);
   if (denied) return reject(hostRequest, denied);
   return { requestId: hostRequest.requestId, status: "ok", payload: { ready: true } };
 }
 
 export async function resolve(context, hostRequest) {
-  const denied = reason(context, hostRequest);
+  const denied = reason(context, hostRequest, ["ok", "rejected"]);
   if (denied) return reject(hostRequest, denied);
   const mode = context?.approvalMode ?? "deny";
   if (mode === "allow") return { requestId: hostRequest.requestId, status: status(hostRequest, "ok"), payload: { approved: true } };
@@ -101,7 +105,7 @@ export async function resolve(context, hostRequest) {
 }
 
 export async function dryRun(context, hostRequest) {
-  const denied = reason({ ...context, policy: { ...(context?.policy ?? {}), humanLive: true, auditOnly: false } }, hostRequest);
+  const denied = reason({ ...context, policy: { ...(context?.policy ?? {}), humanLive: true, auditOnly: false } }, hostRequest, ["deferred"]);
   if (denied) return reject(hostRequest, denied);
   return { requestId: hostRequest.requestId, status: "deferred", payload: { promptWouldBeShown: false } };
 }

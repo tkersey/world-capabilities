@@ -1,6 +1,7 @@
 const packManifest = {
   driverId: "sidecar-fixture",
   packageName: "@tkersey/world-capabilities/sidecar-fixture",
+  authorityLabels: ["sidecar.fixture"],
   supportedActuationClasses: ["sidecar"],
   supportedActuatorRefs: ["actuator.sidecar-fixture"],
   supportedDescriptorFingerprints: ["desc.sidecar-fixture.v0"],

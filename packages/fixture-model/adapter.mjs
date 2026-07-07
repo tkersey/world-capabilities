@@ -1,6 +1,7 @@
 const packManifest = {
   driverId: "fixture-model",
   packageName: "@tkersey/world-capabilities/fixture-model",
+  authorityLabels: ["model.fixture"],
   supportedActuationClasses: ["model"],
   supportedActuatorRefs: ["actuator.fixture-model"],
   supportedDescriptorFingerprints: ["desc.fixture-model.v0"],
