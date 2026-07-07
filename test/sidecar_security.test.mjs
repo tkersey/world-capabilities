@@ -3,6 +3,23 @@ import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadPack, validateSidecarCommand } from "../harness/pack-utils.mjs";
+import { preflight as sidecarPreflight } from "../packages/sidecar-fixture/adapter.mjs";
+
+test("sidecar fixture schema rejection uses an allowed failure status", async () => {
+  const result = await sidecarPreflight({}, {
+    requestId: "req-sidecar-schema",
+    idempotencyKey: "idem-sidecar-schema",
+    target: {
+      descriptorFingerprint: "desc.sidecar-fixture.v0",
+      actuatorRef: "actuator.sidecar-fixture",
+      actuationClass: "sidecar"
+    },
+    responseSchema: { statuses: ["ok", "failed"] },
+    payload: {}
+  });
+  expect(result.status).toBe("failed");
+  expect(result.payload.reason).toBe("unsupported_response_schema");
+});
 
 test("remote sidecar entrypoint is rejected", async () => {
   const pack = await loadPack("sidecar-fixture");
@@ -15,6 +32,15 @@ test("package-scheme sidecar entrypoint is rejected before artifact binding", as
   pack.manifest.metadata.sidecar.command = ["deno", "run", "npm:pkg/mod.mjs"];
   pack.manifest.artifacts.push({ path: "npm:pkg/mod.mjs", role: "sidecar" });
   expect(() => validateSidecarCommand(pack)).toThrow(/sidecar entrypoint missing/);
+});
+
+test("Node sidecar unsupported runtime entrypoints are rejected before artifact binding", async () => {
+  for (const ext of [".tsx", ".jsx"]) {
+    const pack = await loadPack("sidecar-fixture");
+    pack.manifest.metadata.sidecar.command = ["node", `sidecar${ext}`];
+    pack.manifest.artifacts.push({ path: `sidecar${ext}`, role: "sidecar" });
+    expect(() => validateSidecarCommand(pack)).toThrow(/Node sidecar unsupported runtime entrypoint rejected/);
+  }
 });
 
 test("parent-directory sidecar entrypoint is rejected before artifact binding", async () => {

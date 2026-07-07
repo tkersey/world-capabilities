@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, fail, stableStringify } from "./assertions.mjs";
 import { corpusFingerprint, readJson } from "./corpus-utils.mjs";
@@ -73,62 +73,88 @@ export const FORBIDDEN_EVIDENCE_KEYS = [
   "archiveSealBytes"
 ];
 
+const JS_IDENTIFIER_CONTINUE = String.raw`[$_#\u200c\u200d\p{ID_Continue}]`;
+const JS_TOKEN_GAP = String.raw`(?:\s|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$)|/\*[\s\S]*?\*/)*`;
+const JS_PROPERTY_QUOTE = String.raw`["'\x60]`;
 const DYNAMIC_IMPORT = /\bimport\s*\(/;
-const OPTIMIZER_NODE_ENV_ACCESS =
-  /\bprocess\s*(?:\.\s*env|\[\s*["'`]env["'`]\s*\])\s*(?:\.\s*NODE_ENV\b|\[\s*["'`]NODE_ENV["'`]\s*\])/g;
+const UNSAFE_LOADER_HINT = /eval|Function|globalThis|global|self|constructor|with|Object|Reflect|getOwnPropertyDescriptor|getPrototypeOf|import|process|createRequire|Worker|module|require|[\[\]]/;
+const HOST_GLOBAL_HINT = /process|Bun|Deno|fetch|WebSocket|EventSource|XMLHttpRequest/;
+const OPTIMIZER_ENV_ACCESS = new RegExp(
+  String.raw`\bprocess${JS_TOKEN_GAP}(?:\.${JS_TOKEN_GAP}env|\[${JS_TOKEN_GAP}${JS_PROPERTY_QUOTE}env${JS_PROPERTY_QUOTE}${JS_TOKEN_GAP}\])${JS_TOKEN_GAP}(?:\.${JS_TOKEN_GAP}(?:NODE_ENV|BUN_ENV)\b|\[${JS_TOKEN_GAP}${JS_PROPERTY_QUOTE}(?:NODE_ENV|BUN_ENV)${JS_PROPERTY_QUOTE}${JS_TOKEN_GAP}\])`,
+  "g"
+);
 const DYNAMIC_LOADER_IDENTIFIERS = [
-  /\beval\b/,
-  /\bFunction\b/,
-  /\b(?:globalThis|global|self)\b/
+  identifierToken("eval"),
+  identifierToken("Function"),
+  identifierToken("Worker"),
+  identifierToken("(?:globalThis|global|self)")
 ];
 const EVAL_PATTERNS = [
   /(?:\.|\?\.)\s*constructor\b/,
-  /\bwith\s*\(/,
+  new RegExp(String.raw`(?<!\.)${identifierTokenSource("with")}\s*\(`, "u"),
   /\[\s*["']constructor["']\s*\]/,
-  /\[\s*["'][^"']*["']\s*\+/,
-  /\+\s*["'][^"']*["']\s*\]/,
-  /\bObject\s*(?:\.|\?\.)\s*getOwnPropertyDescriptors?\b/,
-  /\bObject\s*(?:\.|\?\.)\s*getPrototypeOf\b/,
-  /\b(?:getOwnPropertyDescriptors?|getPrototypeOf)\b/,
-  /\bReflect\b/,
-  /\bReflect\s*(?:\.|\[)/,
-  /\bglobalThis\s*(?:\.|\[)/,
-  /\bglobal\s*(?:\.|\[)/,
-  /\bself\s*(?:\.|\[)/,
-  /globalThis\s*\[\s*["']Function["']\s*\]/,
-  /import\s*\.\s*meta\b/,
-  /process\s*\[/,
-  /process\s*\.\s*constructor\b/,
-  /process\s*\.\s*getBuiltinModule\s*\(/,
-  /process\s*\[\s*["']getBuiltinModule["']\s*\]/,
-  /process\s*\.\s*mainModule\b/,
-  /process\s*\[\s*["']mainModule["']\s*\]/,
-  /globalThis\s*\[\s*["']process["']\s*\]/,
-  /=\s*process\b/,
-  /import\s*\.\s*meta\s*\.\s*require\b/,
-  /import\s*\.\s*meta\s*\[\s*["']require["']\s*\]/,
-  /\bcreateRequire\b/,
-  /\bnew\s+Worker\s*\(/
+  new RegExp(String.raw`${identifierTokenSource("Object")}\s*(?:\.|\?\.)\s*getOwnPropertyDescriptors?(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("Object")}\s*(?:\.|\?\.)\s*getPrototypeOf(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  identifierToken("getOwnPropertyDescriptors?|getPrototypeOf"),
+  identifierToken("Reflect"),
+  new RegExp(String.raw`${identifierTokenSource("Reflect")}\s*(?:\.|\[)`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("globalThis")}\s*(?:\.|\[)`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("global")}\s*(?:\.|\[)`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("self")}\s*(?:\.|\[)`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("globalThis")}\s*\[\s*["']Function["']\s*\]`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\[`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\.\s*constructor(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\.\s*getBuiltinModule(?!${JS_IDENTIFIER_CONTINUE})\s*\(`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\[\s*["']getBuiltinModule["']\s*\]`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\.\s*mainModule(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("process")}\s*\[\s*["']mainModule["']\s*\]`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("globalThis")}\s*\[\s*["']process["']\s*\]`, "u"),
+  new RegExp(String.raw`=\s*${identifierTokenSource("process")}`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*\.\s*require(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*\[\s*["']require["']\s*\]`, "u"),
+  identifierToken("createRequire"),
+  new RegExp(String.raw`${identifierTokenSource("new")}\s+${identifierTokenSource("Worker")}\s*\(`, "u")
 ];
-const COMMONJS_REQUIRE = /\brequire\s*\(\s*(["'`])([^"'`]+)\1\s*\)/g;
-const ANY_COMMONJS_REQUIRE = /\brequire\b/;
-const COMMONJS_MODULE_LOADER = /\bmodule\s*(?:\.|\?\.)\s*(?:constructor|require)\b/;
-const PROCESS_ACCESS = /\bprocess\b/;
-const BUN_ACCESS = /\bBun\b/;
-const DENO_ACCESS = /\bDeno\b/;
-const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "yield", "await", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
+const JS_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$))*`;
+const COMMONJS_REQUIRE = new RegExp(`\\brequire${JS_INTERTOKEN_SPACE}\\(${JS_INTERTOKEN_SPACE}(["'\`])([^"'\`]+)\\1${JS_INTERTOKEN_SPACE}\\)`, "g");
+const ANY_COMMONJS_REQUIRE = identifierToken("require");
+const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("module")}\s*(?:\.|\?\.)\s*(?:constructor|require)(?!${JS_IDENTIFIER_CONTINUE})`, "u");
+const COMMONJS_WRAPPER_ARGUMENTS = identifierToken("arguments");
+const PROCESS_ACCESS = identifierToken("process");
+const BUN_ACCESS = identifierToken("Bun");
+const DENO_ACCESS = identifierToken("Deno");
+const NETWORK_GLOBAL_ACCESS = identifierToken("fetch|WebSocket|EventSource|XMLHttpRequest");
+const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const PLAIN_JAVASCRIPT_ARTIFACT = /\.(mjs|js|cjs)$/;
 const EXECUTABLE_EXTENSIONS = [".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"];
 const LOCAL_IMPORT_EXTENSIONS = [...EXECUTABLE_EXTENSIONS, ".json"];
 const UNSUPPORTED_RUNTIME_IMPORT_EXTENSIONS = [".node"];
 const NODE_TYPESCRIPT_ARTIFACT = /\.(ts|mts|cts)$/;
+const NODE_MTS_ARTIFACT = /\.mts$/;
+const NODE_CTS_ARTIFACT = /\.cts$/;
+const NODE_UNSUPPORTED_RUNTIME_ARTIFACT = /\.(jsx|tsx)$/;
+const NODE_TYPESCRIPT_IDENTIFIER_START = String.raw`[$_\p{ID_Start}]`;
+const NODE_TYPESCRIPT_IDENTIFIER_CONTINUE = String.raw`[$\u200c\u200d\p{ID_Continue}]*`;
+const NODE_TYPESCRIPT_IDENTIFIER = `${NODE_TYPESCRIPT_IDENTIFIER_START}${NODE_TYPESCRIPT_IDENTIFIER_CONTINUE}`;
+const NODE_TYPESCRIPT_TYPE_PARAMETERS = String.raw`(?:<[^)\r\n]+>\s*)?`;
 const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
-  /\benum\s+[A-Za-z_$]/,
-  /\b(?:namespace|module)\s+[A-Za-z_$]/,
-  /^\s*@/m,
-  /constructor\s*\([^)]*\b(?:public|private|protected|readonly)\s+[A-Za-z_$]/,
-  /\bimport\s+(?!type\b)[A-Za-z_$][\w$]*\s*=/
+  new RegExp(String.raw`\benum\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
+  new RegExp(String.raw`\b(?:namespace|module)\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
+  new RegExp(String.raw`(?:^|[({[=,:;!&|?+\-*~^<>%/]|\b(?:return|throw|yield|await|case|delete|void|typeof|new)\b)\s*<\s*${NODE_TYPESCRIPT_IDENTIFIER}(?:[\s<>,[\].?&|]|${NODE_TYPESCRIPT_IDENTIFIER})*>\s*(?!\([^)]*\)\s*(?::[^=\r\n]*)?=>)(?:${NODE_TYPESCRIPT_IDENTIFIER_START}|\d|["'({[])`, "u"),
+  new RegExp(String.raw`@\s*(?:${NODE_TYPESCRIPT_IDENTIFIER_START}|\()`, "u"),
+  new RegExp(String.raw`constructor\s*\((?:[^)]*,)?\s*(?:public|private|protected|readonly|override)\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
+  new RegExp(String.raw`\bimport\s+(?!type\b)${NODE_TYPESCRIPT_IDENTIFIER}\s*=`, "u"),
+  new RegExp(String.raw`(?:${identifierTokenSource("declare")}\s+)?(?<!\.)${identifierTokenSource("export")}\s*=`, "u")
+];
+const NODE_CTS_UNSUPPORTED_MODULE_SYNTAX = [
+  new RegExp(String.raw`\bimport\s+(?!type\b)(?:["'{*]|${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u"),
+  new RegExp(String.raw`\bexport\s+(?!type\b)(?:["'{*]|default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u")
+];
+const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [
+  hasNodeMtsBareRequireCall,
+  hasNodeMtsCommonJsModuleMember
 ];
 const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module", "node:process"]);
@@ -143,6 +169,14 @@ const IMPORT_SCANNERS = {
   ts: new Bun.Transpiler({ loader: "ts" }),
   tsx: new Bun.Transpiler({ loader: "tsx" })
 };
+
+function identifierTokenSource(pattern) {
+  return String.raw`(?<!${JS_IDENTIFIER_CONTINUE})(?:${pattern})(?!${JS_IDENTIFIER_CONTINUE})`;
+}
+
+function identifierToken(pattern) {
+  return new RegExp(identifierTokenSource(pattern), "u");
+}
 
 function isScannableArtifact(artifactPath) {
   const basename = artifactPath.split(/[\\/]/).pop() ?? artifactPath;
@@ -564,13 +598,40 @@ function isRegexLiteralStart(result) {
   if (/[\(\{\[=,:;!&|?+\-*~^<>%]$/.test(trimmed)) return true;
   if (/=>\s*$/.test(trimmed)) return true;
   if (isAfterControlStatementHead(trimmed)) return true;
+  if (isAfterStatementBlock(trimmed)) return true;
   const token = trimmed.match(/([A-Za-z_$#][\w$#]*)\s*$/);
-  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "yield", "await", "instanceof", "in", "of", "do", "else", "extends", "new", "default"].includes(token[1])) return false;
+  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "instanceof", "in", "of", "do", "else", "extends", "new", "default"].includes(token[1])) return false;
   const tokenStart = token.index ?? 0;
   if (tokenStart > 0 && isIdentifierPartChar(trimmed[tokenStart - 1])) return false;
   const beforeKeyword = trimmed.slice(0, tokenStart).trimEnd();
   if (beforeKeyword.endsWith(".")) return false;
   return token[1] !== "of" || isForOfOperatorPrefix(beforeKeyword);
+}
+
+function isAfterStatementBlock(prefix) {
+  if (!prefix.endsWith("}")) return false;
+  const open = matchingOpenBrace(prefix, prefix.length - 1);
+  if (open < 0) return false;
+  const beforeBrace = prefix.slice(0, open).trimEnd();
+  if (isAfterControlStatementHead(beforeBrace)) return true;
+  const token = beforeBrace.match(/([A-Za-z_$#][\w$#]*)$/);
+  if (!token || !["do", "else", "finally", "try"].includes(token[1])) return false;
+  const tokenStart = token.index ?? 0;
+  return tokenStart === 0 || !isIdentifierPartChar(beforeBrace[tokenStart - 1]);
+}
+
+function matchingOpenBrace(source, closeIndex) {
+  let depth = 0;
+  for (let i = closeIndex; i >= 0; i -= 1) {
+    if (source[i] === "}") {
+      depth += 1;
+      continue;
+    }
+    if (source[i] !== "{") continue;
+    depth -= 1;
+    if (depth === 0) return i;
+  }
+  return -1;
 }
 
 function isAfterControlStatementHead(prefix) {
@@ -586,7 +647,7 @@ function isAfterControlStatementHead(prefix) {
     if (depth > 0) continue;
     const head = prefix.slice(0, i).trimEnd();
     const token = head.match(/([A-Za-z_$#][\w$#]*)$/);
-    if (!token || !["if", "while", "for", "with"].includes(token[1])) return false;
+    if (!token || !["catch", "if", "while", "for", "with"].includes(token[1])) return false;
     const tokenStart = token.index ?? 0;
     if (tokenStart > 0 && isIdentifierPartChar(head[tokenStart - 1])) return false;
     return head[tokenStart - 1] !== ".";
@@ -661,21 +722,30 @@ function loaderScanSource(source, artifactPath) {
 
 function loaderScanInputs(source, artifactPath) {
   const transformed = loaderScanSource(source, artifactPath);
-  const optimizerResistant = optimizerResistantLoaderScanSource(source, artifactPath);
-  return [...new Set([transformed, optimizerResistant])].map((loaderSource) => ({
+  const optimizerResistant = optimizerResistantLoaderScanSources(source, artifactPath);
+  return [...new Set([transformed, ...optimizerResistant])].map((loaderSource) => ({
     loaderSource,
     codeSource: executableCodeSource(loaderSource)
   }));
 }
 
-function optimizerResistantLoaderScanSource(source, artifactPath) {
+function optimizerResistantLoaderScanSources(source, artifactPath) {
   const raw = withoutOptimizerInputs(stripShebang(source));
-  if (!hasExplicitExtension(artifactPath) || PLAIN_JAVASCRIPT_ARTIFACT.test(artifactPath)) return raw;
-  return scannerForPath(artifactPath).transformSync(raw);
+  const transformed = scannerForPath(artifactPath).transformSync(raw);
+  if (!hasExplicitExtension(artifactPath) || PLAIN_JAVASCRIPT_ARTIFACT.test(artifactPath)) return [raw, transformed];
+  return [transformed];
 }
 
 function executableCodeSource(source) {
   return normalizeIdentifierEscapes(withoutStringLiterals(source));
+}
+
+export function scannerExecutableCodeSourceForTest(source) {
+  return executableCodeSource(source);
+}
+
+export function scannerHasComputedMemberAccessForTest(source) {
+  return hasComputedMemberAccess(executableCodeSource(source));
 }
 
 function withoutOptimizerPragmas(source) {
@@ -683,11 +753,89 @@ function withoutOptimizerPragmas(source) {
 }
 
 function withoutOptimizerInputs(source) {
-  return withoutOptimizerConstants(withoutOptimizerPragmas(source));
+  return withoutOptimizerConstants(normalizeExecutableIdentifierEscapes(withoutOptimizerPragmas(source)));
 }
 
 function withoutOptimizerConstants(source) {
-  return source.replace(OPTIMIZER_NODE_ENV_ACCESS, "process.env.__WORLD_NODE_ENV__");
+  return source.replace(OPTIMIZER_ENV_ACCESS, "process.env.__WORLD_ENV__");
+}
+
+function normalizeExecutableIdentifierEscapes(source) {
+  let result = "";
+  let scanPrefix = "";
+  for (let i = 0; i < source.length;) {
+    const ch = source[i];
+    if (ch === "\"" || ch === "'") {
+      const end = skipQuoted(source, i, ch);
+      result += source.slice(i, end);
+      scanPrefix += "\"\"";
+      i = end;
+      continue;
+    }
+    if (ch === "`") {
+      const template = normalizeTemplateExecutableIdentifierEscapes(source, i);
+      result += template.text;
+      scanPrefix += "``";
+      i = template.end;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "/") {
+      const end = skipLineComment(source, i);
+      result += source.slice(i, end);
+      scanPrefix += "\n";
+      i = end;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      const end = skipBlockComment(source, i);
+      result += source.slice(i, end);
+      scanPrefix += " ";
+      i = end;
+      continue;
+    }
+    if (ch === "/" && isRegexLiteralStart(scanPrefix)) {
+      const end = skipRegexLiteral(source, i);
+      if (end > i) {
+        result += source.slice(i, end);
+        scanPrefix += "/ /";
+        i = end;
+        continue;
+      }
+    }
+    const escaped = identifierEscapeAt(source, i);
+    if (escaped) {
+      result += escaped.text;
+      scanPrefix += escaped.text;
+      i = escaped.end;
+      continue;
+    }
+    result += ch;
+    scanPrefix += ch;
+    i += 1;
+  }
+  return result;
+}
+
+function normalizeTemplateExecutableIdentifierEscapes(source, start) {
+  let result = "`";
+  let i = start + 1;
+  while (i < source.length) {
+    if (source[i] === "\\") {
+      result += source.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    if (source[i] === "`") return { text: `${result}\``, end: i + 1 };
+    if (source[i] === "$" && source[i + 1] === "{") {
+      const expression = readTemplateExpression(source, i + 2);
+      result += `\${${normalizeExecutableIdentifierEscapes(expression.text)}}`;
+      i = expression.end;
+      continue;
+    }
+    result += source[i];
+    i += 1;
+  }
+  return { text: result, end: i };
 }
 
 function normalizeIdentifierEscapes(source) {
@@ -702,6 +850,18 @@ function normalizeIdentifierEscapes(source) {
   });
 }
 
+function identifierEscapeAt(source, start) {
+  const match = source.slice(start).match(/^\\u\{([0-9a-fA-F]+)\}|^\\u([0-9a-fA-F]{4})/);
+  if (!match) return null;
+  const codePoint = Number.parseInt(match[1] ?? match[2], 16);
+  if (!Number.isFinite(codePoint)) return null;
+  try {
+    return { text: String.fromCodePoint(codePoint), end: start + match[0].length };
+  } catch {
+    return null;
+  }
+}
+
 function isPreloadFlag(arg) {
   if (typeof arg !== "string") return false;
   return arg === "-r" || /^-r\S+/.test(arg) || PRELOAD_FLAGS.some((flag) => arg === flag || arg.startsWith(`${flag}=`));
@@ -711,13 +871,29 @@ function isSidecarOptionArg(arg) {
   return typeof arg === "string" && arg.startsWith("-");
 }
 
+function sidecarEntrypointIndex(command) {
+  if (!Array.isArray(command) || command.length < 2) return -1;
+  const [runtime, ...args] = command;
+  return runtime === "deno" && args[0] === "run" ? 2 : 1;
+}
+
+function sidecarRuntimeArgsBeforeEntrypoint(command) {
+  const index = sidecarEntrypointIndex(command);
+  return index < 0 ? [] : command.slice(1, index);
+}
+
+function sidecarRuntimeArgsThroughEntrypoint(command) {
+  const index = sidecarEntrypointIndex(command);
+  return index < 0 ? command.slice(1) : command.slice(1, index + 1);
+}
+
 function sidecarEntrypoint(pack) {
   const command = pack.manifest.metadata?.sidecar?.command;
   if (!Array.isArray(command)) return null;
-  assert(!command.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
-  const [runtime, ...args] = command;
-  assert(!args.some(isSidecarOptionArg), `${pack.name}: sidecar option argument rejected`);
-  const entry = runtime === "deno" && args[0] === "run" ? args[1] : args[0];
+  const runtimeArgs = sidecarRuntimeArgsBeforeEntrypoint(command);
+  const entry = command[sidecarEntrypointIndex(command)];
+  assert(!runtimeArgs.some(isPreloadFlag) && !isPreloadFlag(entry), `${pack.name}: preload flag rejected`);
+  assert(!runtimeArgs.some(isSidecarOptionArg) && !isSidecarOptionArg(entry), `${pack.name}: sidecar option argument rejected`);
   return isLocalSidecarEntrypoint(entry) ? entry : null;
 }
 
@@ -752,6 +928,14 @@ function hasEncodedDotSegment(specifier) {
   return specifier.split(/[\\/]/).some((segment) => encodedSegmentIsDotSegment(segment));
 }
 
+function hasUrlSuffix(specifier) {
+  return /[?#]/.test(specifier);
+}
+
+function hasPercentEncodedOctet(specifier) {
+  return /%[0-9a-fA-F]{2}/.test(specifier);
+}
+
 function encodedSegmentIsDotSegment(segment) {
   if (!/%2e/i.test(segment)) return false;
   try {
@@ -783,17 +967,285 @@ function localImportCandidates(pack, artifactPath, specifier) {
   ])];
 }
 
-function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, artifact) {
-  return ["node", "deno"].includes(sidecarRuntimeName) && artifact.role !== "adapter";
+function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, isAdapterArtifact) {
+  return ["node", "deno"].includes(sidecarRuntimeName) && !isAdapterArtifact;
 }
 
-function nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact) {
-  return sidecarRuntimeName === "node" && artifact.role !== "adapter" && NODE_TYPESCRIPT_ARTIFACT.test(artifact.path);
+function nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact, isAdapterArtifact) {
+  return sidecarRuntimeName === "node" && !isAdapterArtifact && NODE_TYPESCRIPT_ARTIFACT.test(artifact.path);
+}
+
+function nodeSidecarUsesUnsupportedRuntimeArtifact(sidecarRuntimeName, artifact, isAdapterArtifact) {
+  return sidecarRuntimeName === "node" && !isAdapterArtifact && NODE_UNSUPPORTED_RUNTIME_ARTIFACT.test(artifact.path);
+}
+
+function nodeSidecarRequiresModuleSyntaxChecks(sidecarRuntimeName, artifact, isAdapterArtifact) {
+  return sidecarRuntimeName === "node" &&
+    !isAdapterArtifact &&
+    EXECUTABLE_ARTIFACT.test(artifact.path) &&
+    !NODE_UNSUPPORTED_RUNTIME_ARTIFACT.test(artifact.path);
+}
+
+function nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, packageType, source, moduleSyntaxSource) {
+  if (sidecarRuntimeName !== "node" || isAdapterArtifact) return null;
+  if (/\.(mjs|mts)$/.test(artifact.path)) return "esm";
+  if (/\.(cjs|cts)$/.test(artifact.path)) return "cjs";
+  if (packageType === "module") return "esm";
+  if (packageType === "commonjs") return "cjs";
+  return nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) ? "esm" : "cjs";
+}
+
+function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
+  return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource)) ||
+    nodeCtsHasDisallowedAwait(source);
+}
+
+function hasJsonStaticImport(importEntries) {
+  return importEntries.some((entry) => entry.kind !== "require-call" && typeof entry.path === "string" && entry.path.endsWith(".json"));
+}
+
+function artifactUsesCommonJsWrapper(artifactPath, nodeModuleKind) {
+  return /\.(?:cjs|cts)$/.test(artifactPath) || nodeModuleKind === "cjs";
 }
 
 function nodeStripOnlyTypeScriptSyntaxSource(source) {
-  return withoutStringLiterals(stripShebang(source))
-    .replace(/\bdeclare\s+(?:const\s+)?(?:enum|namespace|module)\b/g, "declare __world_erased_type");
+  return eraseNodeTypeScriptDeclarations(normalizeExecutableIdentifierEscapes(withoutStringLiterals(stripShebang(source))));
+}
+
+function eraseNodeTypeScriptDeclarations(source) {
+  const chars = source.split("");
+  for (const pattern of [
+    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("interface")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu"),
+    new RegExp(String.raw`${identifierTokenSource("declare")}\s+${identifierTokenSource("global")}\s*\{`, "gu"),
+    new RegExp(String.raw`${identifierTokenSource("declare")}\s+(?:${identifierTokenSource("namespace")}|${identifierTokenSource("module")})\s+(?:${NODE_TYPESCRIPT_IDENTIFIER}|["'][^"']*["'])\s*\{`, "gu"),
+    new RegExp(String.raw`${identifierTokenSource("declare")}\s+(?:const\s+)?${identifierTokenSource("enum")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu")
+  ]) {
+    eraseBraceTypeDeclarations(chars, source, pattern);
+  }
+  eraseTypeAliases(chars, source);
+  return chars.join("");
+}
+
+function eraseBraceTypeDeclarations(chars, source, pattern) {
+  for (const match of source.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    const braceInMatch = match[0].lastIndexOf("{");
+    const brace = braceInMatch >= 0
+      ? start + braceInMatch
+      : typeDeclarationBodyBrace(source, start + match[0].length);
+    if (brace < 0) continue;
+    const end = findMatchingDelimiter(source, brace, "{", "}");
+    eraseSourceRange(chars, start, end >= 0 ? end + 1 : brace + 1);
+  }
+}
+
+function typeDeclarationBodyBrace(source, start) {
+  let angleDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = start; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "<") angleDepth += 1;
+    else if (ch === ">" && angleDepth > 0) angleDepth -= 1;
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === "{" && angleDepth === 0 && bracketDepth === 0 && parenDepth === 0) return i;
+  }
+  return -1;
+}
+
+function eraseTypeAliases(chars, source) {
+  const pattern = new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("type")}\s+${NODE_TYPESCRIPT_IDENTIFIER}\s*=`, "gu");
+  for (const match of source.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    eraseSourceRange(chars, start, typeAliasEnd(source, start, start + match[0].length));
+  }
+}
+
+function typeAliasEnd(source, start, fallbackEnd) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = fallbackEnd; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === ";" && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) return i + 1;
+    else if ((ch === "\n" || ch === "\r") && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0 && typeAliasCanEndAtLineBreak(source, i)) return i;
+  }
+  return fallbackEnd;
+}
+
+function typeAliasCanEndAtLineBreak(source, index) {
+  const previous = previousSignificant(source, index);
+  if (!previous || ["=", "|", "&", "?", ":", ",", "(", "{", "[", "<"].includes(previous.ch)) return false;
+  const next = nextSignificant(source, index + 1);
+  if (!next) return true;
+  if (["|", "&", ",", "?", ":"].includes(next.ch)) return false;
+  return identifierStartingAt(source, next.index) !== "";
+}
+
+function eraseSourceRange(chars, start, end) {
+  for (let i = start; i < end && i < chars.length; i += 1) {
+    if (!/\s/.test(chars[i])) chars[i] = " ";
+  }
+}
+
+function nodeUnsupportedTypeScriptModuleSyntax(moduleKind) {
+  if (moduleKind === "cjs") return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX;
+  if (moduleKind === "esm") return NODE_MTS_UNSUPPORTED_MODULE_SYNTAX;
+  return [];
+}
+
+function sourceCheckMatches(check, source) {
+  return check instanceof RegExp ? check.test(source) : check(source);
+}
+
+function nodeCommonJsSyntaxParses(source, artifactPath) {
+  try {
+    if (nodeCtsHasDisallowedAwait(source)) return false;
+    new Function(loaderScanSource(source, artifactPath));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function nodeCtsHasDisallowedAwait(source) {
+  const executable = nodeStripOnlyTypeScriptSyntaxSource(source);
+  const delimiterPairs = buildDelimiterPairs(executable);
+  for (let i = executable.indexOf("await"); i >= 0; i = executable.indexOf("await", i + "await".length)) {
+    if (isIdentifierPartChar(executable[i - 1]) || isIdentifierPartChar(executable[i + "await".length])) continue;
+    const previous = previousSignificant(executable, i);
+    if (previous?.ch === ".") continue;
+    const next = nextSignificant(executable, i + "await".length);
+    if (next?.ch === ":") continue;
+    if (next?.ch === "(") {
+      const close = findMatchingDelimiter(executable, next.index, "(", ")", delimiterPairs);
+      const after = close >= 0 ? nextSignificant(executable, close + 1) : null;
+      if (after?.ch === "{") continue;
+    }
+    if (!awaitInsideAsyncFunctionBody(executable, i, delimiterPairs)) return true;
+  }
+  return false;
+}
+
+function awaitInsideAsyncFunctionBody(source, index, delimiterPairs) {
+  if (awaitInsideAsyncArrowExpression(source, index)) return true;
+  for (
+    let bodyStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+    bodyStart >= 0;
+    bodyStart = enclosingDelimiterStart(source, bodyStart, "{", "}", delimiterPairs)
+  ) {
+    if (isAsyncFunctionBodyStart(source, bodyStart, delimiterPairs)) return true;
+  }
+  return false;
+}
+
+function awaitInsideAsyncArrowExpression(source, index) {
+  for (let arrow = source.lastIndexOf("=>", index); arrow >= 0; arrow = source.lastIndexOf("=>", arrow - 1)) {
+    const next = nextSignificant(source, arrow + 2, index);
+    if (next?.ch === "{") continue;
+    if (!arrowExpressionReachesIndex(source, arrow + 2, index)) continue;
+    if (prefixEndsWithAsyncArrowHead(source.slice(0, arrow).trimEnd())) return true;
+  }
+  return false;
+}
+
+function arrowExpressionReachesIndex(source, start, index) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = start; i < index; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    if (ch === "}") braceDepth -= 1;
+    if (ch === "[") bracketDepth += 1;
+    if (ch === "]") bracketDepth -= 1;
+    if (ch === "(") parenDepth += 1;
+    if (ch === ")") parenDepth -= 1;
+    if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0 && ch === ";") return false;
+  }
+  return true;
+}
+
+function prefixEndsWithAsyncArrowHead(prefix) {
+  return new RegExp(String.raw`${identifierTokenSource("async")}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS}(?:${NODE_TYPESCRIPT_IDENTIFIER}|\([^)]*\))(?:\s*:[\s\S]*)?$`, "u").test(prefix);
+}
+
+function isAsyncFunctionBodyStart(source, bodyStart, delimiterPairs) {
+  const prefix = source.slice(0, bodyStart).trimEnd();
+  if (prefix.endsWith("=>")) {
+    const beforeArrow = prefix.slice(0, -2).trimEnd();
+    return prefixEndsWithAsyncArrowHead(beforeArrow);
+  }
+  const paramClose = asyncFunctionParamCloseBeforeBody(source, bodyStart);
+  if (paramClose < 0) return false;
+  const paramStart = findOpeningDelimiter(source, paramClose, "(", ")");
+  if (paramStart < 0) return false;
+  const beforeParams = source.slice(0, paramStart).trimEnd();
+  return new RegExp(String.raw`${identifierTokenSource("async")}\s+(?:function(?:\s+\*?\s*${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS})?|(?:\*?\s*)?${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS})$`, "u").test(beforeParams);
+}
+
+function asyncFunctionParamCloseBeforeBody(source, bodyStart) {
+  for (
+    let previous = previousSignificant(source, bodyStart);
+    previous;
+    previous = previousSignificant(source, previous.index)
+  ) {
+    if (previous.ch !== ")") continue;
+    const betweenParamsAndBody = source.slice(previous.index + 1, bodyStart).trim();
+    if (betweenParamsAndBody === "" || betweenParamsAndBody.startsWith(":")) return previous.index;
+  }
+  return -1;
+}
+
+function hasNodeMtsBareRequireCall(source) {
+  for (let i = source.indexOf("require"); i >= 0; i = source.indexOf("require", i + "require".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "require".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    const next = nextSignificant(source, i + "require".length);
+    if (next?.ch !== "(") continue;
+    const close = findMatchingDelimiter(source, next.index, "(", ")");
+    const after = close >= 0 ? nextSignificant(source, close + 1) : null;
+    if (after?.ch === "{") continue;
+    return true;
+  }
+  return false;
+}
+
+function hasNodeMtsCommonJsModuleMember(source) {
+  for (let i = source.indexOf("module"); i >= 0; i = source.indexOf("module", i + "module".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "module".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    const next = nextSignificant(source, i + "module".length);
+    if (next?.ch === "." || next?.ch === "[") return true;
+  }
+  return false;
+}
+
+function hasNodeMtsCommonJsExportsAssignment(source) {
+  for (let i = source.indexOf("exports"); i >= 0; i = source.indexOf("exports", i + 1)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "exports".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+    if (["const", "let", "var", "function", "class"].includes(previousToken)) continue;
+    const next = nextSignificant(source, i + "exports".length);
+    if (next?.ch === ":") continue;
+    if (next?.ch === "." || next?.ch === "[") return true;
+    if (next && isSingleAssignmentAt(source, next.index)) return true;
+    return true;
+  }
+  return false;
 }
 
 function specifierUsesRuntimeResolution(artifactPath, specifier) {
@@ -825,6 +1277,29 @@ async function fileExists(path) {
   } catch {
     return false;
   }
+}
+
+async function packPackageType(root, artifactPath) {
+  const packRoot = resolve(root);
+  let dir = dirname(resolve(packRoot, artifactPath));
+  while (true) {
+    const candidate = join(dir, "package.json");
+    if (await fileExists(candidate)) {
+      const packageJson = await readJson(candidate);
+      return {
+        artifactPath: pathInside(packRoot, candidate) ? relative(packRoot, candidate) : null,
+        type: typeof packageJson.type === "string" ? packageJson.type : null
+      };
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+function nodeSidecarUsesPackageType(sidecarRuntimeName, artifact, isAdapterArtifact) {
+  return sidecarRuntimeName === "node" && !isAdapterArtifact && /\.(js|ts)$/.test(artifact.path);
 }
 
 async function optionalRealpath(path) {
@@ -860,6 +1335,7 @@ function withoutAllowedDenoAccess(source, allowSidecarIo) {
 }
 
 function hasComputedObjectPattern(source, start = 0, end = source.length, inheritedPattern = false) {
+  if (!source.includes("[") && !source.includes("constructor")) return false;
   const delimiterPairs = buildDelimiterPairs(source);
   const stack = [];
   for (let i = start; i < end; i += 1) {
@@ -876,6 +1352,7 @@ function hasComputedObjectPattern(source, start = 0, end = source.length, inheri
 }
 
 function hasComputedMemberAccess(source) {
+  if (!source.includes("[")) return false;
   const delimiterPairs = buildDelimiterPairs(source);
   for (let i = 0; i < source.length; i += 1) {
     if (source[i] !== "[") continue;
@@ -883,16 +1360,21 @@ function hasComputedMemberAccess(source) {
     if (!previous) continue;
     if (enclosingArrayPatternContext(source, i, false, delimiterPairs)) continue;
     if (previous.ch === "." && source[previous.index - 1] === "?") return true;
+    if (previous.ch === ")" && isAfterControlStatementHead(source.slice(0, previous.index + 1))) continue;
     if ([")", "]", "}"].includes(previous.ch)) return true;
     if (literalReceiverBeforeComputedAccess(source, previous)) return true;
     const identifier = identifierEndingAt(source, previous.index);
     if (!identifier) continue;
     const start = previous.index - identifier.length + 1;
-    if (ARRAY_LITERAL_PREFIX_KEYWORDS.has(identifier)) continue;
+    if (ARRAY_LITERAL_PREFIX_KEYWORDS.has(identifier) && !identifierFollowsPropertyAccess(source, start)) continue;
     if (identifier === "of" && identifierLooksLikeForOfKeyword(source, start, delimiterPairs)) continue;
     return true;
   }
   return false;
+}
+
+function identifierFollowsPropertyAccess(source, start) {
+  return previousSignificant(source, start)?.ch === ".";
 }
 
 function literalReceiverBeforeComputedAccess(source, previous) {
@@ -1383,12 +1865,35 @@ export async function verifySelfContained(pack) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
     const artifactReal = await realpath(full);
+    const isAdapterArtifact = adapterReal !== null && artifactReal === adapterReal;
     const source = await readFile(full, "utf8");
-    if (nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact)) {
-      const syntaxSource = nodeStripOnlyTypeScriptSyntaxSource(source);
+    const packageTypeInput = nodeSidecarUsesPackageType(sidecarRuntimeName, artifact, isAdapterArtifact)
+      ? await packPackageType(root, artifact.path)
+      : null;
+    assert(!packageTypeInput || (packageTypeInput.artifactPath && covered.has(packageTypeInput.artifactPath)), `${pack.name}: Node sidecar package.json not checksum-covered for ${artifact.path}`);
+    const packageType = packageTypeInput?.type ?? null;
+    const moduleSyntaxSource = executableCodeSource(loaderScanSource(source, artifact.path));
+    const nodeModuleKind = nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, packageType, source, moduleSyntaxSource);
+    assert(!nodeSidecarUsesUnsupportedRuntimeArtifact(sidecarRuntimeName, artifact, isAdapterArtifact), `${pack.name}: Node sidecar unsupported runtime artifact rejected in ${artifact.path}`);
+    const typeScriptSyntaxSource = nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact, isAdapterArtifact)
+      ? nodeStripOnlyTypeScriptSyntaxSource(source)
+      : null;
+    if (typeScriptSyntaxSource) {
       for (const pattern of NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX) {
-        assert(!pattern.test(syntaxSource), `${pack.name}: Node sidecar unsupported TypeScript syntax rejected in ${artifact.path}`);
+        assert(!pattern.test(typeScriptSyntaxSource), `${pack.name}: Node sidecar unsupported TypeScript syntax rejected in ${artifact.path}`);
       }
+    }
+    if (nodeSidecarRequiresModuleSyntaxChecks(sidecarRuntimeName, artifact, isAdapterArtifact)) {
+      const nodeModuleSyntaxSource = typeScriptSyntaxSource && nodeModuleKind === "cjs"
+        ? typeScriptSyntaxSource
+        : PLAIN_JAVASCRIPT_ARTIFACT.test(artifact.path)
+          ? executableCodeSource(stripShebang(source))
+          : moduleSyntaxSource;
+      for (const check of nodeUnsupportedTypeScriptModuleSyntax(nodeModuleKind)) {
+        assert(!sourceCheckMatches(check, nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
+      }
+      assert(nodeModuleKind !== "esm" || !hasNodeMtsCommonJsExportsAssignment(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
+      assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
     const scanInputs = loaderScanInputs(source, artifact.path);
     const importEntries = scanImportEntries(source, artifact.path);
@@ -1396,16 +1901,27 @@ export async function verifySelfContained(pack) {
       .map((entry) => entry.path)
       .filter((path) => typeof path === "string" && path.length > 0))];
     assert(!importEntries.some((entry) => entry.kind === "dynamic-import"), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+    assert(
+      !(nodeModuleKind === "esm" || (sidecarRuntimeName === "deno" && !isAdapterArtifact)) || !hasJsonStaticImport(importEntries),
+      `${pack.name}: sidecar JSON import requires verifiable import attributes in ${artifact.path}`
+    );
     for (const { loaderSource, codeSource } of scanInputs) {
-      assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
-      for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
-        assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+      if (artifactUsesCommonJsWrapper(artifact.path, nodeModuleKind)) {
+        assert(!COMMONJS_WRAPPER_ARGUMENTS.test(codeSource), `${pack.name}: CommonJS wrapper arguments rejected in ${artifact.path}`);
       }
-      for (const pattern of EVAL_PATTERNS) {
-        assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+      if (UNSAFE_LOADER_HINT.test(codeSource)) {
+        assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+        for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
+          assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+        }
+        for (const pattern of EVAL_PATTERNS) {
+          assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+        }
+        assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
       }
-      assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
-      assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+      if (loaderSource.includes("require")) {
+        assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+      }
     }
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
@@ -1415,9 +1931,12 @@ export async function verifySelfContained(pack) {
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
+      assert(!specifier.includes("\\"), `${pack.name}: backslash local import ${specifier} rejected`);
+      assert(!hasUrlSuffix(specifier), `${pack.name}: URL-suffixed local import ${specifier} rejected`);
       assert(!hasEncodedDotSegment(specifier), `${pack.name}: encoded dot segment import ${specifier} rejected`);
+      assert(!hasPercentEncodedOctet(specifier), `${pack.name}: percent-encoded local import ${specifier} rejected`);
       assert(
-        !sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, artifact) ||
+        !sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, isAdapterArtifact) ||
           !specifierUsesRuntimeResolution(artifact.path, specifier),
         `${pack.name}: non-Bun sidecar extensionless local import ${specifier} rejected`
       );
@@ -1474,11 +1993,17 @@ export async function verifySelfContained(pack) {
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
+    const allowNetworkGlobals = pack.manifest.authorityLabels?.includes("network.http") === true;
     for (const { codeSource } of scanInputs) {
-      assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
-      assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
-      assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
-      assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
+      if (codeSource.includes("module")) {
+        assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
+      }
+      if (HOST_GLOBAL_HINT.test(codeSource)) {
+        assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
+        assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
+        assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
+        assert(allowNetworkGlobals || !NETWORK_GLOBAL_ACCESS.test(codeSource), `${pack.name}: network global access rejected in ${artifact.path}`);
+      }
     }
   }
   validateSidecarCommand(pack);
@@ -1502,10 +2027,12 @@ export function validateSidecarCommand(pack) {
   assert(!(runtime === "bun" && args[0] === "x"), `${pack.name}: bun package runner rejected`);
   assert(!(runtime === "npm" && args[0] === "exec"), `${pack.name}: npm exec package runner rejected`);
   assert(!(runtime === "node" && args[0] === "--run"), `${pack.name}: node --run package runner rejected`);
-  assert(!args.some((arg) => ["-e", "--eval", "eval"].includes(arg)), `${pack.name}: eval flag rejected`);
-  assert(!args.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
+  const runtimeSelectionArgs = sidecarRuntimeArgsThroughEntrypoint(command);
+  assert(!runtimeSelectionArgs.some((arg) => ["-e", "--eval", "eval"].includes(arg)), `${pack.name}: eval flag rejected`);
+  assert(!runtimeSelectionArgs.some(isPreloadFlag), `${pack.name}: preload flag rejected`);
   const entry = sidecarEntrypoint(pack);
   assert(entry, `${pack.name}: sidecar entrypoint missing`);
+  assert(!(runtime === "node" && NODE_UNSUPPORTED_RUNTIME_ARTIFACT.test(entry)), `${pack.name}: Node sidecar unsupported runtime entrypoint rejected`);
   assert(pack.manifest.artifacts.some((artifact) => artifact.path === entry), `${pack.name}: sidecar entrypoint not artifact-bound`);
   assert(!sidecarEntrypointAliasesAdapter(pack, entry), `${pack.name}: sidecar adapter entrypoint rejected`);
   assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);

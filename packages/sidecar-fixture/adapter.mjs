@@ -24,8 +24,15 @@ const FORBIDDEN_EVIDENCE_KEYS = [
   "archiveSealBytes"
 ];
 
+function status(hostRequest, wanted, fallback = "failed") {
+  const statuses = hostRequest?.responseSchema?.statuses ?? [];
+  if (statuses.includes(wanted)) return wanted;
+  if (statuses.includes(fallback)) return fallback;
+  return "failed";
+}
+
 function reject(hostRequest, reason) {
-  return { requestId: hostRequest?.requestId ?? "unknown", status: "rejected", payload: { reason } };
+  return { requestId: hostRequest?.requestId ?? "unknown", status: status(hostRequest, "rejected"), payload: { reason } };
 }
 
 function tooDeep(value, depth = 0) {

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { importAdapter, loadPack, packageNames } from "../harness/pack-utils.mjs";
 import { resolve } from "../packages/generic-http-json/adapter.mjs";
+import { resolve as resolveHumanApproval } from "../packages/human-approval/adapter.mjs";
 import { dryRun as dryRunFile, resolve as resolveFile } from "../packages/sandbox-files/adapter.mjs";
 
 test("missing idempotency key prevents effect", async () => {
@@ -16,6 +17,22 @@ test("missing idempotency key prevents effect", async () => {
   });
   expect(result.status).toBe("rejected");
   expect(context.effectAttempted).toBe(0);
+});
+
+test("human approval rejection fallback stays schema compatible", async () => {
+  const result = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
+    requestId: "human-schema-fallback",
+    idempotencyKey: "world:idem:human-schema-fallback",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["ok", "deferred"] },
+    payload: { anchor: "world:host-request:1" }
+  });
+  expect(result.status).toBe("deferred");
+  expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
 function fileRequest(overrides = {}) {

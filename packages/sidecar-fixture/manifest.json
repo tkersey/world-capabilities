@@ -17,7 +17,7 @@
     "sidecar.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "b353728afcf0f9f63cf02e9b114a0c81c960cda68f49fe8f4802654968c55294",
+    "adapter.mjs": "58a0d898d552503d09c3a20952ffdb63a4aaf6ee6929ee974fafb107374bf10d",
     "helper.mjs": "579547e7032209f5eabc9597a52d910b2ad83f9994585c2a256366bb78d881ce",
     "sidecar.mjs": "7f43ff884fcf4d4bc6eadf6cfae709b34d878c295072ffab6549dbafa264043a"
   },
@@ -41,7 +41,7 @@
   },
   "packageName": "@tkersey/world-capabilities/sidecar-fixture",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "1a9f80d8243076dabbccc657542801a9cd40673e13affd27350c041464cf7330",
+  "packFingerprint": "b29ef3a680734c01bc9aa1708de6c1d1ef176b895e968923988a05c9bbb0d159",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",
