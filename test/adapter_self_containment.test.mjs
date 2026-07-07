@@ -1249,6 +1249,40 @@ test("CommonJS wrapper arguments cannot alias require", async () => {
   }
 });
 
+test("CommonJS wrapper arguments check allows nested function arguments", async () => {
+  for (const [name, artifactPath, source, metadata] of [
+    [
+      "adapter-cjs",
+      "adapter.cjs",
+      "function count() { return arguments.length; }\nmodule.exports = count(1, 2);\n",
+      { allowedBuiltins: [] }
+    ],
+    [
+      "node-cts",
+      "sidecar.cts",
+      "function count() { return arguments.length; }\nprocess.stdout.write(String(count(1, 2)));\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), `world-cjs-nested-arguments-${name}-pack-`));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, artifactPath), source);
+      await verifySelfContained({
+        name: `cjs-nested-arguments-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: artifactPath, role: artifactPath === "adapter.cjs" ? "adapter" : "sidecar" }],
+          metadata
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("contextual keyword divisions stay visible to loader scans", () => {
   for (const keyword of ["yield", "await"]) {
     const codeSource = scannerExecutableCodeSourceForTest(`var ${keyword} = 1;\nconst x = 1;\nmodule.exports = ${keyword} / module.constructor._load("node:child_process") / x;\n`);
@@ -3108,6 +3142,7 @@ test("Node TypeScript sidecar module checks ignore type-only syntax", async () =
     ["cts-generic-arrow", "sidecar.cts", "type Box<T> = { value: T };\nconst read = <T extends Box<string>>(x: T) => x.value;\nprocess.stdout.write(read({ value: \"ok\" }));\n"],
     ["cts-async-nested-generic", "sidecar.cts", "async function f<T extends (x: string) => Promise<string>>(fn: T) { await fn(\"x\"); }\nvoid f;\nprocess.stdout.write(\"ok\");\n"],
     ["mts-method-return", "sidecar.mts", "const obj = { m() { return \"ok\"; } };\nprocess.stdout.write(obj.m());\n"],
+    ["mts-return-property-names", "sidecar.mts", "const obj = { return: 1, nested: { return() { return \"ok\"; } } };\nprocess.stdout.write(obj.nested.return());\n"],
     ["mts-data-properties", "sidecar.mts", "const state = { export: 0, module: { value: 1 }, exports: 2 };\nstate.export = 1;\nstate.module.value += 1;\nstate.exports = 3;\nprocess.stdout.write(\"ok\");\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-type-module-pack-"));

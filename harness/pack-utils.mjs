@@ -121,7 +121,6 @@ const JS_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029
 const COMMONJS_REQUIRE = new RegExp(`\\brequire${JS_INTERTOKEN_SPACE}\\(${JS_INTERTOKEN_SPACE}(["'\`])([^"'\`]+)\\1${JS_INTERTOKEN_SPACE}\\)`, "g");
 const ANY_COMMONJS_REQUIRE = identifierToken("require");
 const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("module")}\s*(?:\.|\?\.)\s*(?:constructor|require)(?!${JS_IDENTIFIER_CONTINUE})`, "u");
-const COMMONJS_WRAPPER_ARGUMENTS = identifierToken("arguments");
 const PROCESS_ACCESS = identifierToken("process");
 const BUN_ACCESS = identifierToken("Bun");
 const DENO_ACCESS = identifierToken("Deno");
@@ -1191,13 +1190,38 @@ function nodeCommonJsSyntaxParses(source, artifactPath) {
 }
 
 function nodeEsmHasTopLevelReturn(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
   for (let i = source.indexOf("return"); i >= 0; i = source.indexOf("return", i + "return".length)) {
     if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "return".length])) continue;
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
+    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
     if (!nearestEnclosingFunctionBody(source, i)) return true;
   }
   return false;
+}
+
+function commonJsWrapperArgumentsAccessed(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  for (let i = source.indexOf("arguments"); i >= 0; i = source.indexOf("arguments", i + "arguments".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "arguments".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
+    if (!nearestEnclosingFunctionBody(source, i)) return true;
+  }
+  return false;
+}
+
+function tokenIsObjectPropertyName(source, index, delimiterPairs) {
+  const previous = previousSignificant(source, index);
+  if (!previous || !["{", ","].includes(previous.ch)) return false;
+  const next = nextSignificant(source, index + identifierStartingAt(source, index).length);
+  if (next?.ch === ":") return true;
+  if (next?.ch !== "(") return false;
+  const close = findMatchingDelimiter(source, next.index, "(", ")", delimiterPairs);
+  const after = close >= 0 ? nextSignificant(source, close + 1) : null;
+  return after?.ch === "{";
 }
 
 function nodeCtsHasDisallowedAwait(source) {
@@ -1992,7 +2016,7 @@ export async function verifySelfContained(pack) {
     );
     for (const { loaderSource, codeSource } of scanInputs) {
       if (artifactUsesCommonJsWrapper(artifact.path, nodeModuleKind)) {
-        assert(!COMMONJS_WRAPPER_ARGUMENTS.test(codeSource), `${pack.name}: CommonJS wrapper arguments rejected in ${artifact.path}`);
+        assert(!commonJsWrapperArgumentsAccessed(codeSource), `${pack.name}: CommonJS wrapper arguments rejected in ${artifact.path}`);
       }
       if (UNSAFE_LOADER_HINT.test(codeSource)) {
         assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
