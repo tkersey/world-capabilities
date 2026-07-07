@@ -1224,9 +1224,21 @@ test("CommonJS wrapper arguments cannot alias require", async () => {
       { allowedBuiltins: [] }
     ],
     [
+      "adapter-arrow-cjs",
+      "adapter.cjs",
+      "const leak = () => { const [, r] = arguments; return r(\"node:fs\"); };\nmodule.exports = leak();\n",
+      { allowedBuiltins: [] }
+    ],
+    [
       "node-cts",
       "sidecar.cts",
       "const [, r] = arguments;\nr(\"node:fs\");\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-arrow-cts",
+      "sidecar.cts",
+      "const leak = () => { const [, r] = arguments; return r(\"node:fs\"); };\nleak();\nprocess.stdout.write(\"ok\");\n",
       { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
     ]
   ]) {
@@ -1254,13 +1266,13 @@ test("CommonJS wrapper arguments check allows nested function arguments", async 
     [
       "adapter-cjs",
       "adapter.cjs",
-      "function count() { return arguments.length; }\nmodule.exports = count(1, 2);\n",
+      "function count() { return arguments.length; }\nfunction outer() { return () => arguments.length; }\nmodule.exports = count(1, 2) + outer(1, 2)();\n",
       { allowedBuiltins: [] }
     ],
     [
       "node-cts",
       "sidecar.cts",
-      "function count() { return arguments.length; }\nprocess.stdout.write(String(count(1, 2)));\n",
+      "function count() { return arguments.length; }\nfunction outer() { return () => arguments.length; }\nprocess.stdout.write(String(count(1, 2) + outer(1, 2)()));\n",
       { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
     ]
   ]) {

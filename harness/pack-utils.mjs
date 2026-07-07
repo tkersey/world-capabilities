@@ -632,6 +632,22 @@ function nearestEnclosingFunctionBody(source, start) {
   return null;
 }
 
+function nearestArgumentsBindingFunctionBody(source, start) {
+  const stack = [];
+  for (let i = 0; i < start; i += 1) {
+    if (source[i] === "{") {
+      stack.push(i);
+      continue;
+    }
+    if (source[i] === "}") stack.pop();
+  }
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const body = functionBodyBeforeBrace(source, stack[i]);
+    if (body?.arguments) return body;
+  }
+  return null;
+}
+
 function functionBodyBeforeBrace(source, openBrace) {
   const head = source.slice(0, openBrace).trimEnd();
   if (!head) return null;
@@ -640,14 +656,14 @@ function functionBodyBeforeBrace(source, openBrace) {
   const openParen = findOpeningDelimiter(head, head.length - 1, "(", ")");
   if (openParen < 0) return null;
   const beforeParams = head.slice(0, openParen).trimEnd();
-  if (/\basync\s+function\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: true };
-  if (/\basync\s+function(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: false };
-  if (/\bfunction\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: true };
-  if (/\bfunction(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: false };
-  if (/\basync\s*\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: true };
-  if (/(?:^|[\s{;,])\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: false, generator: true };
-  if (/\basync\s+(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: false };
-  if (plainMethodBodyBeforeParams(beforeParams)) return { async: false, generator: false };
+  if (/\basync\s+function\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: true, arguments: true };
+  if (/\basync\s+function(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: false, arguments: true };
+  if (/\bfunction\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: true, arguments: true };
+  if (/\bfunction(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: false, arguments: true };
+  if (/\basync\s*\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: true, arguments: true };
+  if (/(?:^|[\s{;,])\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: false, generator: true, arguments: true };
+  if (/\basync\s+(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: false, arguments: true };
+  if (plainMethodBodyBeforeParams(beforeParams)) return { async: false, generator: false, arguments: true };
   return null;
 }
 
@@ -664,14 +680,14 @@ function arrowFunctionBodyBeforeArrow(head) {
   if (!beforeArrow) return { async: false, generator: false };
   if (beforeArrow.endsWith(")")) {
     const openParen = findOpeningDelimiter(beforeArrow, beforeArrow.length - 1, "(", ")");
-    if (openParen < 0) return { async: false, generator: false };
+    if (openParen < 0) return { async: false, generator: false, arguments: false };
     const beforeParams = beforeArrow.slice(0, openParen).trimEnd();
-    return { async: identifierEndingAt(beforeParams, beforeParams.length - 1) === "async", generator: false };
+    return { async: identifierEndingAt(beforeParams, beforeParams.length - 1) === "async", generator: false, arguments: false };
   }
   const parameter = identifierEndingAt(beforeArrow, beforeArrow.length - 1);
-  if (!parameter) return { async: false, generator: false };
+  if (!parameter) return { async: false, generator: false, arguments: false };
   const beforeParameter = beforeArrow.slice(0, beforeArrow.length - parameter.length).trimEnd();
-  return { async: identifierEndingAt(beforeParameter, beforeParameter.length - 1) === "async", generator: false };
+  return { async: identifierEndingAt(beforeParameter, beforeParameter.length - 1) === "async", generator: false, arguments: false };
 }
 
 function isAfterStatementBlock(prefix) {
@@ -1208,9 +1224,14 @@ function commonJsWrapperArgumentsAccessed(source) {
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
     if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
-    if (!nearestEnclosingFunctionBody(source, i)) return true;
+    if (!nearestArgumentsBindingFunctionBody(source, i)) return true;
   }
   return false;
+}
+
+function commonJsWrapperArgumentScanSource(source, artifactPath) {
+  if (NODE_TYPESCRIPT_ARTIFACT.test(artifactPath)) return nodeStripOnlyTypeScriptSyntaxSource(source);
+  return executableCodeSource(withoutOptimizerInputs(stripShebang(source)));
 }
 
 function tokenIsObjectPropertyName(source, index, delimiterPairs) {
@@ -2014,10 +2035,10 @@ export async function verifySelfContained(pack) {
       !(nodeModuleKind === "esm" || (sidecarRuntimeName === "deno" && !isAdapterArtifact)) || !hasJsonStaticImport(importEntries),
       `${pack.name}: sidecar JSON import requires verifiable import attributes in ${artifact.path}`
     );
+    if (artifactUsesCommonJsWrapper(artifact.path, nodeModuleKind)) {
+      assert(!commonJsWrapperArgumentsAccessed(commonJsWrapperArgumentScanSource(source, artifact.path)), `${pack.name}: CommonJS wrapper arguments rejected in ${artifact.path}`);
+    }
     for (const { loaderSource, codeSource } of scanInputs) {
-      if (artifactUsesCommonJsWrapper(artifact.path, nodeModuleKind)) {
-        assert(!commonJsWrapperArgumentsAccessed(codeSource), `${pack.name}: CommonJS wrapper arguments rejected in ${artifact.path}`);
-      }
       if (UNSAFE_LOADER_HINT.test(codeSource)) {
         assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
         for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
