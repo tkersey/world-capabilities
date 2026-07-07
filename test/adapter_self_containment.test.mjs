@@ -3182,6 +3182,7 @@ test("Node TypeScript sidecars reject transform-only syntax", async () => {
     ["namespace", "namespace N { export const x = 1 }\nprocess.stdout.write(\"ok\");\n"],
     ["unicode-namespace", "namespace \u03a9 { export const x = 1 }\nprocess.stdout.write(\"ok\");\n"],
     ["angle-type-assertion", "const x = <number>1;\nprocess.stdout.write(String(x));\n"],
+    ["operator-angle-type-assertion", "const value = 1;\nconst x = <number> +value;\nprocess.stdout.write(String(x));\n"],
     ["return-angle-type-assertion", "function value() { return <number>1; }\nprocess.stdout.write(String(value()));\n"],
     ["throw-angle-type-assertion", "function fail(err: unknown) { throw <Error>err; }\nvoid fail;\nprocess.stdout.write(\"ok\");\n"],
     ["semicolonless-type-alias-enum", "type A = string\nenum E { A }\nprocess.stdout.write(\"ok\");\n"],

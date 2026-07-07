@@ -144,7 +144,7 @@ const NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS = String.raw`(?:<(?:=>|[^<>\r\n]|<[
 const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
   new RegExp(String.raw`\benum\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
   new RegExp(String.raw`\b(?:namespace|module)\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
-  new RegExp(String.raw`(?:^|[({[=,:;!&|?+\-*~^<>%/]|\b(?:return|throw|yield|await|case|delete|void|typeof|new)\b)\s*<\s*${NODE_TYPESCRIPT_IDENTIFIER}(?:[\s<>,[\].?&|]|${NODE_TYPESCRIPT_IDENTIFIER})*>\s*(?!\([^)]*\)\s*(?::[^=\r\n]*)?=>)(?:${NODE_TYPESCRIPT_IDENTIFIER_START}|\d|["'({[])`, "u"),
+  new RegExp(String.raw`(?:^|[({[=,:;!&|?+\-*~^<>%/]|\b(?:return|throw|yield|await|case|delete|void|typeof|new)\b)\s*<\s*${NODE_TYPESCRIPT_IDENTIFIER}(?:[\s<>,[\].?&|]|${NODE_TYPESCRIPT_IDENTIFIER})*>\s*(?!\([^)]*\)\s*(?::[^=\r\n]*)?=>)(?:${NODE_TYPESCRIPT_IDENTIFIER_START}|\d|["'({[+\-!~])`, "u"),
   new RegExp(String.raw`@\s*(?:${NODE_TYPESCRIPT_IDENTIFIER_START}|\()`, "u"),
   new RegExp(String.raw`constructor\s*\((?:[^)]*,)?\s*(?:public|private|protected|readonly|override)\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
   new RegExp(String.raw`\bimport\s+(?!type\b)${NODE_TYPESCRIPT_IDENTIFIER}\s*=`, "u"),
