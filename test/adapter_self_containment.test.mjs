@@ -1962,6 +1962,25 @@ test("array literals and with-named methods are not unsafe loaders", async () =>
   }
 });
 
+test("array and regex literals after await and yield are not unsafe loaders", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-loader-async-generator-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export async function asyncValues(value) {\n  const xs = await [value];\n  return await /process/.test(String(xs));\n}\nexport function* generatorValues(value) {\n  yield [value];\n  yield /process/.test(String(value));\n}\n");
+    await verifySelfContained({
+      name: "loader-async-generator-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assignment destructured computed members are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
   try {

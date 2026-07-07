@@ -601,12 +601,68 @@ function isRegexLiteralStart(result) {
   if (isAfterControlStatementHead(trimmed)) return true;
   if (isAfterStatementBlock(trimmed)) return true;
   const token = trimmed.match(/([A-Za-z_$#][\w$#]*)\s*$/);
-  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "instanceof", "in", "of", "do", "else", "extends", "new", "default"].includes(token[1])) return false;
+  if (!token || !["return", "throw", "case", "delete", "void", "typeof", "await", "yield", "instanceof", "in", "of", "do", "else", "extends", "new", "default"].includes(token[1])) return false;
   const tokenStart = token.index ?? 0;
   if (tokenStart > 0 && isIdentifierPartChar(trimmed[tokenStart - 1])) return false;
   const beforeKeyword = trimmed.slice(0, tokenStart).trimEnd();
   if (beforeKeyword.endsWith(".")) return false;
+  if (["await", "yield"].includes(token[1]) && !contextualKeywordMayPrefixExpression(trimmed, tokenStart, token[1])) return false;
   return token[1] !== "of" || isForOfOperatorPrefix(beforeKeyword);
+}
+
+function contextualKeywordMayPrefixExpression(source, tokenStart, keyword) {
+  const body = nearestEnclosingFunctionBody(source, tokenStart);
+  if (!body) return false;
+  return keyword === "await" ? body.async : body.generator;
+}
+
+function nearestEnclosingFunctionBody(source, start) {
+  const stack = [];
+  for (let i = 0; i < start; i += 1) {
+    if (source[i] === "{") {
+      stack.push(i);
+      continue;
+    }
+    if (source[i] === "}") stack.pop();
+  }
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const body = functionBodyBeforeBrace(source, stack[i]);
+    if (body) return body;
+  }
+  return null;
+}
+
+function functionBodyBeforeBrace(source, openBrace) {
+  const head = source.slice(0, openBrace).trimEnd();
+  if (!head) return null;
+  if (/=>\s*$/.test(head)) return arrowFunctionBodyBeforeArrow(head.replace(/=>\s*$/, ""));
+  if (!head.endsWith(")")) return null;
+  const openParen = findOpeningDelimiter(head, head.length - 1, "(", ")");
+  if (openParen < 0) return null;
+  const beforeParams = head.slice(0, openParen).trimEnd();
+  if (/\basync\s+function\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: true };
+  if (/\basync\s+function(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: true, generator: false };
+  if (/\bfunction\s*\*(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: true };
+  if (/\bfunction(?:\s+[A-Za-z_$#][\w$#]*)?$/.test(beforeParams)) return { async: false, generator: false };
+  if (/\basync\s*\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: true };
+  if (/(?:^|[\s{;,])\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: false, generator: true };
+  if (/\basync\s+(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: false };
+  return null;
+}
+
+function arrowFunctionBodyBeforeArrow(head) {
+  const beforeArrow = head.trimEnd();
+  if (!beforeArrow) return { async: false, generator: false };
+  if (beforeArrow.endsWith(")")) {
+    const openParen = findOpeningDelimiter(beforeArrow, beforeArrow.length - 1, "(", ")");
+    if (openParen < 0) return { async: false, generator: false };
+    const beforeParams = beforeArrow.slice(0, openParen).trimEnd();
+    return { async: identifierEndingAt(beforeParams, beforeParams.length - 1) === "async", generator: false };
+  }
+  const parameter = identifierEndingAt(beforeArrow, beforeArrow.length - 1);
+  if (!parameter) return { async: false, generator: false };
+  const beforeParameter = beforeArrow.slice(0, beforeArrow.length - parameter.length).trimEnd();
+  return { async: identifierEndingAt(beforeParameter, beforeParameter.length - 1) === "async", generator: false };
 }
 
 function isAfterStatementBlock(prefix) {
@@ -1368,6 +1424,7 @@ function hasComputedMemberAccess(source) {
     if (!identifier) continue;
     const start = previous.index - identifier.length + 1;
     if (ARRAY_LITERAL_PREFIX_KEYWORDS.has(identifier) && !identifierFollowsPropertyAccess(source, start)) continue;
+    if (["await", "yield"].includes(identifier) && !identifierFollowsPropertyAccess(source, start) && contextualKeywordMayPrefixExpression(source, start, identifier)) continue;
     if (identifier === "of" && identifierLooksLikeForOfKeyword(source, start, delimiterPairs)) continue;
     return true;
   }
