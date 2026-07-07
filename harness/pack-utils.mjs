@@ -648,7 +648,16 @@ function functionBodyBeforeBrace(source, openBrace) {
   if (/\basync\s*\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: true };
   if (/(?:^|[\s{;,])\*\s*(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: false, generator: true };
   if (/\basync\s+(?:[#A-Za-z_$][\w$#]*|\[[^\]]+\])$/.test(beforeParams)) return { async: true, generator: false };
+  if (plainMethodBodyBeforeParams(beforeParams)) return { async: false, generator: false };
   return null;
+}
+
+function plainMethodBodyBeforeParams(source) {
+  const name = identifierEndingAt(source, source.length - 1);
+  if (!name || ["catch", "for", "if", "switch", "while", "with"].includes(name)) return false;
+  const beforeName = source.slice(0, source.length - name.length);
+  const previous = previousSignificant(beforeName, beforeName.length);
+  return previous?.ch === "{" || previous?.ch === ",";
 }
 
 function arrowFunctionBodyBeforeArrow(head) {
@@ -1179,6 +1188,16 @@ function nodeCommonJsSyntaxParses(source, artifactPath) {
   } catch {
     return false;
   }
+}
+
+function nodeEsmHasTopLevelReturn(source) {
+  for (let i = source.indexOf("return"); i >= 0; i = source.indexOf("return", i + "return".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "return".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    if (!nearestEnclosingFunctionBody(source, i)) return true;
+  }
+  return false;
 }
 
 function nodeCtsHasDisallowedAwait(source) {
@@ -1958,6 +1977,7 @@ export async function verifySelfContained(pack) {
         assert(!sourceCheckMatches(check, nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       }
       assert(nodeModuleKind !== "esm" || !hasNodeMtsCommonJsExportsAssignment(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
+      assert(nodeModuleKind !== "esm" || !nodeEsmHasTopLevelReturn(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
     const scanInputs = loaderScanInputs(source, artifact.path);

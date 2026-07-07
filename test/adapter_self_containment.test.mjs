@@ -3107,6 +3107,7 @@ test("Node TypeScript sidecar module checks ignore type-only syntax", async () =
     ["mts-generic-arrow", "sidecar.mts", "type Box<T> = { value: T };\nconst read = <T extends Box<string>>(x: T) => x.value;\nprocess.stdout.write(read({ value: \"ok\" }));\n"],
     ["cts-generic-arrow", "sidecar.cts", "type Box<T> = { value: T };\nconst read = <T extends Box<string>>(x: T) => x.value;\nprocess.stdout.write(read({ value: \"ok\" }));\n"],
     ["cts-async-nested-generic", "sidecar.cts", "async function f<T extends (x: string) => Promise<string>>(fn: T) { await fn(\"x\"); }\nvoid f;\nprocess.stdout.write(\"ok\");\n"],
+    ["mts-method-return", "sidecar.mts", "const obj = { m() { return \"ok\"; } };\nprocess.stdout.write(obj.m());\n"],
     ["mts-data-properties", "sidecar.mts", "const state = { export: 0, module: { value: 1 }, exports: 2 };\nstate.export = 1;\nstate.module.value += 1;\nstate.exports = 3;\nprocess.stdout.write(\"ok\");\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-type-module-pack-"));
@@ -3324,6 +3325,7 @@ test("Node TypeScript sidecars reject incompatible module syntax", async () => {
     ["ts-inline-type-export", "sidecar.ts", "interface Helper { value: string }\nexport { type Helper };\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["cts-top-level-await", "sidecar.cts", "await Promise.resolve();\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["cts-dead-top-level-await", "sidecar.cts", "if (false) await Promise.resolve();\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
+    ["mts-top-level-return", "sidecar.mts", "return;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-require", "sidecar.mts", "require(\"./helper.cjs\");\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-export", "sidecar.mts", "module.exports = {};\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-bare-exports", "sidecar.mts", "exports = {};\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
