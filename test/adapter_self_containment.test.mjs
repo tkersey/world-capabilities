@@ -458,6 +458,34 @@ test("Deno sidecars reject JSON imports without verifiable attributes", async ()
   }
 });
 
+test("Node sidecar entrypoints cannot import adapter modules", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-node-sidecar-adapter-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "import \"./adapter.mjs\";\nprocess.stdout.write(\"ok\");\n");
+    await writeFile(join(dir, "adapter.mjs"), "import data from \"./data.json\";\nexport default data;\n");
+    await writeFile(join(dir, "data.json"), "{\"ok\":true}\n");
+    await expect(verifySelfContained({
+      name: "node-sidecar-adapter-import-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "sidecar.mjs", role: "sidecar" },
+          { path: "adapter.mjs", role: "adapter" },
+          { path: "data.json", role: "helper" }
+        ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/sidecar adapter import rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node sidecar package type must be checksum covered", async () => {
   for (const [name, packageJsonDir] of [
     ["pack", "pack"],
@@ -3050,6 +3078,7 @@ test("Node TypeScript sidecar module checks ignore type-only syntax", async () =
     ["mts-readonly-constructor-type", "sidecar.mts", "class Box { constructor(xs: readonly string[]) { void xs; } }\nnew Box([]);\nprocess.stdout.write(\"ok\");\n"],
     ["mts-generic-arrow", "sidecar.mts", "type Box<T> = { value: T };\nconst read = <T extends Box<string>>(x: T) => x.value;\nprocess.stdout.write(read({ value: \"ok\" }));\n"],
     ["cts-generic-arrow", "sidecar.cts", "type Box<T> = { value: T };\nconst read = <T extends Box<string>>(x: T) => x.value;\nprocess.stdout.write(read({ value: \"ok\" }));\n"],
+    ["cts-async-nested-generic", "sidecar.cts", "async function f<T extends (x: string) => Promise<string>>(fn: T) { await fn(\"x\"); }\nvoid f;\nprocess.stdout.write(\"ok\");\n"],
     ["mts-data-properties", "sidecar.mts", "const state = { export: 0, module: { value: 1 }, exports: 2 };\nstate.export = 1;\nstate.module.value += 1;\nstate.exports = 3;\nprocess.stdout.write(\"ok\");\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-type-module-pack-"));

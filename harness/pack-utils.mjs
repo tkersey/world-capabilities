@@ -140,6 +140,7 @@ const NODE_TYPESCRIPT_IDENTIFIER_START = String.raw`[$_\p{ID_Start}]`;
 const NODE_TYPESCRIPT_IDENTIFIER_CONTINUE = String.raw`[$\u200c\u200d\p{ID_Continue}]*`;
 const NODE_TYPESCRIPT_IDENTIFIER = `${NODE_TYPESCRIPT_IDENTIFIER_START}${NODE_TYPESCRIPT_IDENTIFIER_CONTINUE}`;
 const NODE_TYPESCRIPT_TYPE_PARAMETERS = String.raw`(?:<[^)\r\n]+>\s*)?`;
+const NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS = String.raw`(?:<(?:=>|[^<>\r\n]|<[^<>\r\n]*>)*>\s*)?`;
 const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
   new RegExp(String.raw`\benum\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
   new RegExp(String.raw`\b(?:namespace|module)\s+${NODE_TYPESCRIPT_IDENTIFIER_START}`, "u"),
@@ -1028,6 +1029,13 @@ function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, isAd
   return ["node", "deno"].includes(sidecarRuntimeName) && !isAdapterArtifact;
 }
 
+function sidecarArtifactCannotImportAdapter(sidecarRuntimeName, artifactReal, sidecarEntryReal, adapterReal) {
+  return ["node", "deno"].includes(sidecarRuntimeName) &&
+    adapterReal !== null &&
+    sidecarEntryReal !== null &&
+    artifactReal === sidecarEntryReal;
+}
+
 function nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact, isAdapterArtifact) {
   return sidecarRuntimeName === "node" && !isAdapterArtifact && NODE_TYPESCRIPT_ARTIFACT.test(artifact.path);
 }
@@ -1233,7 +1241,7 @@ function arrowExpressionReachesIndex(source, start, index) {
 }
 
 function prefixEndsWithAsyncArrowHead(prefix) {
-  return new RegExp(String.raw`${identifierTokenSource("async")}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS}(?:${NODE_TYPESCRIPT_IDENTIFIER}|\([^)]*\))(?:\s*:[\s\S]*)?$`, "u").test(prefix);
+  return new RegExp(String.raw`${identifierTokenSource("async")}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS}(?:${NODE_TYPESCRIPT_IDENTIFIER}|\([^)]*\))(?:\s*:[\s\S]*)?$`, "u").test(prefix);
 }
 
 function isAsyncFunctionBodyStart(source, bodyStart, delimiterPairs) {
@@ -1247,7 +1255,7 @@ function isAsyncFunctionBodyStart(source, bodyStart, delimiterPairs) {
   const paramStart = findOpeningDelimiter(source, paramClose, "(", ")");
   if (paramStart < 0) return false;
   const beforeParams = source.slice(0, paramStart).trimEnd();
-  return new RegExp(String.raw`${identifierTokenSource("async")}\s+(?:function(?:\s+\*?\s*${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS})?|(?:\*?\s*)?${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_TYPE_PARAMETERS})$`, "u").test(beforeParams);
+  return new RegExp(String.raw`${identifierTokenSource("async")}\s+(?:function(?:\s+\*?\s*${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})?|(?:\*?\s*)?${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})$`, "u").test(beforeParams);
 }
 
 function asyncFunctionParamCloseBeforeBody(source, bodyStart) {
@@ -2041,6 +2049,15 @@ export async function verifySelfContained(pack) {
             await realpath(candidate.resolved) !== sidecarEntryReal &&
               !(await sameFilePathIdentity(candidate.resolved, sidecarEntryPath)),
             `${pack.name}: sidecar entrypoint import rejected in ${artifact.path}`
+          );
+        }
+      }
+      if (sidecarArtifactCannotImportAdapter(sidecarRuntimeName, artifactReal, sidecarEntryReal, adapterReal)) {
+        for (const candidate of existingCandidates) {
+          assert(
+            await realpath(candidate.resolved) !== adapterReal &&
+              !(await sameFilePathIdentity(candidate.resolved, resolve(root, "adapter.mjs"))),
+            `${pack.name}: sidecar adapter import rejected in ${artifact.path}`
           );
         }
       }
