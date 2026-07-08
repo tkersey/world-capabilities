@@ -1236,6 +1236,12 @@ test("CommonJS wrapper arguments cannot alias require", async () => {
       { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
     ],
     [
+      "node-cts-type-alias-parenthesized",
+      "sidecar.cts",
+      "type T = string\n([, r] = arguments);\nr(\"node:fs\");\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
       "node-arrow-cts",
       "sidecar.cts",
       "const leak = () => { const [, r] = arguments; return r(\"node:fs\"); };\nleak();\nprocess.stdout.write(\"ok\");\n",

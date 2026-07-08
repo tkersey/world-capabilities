@@ -1196,6 +1196,7 @@ function typeAliasCanEndAtLineBreak(source, index) {
   const next = nextSignificant(source, index + 1);
   if (!next) return true;
   if (["|", "&", ",", "?", ":"].includes(next.ch)) return false;
+  if (["(", "["].includes(next.ch)) return true;
   return identifierStartingAt(source, next.index) !== "";
 }
 
