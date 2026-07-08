@@ -1099,7 +1099,7 @@ function sidecarArtifactRequiresExplicitLocalSpecifiers(sidecarRuntimeName, isAd
 }
 
 function sidecarRuntimeDisallowsAdapterImport(sidecarRuntimeName, isAdapterArtifact, adapterReal) {
-  return ["node", "deno"].includes(sidecarRuntimeName) &&
+  return ["node", "bun", "deno"].includes(sidecarRuntimeName) &&
     adapterReal !== null &&
     !isAdapterArtifact;
 }
@@ -1455,6 +1455,18 @@ function tokenIsObjectPropertyName(source, index, delimiterPairs) {
   const close = findMatchingDelimiter(source, next.index, "(", ")", delimiterPairs);
   const after = close >= 0 ? nextSignificant(source, close + 1) : null;
   return after?.ch === "{";
+}
+
+function sourceMatchesOutsideObjectPropertyName(source, pattern, delimiterPairs = buildDelimiterPairs(source)) {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  const matcher = new RegExp(pattern.source, flags);
+  for (const match of source.matchAll(matcher)) {
+    const index = match.index ?? 0;
+    if (match[0].length === 0) return true;
+    if (isIdentifierStartChar(source[index]) && tokenIsObjectPropertyName(source, index, delimiterPairs)) continue;
+    return true;
+  }
+  return false;
 }
 
 function nodeRuntimeTypeScriptScanSource(source, artifactPath) {
@@ -2348,17 +2360,19 @@ export async function verifySelfContained(pack) {
     }
     for (const { loaderSource, codeSource } of scanInputs) {
       if (UNSAFE_LOADER_HINT.test(codeSource)) {
-        assert(!DYNAMIC_IMPORT.test(codeSource), `${pack.name}: dynamic import rejected in ${artifact.path}`);
+        const codeDelimiterPairs = buildDelimiterPairs(codeSource);
+        assert(!sourceMatchesOutsideObjectPropertyName(codeSource, DYNAMIC_IMPORT, codeDelimiterPairs), `${pack.name}: dynamic import rejected in ${artifact.path}`);
         for (const pattern of DYNAMIC_LOADER_IDENTIFIERS) {
-          assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+          assert(!sourceMatchesOutsideObjectPropertyName(codeSource, pattern, codeDelimiterPairs), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
         }
         for (const pattern of EVAL_PATTERNS) {
-          assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
+          assert(!sourceMatchesOutsideObjectPropertyName(codeSource, pattern, codeDelimiterPairs), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
         }
         assert(!hasComputedMemberAccess(codeSource, scanOptions) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
       }
       if (loaderSource.includes("require")) {
-        assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries), true, scanOptions)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+        const requireScanSource = withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries), true, scanOptions);
+        assert(!sourceMatchesOutsideObjectPropertyName(requireScanSource, ANY_COMMONJS_REQUIRE), `${pack.name}: dynamic require rejected in ${artifact.path}`);
       }
     }
     for (const specifier of specifiers) {

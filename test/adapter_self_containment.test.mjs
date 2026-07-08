@@ -698,6 +698,38 @@ test("require-looking string and regex literals are allowed", async () => {
   }
 });
 
+test("loader-looking object property names are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-loader-property-name-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.mjs"),
+      [
+        "export const schema = {",
+        "  require: false,",
+        "  Function: \"type\",",
+        "  eval: false,",
+        "  Worker() { return \"worker\"; },",
+        "  getPrototypeOf: \"metadata\",",
+        "  createRequire: \"metadata\"",
+        "};",
+        "export default schema;"
+      ].join("\n")
+    );
+    await verifySelfContained({
+      name: "loader-property-name-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("require-looking string literals do not consume scanned CommonJS requires", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-cjs-require-literal-before-static-pack-"));
   try {
@@ -4007,6 +4039,43 @@ test("adapter imports cannot execute sidecar entrypoints in-process", async () =
     })).rejects.toThrow(/sidecar entrypoint import rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Bun sidecar artifacts cannot import adapter modules", async () => {
+  for (const [name, sidecarSource, artifacts] of [
+    [
+      "entry",
+      "import \"./adapter.mjs\";\nprocess.stdout.write(\"ok\");\n",
+      [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }]
+    ],
+    [
+      "helper",
+      "import \"./helper.mjs\";\nprocess.stdout.write(\"ok\");\n",
+      [{ path: "adapter.mjs", role: "adapter" }, { path: "sidecar.mjs", role: "sidecar" }, { path: "helper.mjs", role: "helper" }]
+    ]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-bun-sidecar-adapter-import-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "adapter.mjs"), "export const manifest = () => ({});\n");
+      await writeFile(join(dir, "sidecar.mjs"), sidecarSource);
+      if (name === "helper") await writeFile(join(dir, "helper.mjs"), "import \"./adapter.mjs\";\nexport const value = 1;\n");
+      await expect(verifySelfContained({
+        name: `bun-sidecar-adapter-import-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts,
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["bun", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/sidecar adapter import rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 
