@@ -3682,7 +3682,7 @@ test("sidecar IO allowance rejects adapter path aliases", async () => {
           sidecar: { command: ["bun", "adapter-link.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
         }
       }
-    })).rejects.toThrow(/process access rejected/);
+    })).rejects.toThrow(/symlinked executable artifact rejected|process access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -4078,6 +4078,32 @@ test("symlinked pack artifacts must not point outside the pack root", async () =
         metadata: { allowedBuiltins: [] }
       }
     })).rejects.toThrow(/artifact path escapes pack root/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("symlinked executable artifacts are rejected before import coverage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-pack-executable-symlink-"));
+  try {
+    const packDir = join(root, "pack");
+    const subDir = join(packDir, "sub");
+    await mkdir(subDir, { recursive: true });
+    await writeFile(join(subDir, "sidecar.mjs"), "import \"./helper.mjs\";\nprocess.stdout.write(\"ok\");\n");
+    await writeFile(join(subDir, "helper.mjs"), "process.exit(7);\n");
+    await writeFile(join(packDir, "helper.mjs"), "export const helper = true;\n");
+    await symlink(join(subDir, "sidecar.mjs"), join(packDir, "sidecar.mjs"));
+    await expect(verifySelfContained({
+      name: "executable-symlink-pack",
+      dir: packDir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }, { path: "helper.mjs", role: "helper" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/symlinked executable artifact rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

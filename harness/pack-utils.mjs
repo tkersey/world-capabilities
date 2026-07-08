@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
-import { readdir, readFile, realpath, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, fail, stableStringify } from "./assertions.mjs";
@@ -2015,6 +2015,7 @@ export async function verifySelfContained(pack) {
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
+    assert(!(await lstat(full)).isSymbolicLink(), `${pack.name}: symlinked executable artifact rejected in ${artifact.path}`);
     const artifactReal = await realpath(full);
     const isAdapterArtifact = adapterReal !== null && artifactReal === adapterReal;
     const source = await readFile(full, "utf8");
