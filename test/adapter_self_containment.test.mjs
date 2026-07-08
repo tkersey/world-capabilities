@@ -3127,6 +3127,32 @@ test("Node ESM TypeScript sidecars cover inline type specifier imports", async (
   }
 });
 
+test("Node ESM TypeScript sidecars ignore ambient declaration type imports", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-ambient-type-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "package.json"), "{\"type\":\"module\"}\n");
+    await writeFile(
+      join(dir, "sidecar.ts"),
+      "declare module \"ambient\" {\n  import { type Missing } from \"./missing.ts\";\n  export { type Other } from \"./also-missing.ts\";\n}\nprocess.stdout.write(\"ok\");\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-ambient-type-import-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "package.json" }, { path: "sidecar.ts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.ts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("non-Bun TypeScript sidecar multiline type aliases are ignored by raw scans", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-multiline-type-pack-"));
   try {
@@ -3265,6 +3291,8 @@ test("Node cts sidecar CJS scans ignore erased type-only await and arguments", a
 test("Node TypeScript sidecar module checks ignore type-only syntax", async () => {
   for (const [name, artifactPath, source] of [
     ["cts-export-interface", "sidecar.cts", "export interface Msg { value: string }\nprocess.stdout.write(\"ok\");\n"],
+    ["cts-export-declare-interface", "sidecar.cts", "export declare interface Msg { value: string }\nprocess.stdout.write(\"ok\");\n"],
+    ["cts-export-declare-type", "sidecar.cts", "export declare type Msg = { value: string };\nprocess.stdout.write(\"ok\");\n"],
     ["cts-interface-await", "sidecar.cts", "interface AwaitShape { await(): void }\nprocess.stdout.write(\"ok\");\n"],
     ["cts-interface-generic-constraint-await", "sidecar.cts", "interface AwaitShape<T extends {}> { await(): void }\nprocess.stdout.write(\"ok\");\n"],
     ["ts-interface-generic-constraint-await", "sidecar.ts", "interface AwaitShape<T extends {}> { await(): void }\nprocess.stdout.write(\"ok\");\n"],

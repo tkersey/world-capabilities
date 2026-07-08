@@ -349,7 +349,7 @@ export function scanImportEntries(source, artifactPath = "artifact.js") {
 function nodeTypeScriptRuntimeTypeImportEntries(source, artifactPath, sidecarRuntimeName, isAdapterArtifact, nodeModuleKind) {
   if (sidecarRuntimeName !== "node" || isAdapterArtifact || nodeModuleKind !== "esm" || !NODE_TYPESCRIPT_ARTIFACT.test(artifactPath)) return [];
   const entries = [];
-  const scanSource = stripShebang(source);
+  const scanSource = eraseNodeTypeScriptDeclarations(stripShebang(source));
   for (const match of scanSource.matchAll(NODE_TYPESCRIPT_INLINE_TYPE_FROM_IMPORT)) {
     const offset = match.index ?? 0;
     if (!isExecutableSourceOffset(scanSource, offset)) continue;
@@ -1157,10 +1157,10 @@ function nodeStripOnlyTypeScriptSyntaxSource(source, scanOptions = {}) {
 function eraseNodeTypeScriptDeclarations(source) {
   const chars = source.split("");
   for (const pattern of [
-    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("interface")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu"),
-    new RegExp(String.raw`${identifierTokenSource("declare")}\s+${identifierTokenSource("global")}\s*\{`, "gu"),
-    new RegExp(String.raw`${identifierTokenSource("declare")}\s+(?:${identifierTokenSource("namespace")}|${identifierTokenSource("module")})\s+(?:${NODE_TYPESCRIPT_IDENTIFIER}|["'][^"']*["'])\s*\{`, "gu"),
-    new RegExp(String.raw`${identifierTokenSource("declare")}\s+(?:const\s+)?${identifierTokenSource("enum")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu")
+    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?(?:${identifierTokenSource("declare")}\s+)?${identifierTokenSource("interface")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu"),
+    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("declare")}\s+${identifierTokenSource("global")}\s*\{`, "gu"),
+    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("declare")}\s+(?:${identifierTokenSource("namespace")}|${identifierTokenSource("module")})\s+(?:${NODE_TYPESCRIPT_IDENTIFIER}|["'][^"']*["'])\s*\{`, "gu"),
+    new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("declare")}\s+(?:const\s+)?${identifierTokenSource("enum")}\s+${NODE_TYPESCRIPT_IDENTIFIER}`, "gu")
   ]) {
     eraseBraceTypeDeclarations(chars, source, pattern);
   }
@@ -1199,7 +1199,7 @@ function typeDeclarationBodyBrace(source, start) {
 }
 
 function eraseTypeAliases(chars, source) {
-  const pattern = new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("type")}\s+${NODE_TYPESCRIPT_IDENTIFIER}${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS}\s*=`, "gu");
+  const pattern = new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?(?:${identifierTokenSource("declare")}\s+)?${identifierTokenSource("type")}\s+${NODE_TYPESCRIPT_IDENTIFIER}${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS}\s*=`, "gu");
   for (const match of source.matchAll(pattern)) {
     const start = match.index ?? 0;
     eraseSourceRange(chars, start, typeAliasEnd(source, start, start + match[0].length));
