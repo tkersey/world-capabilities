@@ -1157,7 +1157,10 @@ async function bunStaticModuleArtifacts(pack, covered) {
     changed = false;
     for (const artifactPath of [...modules]) {
       for (const entry of staticImports.get(artifactPath) ?? []) {
-        for (const candidate of localImportDirectCandidates(pack, artifactPath, entry.path)) {
+        for (const candidate of [
+          ...localImportDirectCandidates(pack, artifactPath, entry.path),
+          ...localImportDirectoryIndexCandidates(artifactPath, entry.path)
+        ]) {
           if (!covered.has(candidate) || !isScannableArtifact(candidate) || modules.has(candidate)) continue;
           modules.add(candidate);
           changed = true;
@@ -1322,7 +1325,7 @@ function identifierIsFunctionParameterBinding(source, index, name, delimiterPair
   const parenStart = enclosingDelimiterStart(source, index, "(", ")", delimiterPairs);
   if (parenStart >= 0) {
     const parenEnd = findMatchingDelimiter(source, parenStart, "(", ")", delimiterPairs);
-    if (index < parenEnd && parameterListOwnsFunctionOrArrow(source, parenStart, parenEnd) && parameterListContainsIdentifier(source.slice(parenStart + 1, parenEnd), name)) return true;
+    if (index < parenEnd && parameterListOwnsFunctionOrArrow(source, parenStart, parenEnd) && parameterListBindsIdentifier(source.slice(parenStart + 1, parenEnd), name)) return true;
   }
   const next = nextSignificant(source, index + name.length);
   return next?.ch === "=" && source[next.index + 1] === ">";
@@ -1345,7 +1348,7 @@ function identifierIsBoundByFunctionParameter(source, index, name, delimiterPair
   }
   for (let i = stack.length - 1; i >= 0; i -= 1) {
     const params = functionParameterSourceBeforeBrace(source, stack[i], delimiterPairs);
-    if (params !== null && parameterListContainsIdentifier(params, name)) return true;
+    if (params !== null && parameterListBindsIdentifier(params, name)) return true;
   }
   return false;
 }
@@ -1361,7 +1364,7 @@ function functionParameterSourceBeforeBrace(source, openBrace, delimiterPairs) {
 function identifierIsBoundByArrowParameter(source, index, name, delimiterPairs) {
   for (let arrow = source.lastIndexOf("=>", index); arrow >= 0; arrow = source.lastIndexOf("=>", arrow - 1)) {
     const params = arrowParameterSourceBeforeArrow(source, arrow, delimiterPairs);
-    if (!parameterListContainsIdentifier(params ?? "", name)) continue;
+    if (!parameterListBindsIdentifier(params ?? "", name)) continue;
     if (arrowBodyContainsIndex(source, arrow + 2, index, delimiterPairs)) return true;
   }
   return false;
@@ -1405,11 +1408,37 @@ function conciseArrowBodyEnd(source, bodyStart) {
   return source.length;
 }
 
-function parameterListContainsIdentifier(source, name) {
-  for (let index = source.indexOf(name); index >= 0; index = source.indexOf(name, index + name.length)) {
-    if (!isIdentifierPartChar(source[index - 1]) && !isIdentifierPartChar(source[index + name.length])) return true;
+function parameterListBindsIdentifier(source, name) {
+  for (const segment of topLevelParameterSegments(source)) {
+    const candidate = segment.trim().replace(/^\.\.\.\s*/, "");
+    if (!candidate.startsWith(name) || isIdentifierPartChar(candidate[name.length])) continue;
+    const next = candidate.slice(name.length).trimStart();
+    if (!next || next.startsWith("=")) return true;
   }
   return false;
+}
+
+function topLevelParameterSegments(source) {
+  const segments = [];
+  let start = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === "," && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      segments.push(source.slice(start, i));
+      start = i + 1;
+    }
+  }
+  segments.push(source.slice(start));
+  return segments;
 }
 
 function commonJsWrapperArgumentScanSource(source, artifactPath) {
@@ -1571,9 +1600,43 @@ function hasNodeMtsCommonJsExportsAssignment(source) {
 
 function identifierHasPriorLexicalBinding(source, index, name, delimiterPairs) {
   const blockStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
-  const prefix = source.slice(blockStart >= 0 ? blockStart + 1 : 0, index);
-  const pattern = new RegExp(String.raw`(?:^|[;{}\n\r])\s*(?:const|let|var|function|class)\s+${name}(?!${JS_IDENTIFIER_CONTINUE})`, "u");
-  return pattern.test(prefix);
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = blockStart >= 0 ? blockStart + 1 : 0; i < index; i += 1) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+    if (braceDepth > 0 || bracketDepth > 0 || parenDepth > 0 || isIdentifierPartChar(source[i - 1])) continue;
+    const keyword = identifierStartingAt(source, i);
+    if (!["const", "let", "var", "function", "class"].includes(keyword)) continue;
+    const next = nextSignificant(source, i + keyword.length);
+    if (next && identifierStartingAt(source, next.index) === name) return true;
+    i += keyword.length - 1;
+  }
+  return false;
 }
 
 function identifierIsCommonJsExportsMutatorArgument(source, index) {

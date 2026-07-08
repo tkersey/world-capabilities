@@ -1290,6 +1290,12 @@ test("CommonJS wrapper arguments cannot alias require", async () => {
       "sidecar.cts",
       "const leak = () => { const [, r] = arguments; return r(\"node:fs\"); };\nleak();\nprocess.stdout.write(\"ok\");\n",
       { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-arrow-default-wrapper-cts",
+      "sidecar.cts",
+      "const leak = (x = arguments) => Array.prototype.at.call(arguments, 1);\nleak()(\"node:fs\");\nprocess.stdout.write(\"ok\");\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
     ]
   ]) {
     const root = await mkdtemp(join(tmpdir(), `world-cjs-wrapper-arguments-${name}-pack-`));
@@ -2181,6 +2187,31 @@ test("Bun side-effect helpers allow top-level await array literals", async () =>
     });
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Bun directory side-effect helpers allow top-level await array literals", async () => {
+  for (const [name, specifier] of [
+    ["directory", "./helper"],
+    ["directory-slash", "./helper/"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), `world-bun-${name}-helper-await-pack-`));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(join(dir, "helper"), { recursive: true });
+      await writeFile(join(dir, "adapter.mjs"), `import "${specifier}";\nexport default true;\n`);
+      await writeFile(join(dir, "helper", "index.js"), "const xs = await [1];\nvoid xs;\n");
+      await verifySelfContained({
+        name: `bun-${name}-helper-await-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.mjs" }, { path: "helper/index.js" }],
+          metadata: { allowedBuiltins: [] }
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -3677,7 +3708,8 @@ test("Node TypeScript sidecars reject incompatible module syntax", async () => {
     ["mts-commonjs-optional-module", "sidecar.mts", "void module?.exports;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-bare-exports", "sidecar.mts", "exports = {};\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-exports-member", "sidecar.mts", "exports.foo = 1;\nexports[\"bar\"] = 2;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
-    ["mts-commonjs-exports-value", "sidecar.mts", "Object.defineProperty(exports, \"__esModule\", { value: true });\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"]
+    ["mts-commonjs-exports-value", "sidecar.mts", "Object.defineProperty(exports, \"__esModule\", { value: true });\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
+    ["mts-nested-block-local-exports-member", "sidecar.mts", "if (true) { const exports = {}; }\nexports.foo = 1;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-ts-module-pack-"));
     try {
