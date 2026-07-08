@@ -1275,7 +1275,7 @@ function tokenIsObjectPropertyName(source, index, delimiterPairs) {
 }
 
 function nodeRuntimeTypeScriptScanSource(source, artifactPath) {
-  return executableCodeSource(loaderScanSource(source, artifactPath));
+  return executableCodeSource(loaderScanSource(withoutOptimizerInputs(stripShebang(source)), artifactPath));
 }
 
 function nodeCtsHasDisallowedAwait(source) {
