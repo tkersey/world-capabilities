@@ -123,7 +123,7 @@ const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("mo
 const PROCESS_ACCESS = identifierToken("process");
 const BUN_ACCESS = identifierToken("Bun");
 const DENO_ACCESS = identifierToken("Deno");
-const NETWORK_GLOBAL_ACCESS = identifierToken("fetch|WebSocket|EventSource|XMLHttpRequest");
+const NETWORK_GLOBAL_NAMES = ["fetch", "WebSocket", "EventSource", "XMLHttpRequest"];
 const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const PLAIN_JAVASCRIPT_ARTIFACT = /\.(mjs|js|cjs)$/;
@@ -1661,6 +1661,22 @@ function hasUnboundCommonJsRequireReference(source) {
   return false;
 }
 
+function hasUnboundNetworkGlobalReference(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  for (const name of NETWORK_GLOBAL_NAMES) {
+    for (let i = source.indexOf(name); i >= 0; i = source.indexOf(name, i + name.length)) {
+      if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + name.length])) continue;
+      if (identifierIsLocalBindingOrBoundReference(source, i, name, delimiterPairs)) continue;
+      if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
+      const previous = previousSignificant(source, i);
+      if (previous?.ch === ".") continue;
+      if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
 function identifierIsLocalBindingOrBoundReference(source, index, name, delimiterPairs) {
   if (identifierIsFunctionParameterBinding(source, index, name, delimiterPairs)) return true;
   if (identifierIsBoundByFunctionParameter(source, index, name, delimiterPairs)) return true;
@@ -2731,7 +2747,7 @@ export async function verifySelfContained(pack) {
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo), PROCESS_ACCESS), `${pack.name}: process access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedBunAccess(codeSource, allowSidecarBunIo), BUN_ACCESS), `${pack.name}: Bun access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo), DENO_ACCESS), `${pack.name}: Deno access rejected in ${artifact.path}`);
-        assert(allowNetworkGlobals || !sourceMatchesOutsideObjectPropertyName(codeSource, NETWORK_GLOBAL_ACCESS), `${pack.name}: network global access rejected in ${artifact.path}`);
+        assert(allowNetworkGlobals || !hasUnboundNetworkGlobalReference(codeSource), `${pack.name}: network global access rejected in ${artifact.path}`);
       }
     }
   }
@@ -2748,6 +2764,7 @@ export function validateSidecarCommand(pack) {
   if (!sidecar) return;
   const command = sidecar.command ?? [];
   assert(Array.isArray(command) && command.length >= 2, `${pack.name}: sidecar command required`);
+  assert(command.every((part) => typeof part === "string"), `${pack.name}: sidecar command must contain strings`);
   const [runtime, ...args] = command;
   assert(["node", "bun", "deno"].includes(runtime), `${pack.name}: sidecar bare executable rejected`);
   assert(runtime !== "deno" || args[0] === "run", `${pack.name}: deno run subcommand required`);

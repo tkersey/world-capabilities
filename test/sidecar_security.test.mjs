@@ -27,6 +27,12 @@ test("remote sidecar entrypoint is rejected", async () => {
   expect(() => validateSidecarCommand(pack)).toThrow();
 });
 
+test("non-string sidecar command arguments are rejected", async () => {
+  const pack = await loadPack("sidecar-fixture");
+  pack.manifest.metadata.sidecar.command = ["bun", "sidecar.mjs", 123];
+  expect(() => validateSidecarCommand(pack)).toThrow(/sidecar command must contain strings/);
+});
+
 test("package-scheme sidecar entrypoint is rejected before artifact binding", async () => {
   const pack = await loadPack("sidecar-fixture");
   pack.manifest.metadata.sidecar.command = ["deno", "run", "npm:pkg/mod.mjs"];

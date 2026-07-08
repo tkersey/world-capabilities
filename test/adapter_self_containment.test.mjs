@@ -1292,6 +1292,40 @@ test("network globals require explicit authority labels", async () => {
   }
 });
 
+test("local network global bindings do not require authority labels", async () => {
+  for (const [name, files] of [
+    ["lexical-fetch", {
+      "adapter.mjs": "const fetch = () => \"local\";\nexport default fetch;\n"
+    }],
+    ["parameter-websocket", {
+      "adapter.mjs": "export default function use(WebSocket) { return WebSocket; }\n"
+    }],
+    ["imported-eventsource", {
+      "adapter.mjs": "import { EventSource } from \"./helper.mjs\";\nexport default EventSource;\n",
+      "helper.mjs": "export const EventSource = true;\n"
+    }]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), `world-network-local-binding-${name}-pack-`));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      for (const [path, source] of Object.entries(files)) {
+        await writeFile(join(dir, path), source);
+      }
+      await verifySelfContained({
+        name: `network-local-binding-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: Object.keys(files).map((path) => ({ path })),
+          metadata: { allowedBuiltins: [] }
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("network authority labels allow network globals", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-network-authority-global-pack-"));
   try {
