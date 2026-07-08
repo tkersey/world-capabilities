@@ -3193,6 +3193,31 @@ test("Node cts sidecars allow await inside async functions", async () => {
   }
 });
 
+test("Node cts sidecar CJS scans ignore erased type-only await and arguments", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-cts-erased-cjs-scan-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "sidecar.cts"),
+      "type T<U extends { await(): void }> = U;\nconst fn: (arguments: string) => void = () => {};\nvoid fn;\nprocess.stdout.write(\"ok\");\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-node-cts-erased-cjs-scan-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.cts", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node TypeScript sidecar module checks ignore type-only syntax", async () => {
   for (const [name, artifactPath, source] of [
     ["cts-export-interface", "sidecar.cts", "export interface Msg { value: string }\nprocess.stdout.write(\"ok\");\n"],

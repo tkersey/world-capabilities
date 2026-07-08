@@ -1173,7 +1173,7 @@ function typeDeclarationBodyBrace(source, start) {
 }
 
 function eraseTypeAliases(chars, source) {
-  const pattern = new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("type")}\s+${NODE_TYPESCRIPT_IDENTIFIER}\s*=`, "gu");
+  const pattern = new RegExp(String.raw`(?:${identifierTokenSource("export")}\s+)?${identifierTokenSource("type")}\s+${NODE_TYPESCRIPT_IDENTIFIER}${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS}\s*=`, "gu");
   for (const match of source.matchAll(pattern)) {
     const start = match.index ?? 0;
     eraseSourceRange(chars, start, typeAliasEnd(source, start, start + match[0].length));
@@ -1259,7 +1259,7 @@ function commonJsWrapperArgumentsAccessed(source) {
 }
 
 function commonJsWrapperArgumentScanSource(source, artifactPath) {
-  if (NODE_TYPESCRIPT_ARTIFACT.test(artifactPath)) return nodeStripOnlyTypeScriptSyntaxSource(source);
+  if (NODE_TYPESCRIPT_ARTIFACT.test(artifactPath)) return nodeRuntimeTypeScriptScanSource(source, artifactPath);
   return executableCodeSource(withoutOptimizerInputs(stripShebang(source)));
 }
 
@@ -1272,6 +1272,10 @@ function tokenIsObjectPropertyName(source, index, delimiterPairs) {
   const close = findMatchingDelimiter(source, next.index, "(", ")", delimiterPairs);
   const after = close >= 0 ? nextSignificant(source, close + 1) : null;
   return after?.ch === "{";
+}
+
+function nodeRuntimeTypeScriptScanSource(source, artifactPath) {
+  return executableCodeSource(loaderScanSource(source, artifactPath));
 }
 
 function nodeCtsHasDisallowedAwait(source) {
