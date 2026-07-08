@@ -103,7 +103,6 @@ const EVAL_PATTERNS = [
   new RegExp(String.raw`${identifierTokenSource("global")}\s*(?:\.|\[)`, "u"),
   new RegExp(String.raw`${identifierTokenSource("self")}\s*(?:\.|\[)`, "u"),
   new RegExp(String.raw`${identifierTokenSource("globalThis")}\s*\[\s*["']Function["']\s*\]`, "u"),
-  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
   new RegExp(String.raw`${identifierTokenSource("process")}\s*\[`, "u"),
   new RegExp(String.raw`${identifierTokenSource("process")}\s*\.\s*constructor(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
   new RegExp(String.raw`${identifierTokenSource("process")}\s*\.\s*getBuiltinModule(?!${JS_IDENTIFIER_CONTINUE})\s*\(`, "u"),
@@ -120,7 +119,6 @@ const EVAL_PATTERNS = [
 const JS_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$))*`;
 const JS_REQUIRED_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$))+`;
 const COMMONJS_REQUIRE = new RegExp(`\\brequire${JS_INTERTOKEN_SPACE}\\(${JS_INTERTOKEN_SPACE}(["'\`])([^"'\`]+)\\1${JS_INTERTOKEN_SPACE}\\)`, "g");
-const ANY_COMMONJS_REQUIRE = identifierToken("require");
 const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("module")}\s*(?:\.|\?\.)\s*(?:constructor|require)(?!${JS_IDENTIFIER_CONTINUE})`, "u");
 const PROCESS_ACCESS = identifierToken("process");
 const BUN_ACCESS = identifierToken("Bun");
@@ -154,6 +152,7 @@ const NODE_CTS_UNSUPPORTED_MODULE_SYNTAX = [
   new RegExp(String.raw`\bimport(?:${JS_INTERTOKEN_SPACE}(?:["'{*])|${JS_REQUIRED_INTERTOKEN_SPACE}(?!type\b)${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u"),
   new RegExp(String.raw`\bexport(?:${JS_INTERTOKEN_SPACE}(?:["'{*])|${JS_REQUIRED_INTERTOKEN_SPACE}(?!type\b)(?:default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START}))`, "u")
 ];
+const COMMONJS_WRAPPER_BINDINGS = ["require", "exports", "module", "__filename", "__dirname"];
 const NODE_TYPESCRIPT_INLINE_TYPE_FROM_IMPORT = new RegExp(
   String.raw`\b(?:import|export)${JS_INTERTOKEN_SPACE}\{[^{}]*?\btype\b[^{}]*?\}${JS_INTERTOKEN_SPACE}from${JS_INTERTOKEN_SPACE}(["'\x60])([^"'\x60]+)\1`,
   "gu"
@@ -1173,7 +1172,12 @@ async function bunStaticModuleArtifacts(pack, covered) {
 
 function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
   return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource)) ||
-    nodeCtsHasDisallowedAwait(source);
+    nodeCtsHasDisallowedAwait(source) ||
+    nodeHasCommonJsWrapperLexicalRedeclaration(executableCodeSource(stripShebang(source)));
+}
+
+function nodeHasCommonJsWrapperLexicalRedeclaration(source) {
+  return COMMONJS_WRAPPER_BINDINGS.some((name) => sourceHasTopLevelLexicalBinding(source, name));
 }
 
 function hasJsonStaticImport(importEntries) {
@@ -1610,8 +1614,11 @@ function asyncFunctionParamCloseBeforeBody(source, bodyStart) {
 }
 
 function hasNodeMtsBareRequireCall(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
   for (let i = source.indexOf("require"); i >= 0; i = source.indexOf("require", i + "require".length)) {
     if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "require".length])) continue;
+    if (identifierIsLocalBindingOrBoundReference(source, i, "require", delimiterPairs)) continue;
+    if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
     const next = nextSignificant(source, i + "require".length);
@@ -1622,6 +1629,121 @@ function hasNodeMtsBareRequireCall(source) {
     return true;
   }
   return false;
+}
+
+function hasUnboundCommonJsRequireReference(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  for (let i = source.indexOf("require"); i >= 0; i = source.indexOf("require", i + "require".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "require".length])) continue;
+    if (identifierIsLocalBindingOrBoundReference(source, i, "require", delimiterPairs)) continue;
+    if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
+    return true;
+  }
+  return false;
+}
+
+function identifierIsLocalBindingOrBoundReference(source, index, name, delimiterPairs) {
+  if (identifierIsFunctionParameterBinding(source, index, name, delimiterPairs)) return true;
+  if (identifierIsBoundByFunctionParameter(source, index, name, delimiterPairs)) return true;
+  if (identifierIsBoundByArrowParameter(source, index, name, delimiterPairs)) return true;
+  if (identifierHasPriorImportBinding(source, index, name)) return true;
+  if (identifierHasPriorLexicalBinding(source, index, name, delimiterPairs)) return true;
+  const previous = previousSignificant(source, index);
+  const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+  return ["const", "let", "var", "function", "class"].includes(previousToken);
+}
+
+function sourceHasTopLevelLexicalBinding(source, name) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+    if (braceDepth > 0 || bracketDepth > 0 || parenDepth > 0 || isIdentifierPartChar(source[i - 1])) continue;
+    const keyword = identifierStartingAt(source, i);
+    if (!["const", "let", "class"].includes(keyword)) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    const next = nextSignificant(source, i + keyword.length);
+    if (!next) continue;
+    if (keyword === "class") {
+      if (identifierStartingAt(source, next.index) === name) return true;
+      continue;
+    }
+    const declarationEnd = topLevelLexicalDeclarationEnd(source, next.index);
+    if (declarationListBindsIdentifier(source.slice(next.index, declarationEnd), name)) return true;
+    i += keyword.length - 1;
+  }
+  return false;
+}
+
+function topLevelLexicalDeclarationEnd(source, start) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = start; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === ";" && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) return i;
+  }
+  return source.length;
+}
+
+function declarationListBindsIdentifier(source, name) {
+  for (const segment of topLevelParameterSegments(source)) {
+    const binding = segment.slice(0, topLevelAssignmentIndex(segment)).trimStart();
+    if (binding.startsWith(name) && !isIdentifierPartChar(binding[name.length])) return true;
+  }
+  return false;
+}
+
+function topLevelAssignmentIndex(source) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if (ch === "=" && source[i + 1] !== "=" && source[i + 1] !== ">" && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) return i;
+  }
+  return source.length;
 }
 
 function hasNodeMtsCommonJsModuleMember(source) {
@@ -2502,7 +2624,7 @@ export async function verifySelfContained(pack) {
       }
       if (loaderSource.includes("require")) {
         const requireScanSource = withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries), true, scanOptions);
-        assert(!sourceMatchesOutsideObjectPropertyName(requireScanSource, ANY_COMMONJS_REQUIRE), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+        assert(!hasUnboundCommonJsRequireReference(requireScanSource), `${pack.name}: dynamic require rejected in ${artifact.path}`);
       }
     }
     for (const specifier of specifiers) {

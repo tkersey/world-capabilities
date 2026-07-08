@@ -1837,6 +1837,25 @@ test("Bun import.meta.require loaders are rejected", async () => {
   }
 });
 
+test("import.meta.url metadata is allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-import-meta-url-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export default new URL(\"./asset.txt\", import.meta.url).pathname;\n");
+    await verifySelfContained({
+      name: "import-meta-url-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Worker aliases are rejected before unchecked worker execution", async () => {
   for (const [name, source] of [
     ["alias", "const W = Worker;\nexport default new W(\"./unchecked.mjs\");\n"],
@@ -3690,6 +3709,28 @@ test("Node JavaScript sidecars infer ESM from side-effect imports", async () => 
           { path: "sidecar.js", role: "sidecar" },
           { path: "helper.cjs", role: "helper" }
         ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Node JavaScript sidecars infer ESM from wrapper redeclarations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-wrapper-esm-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.js"), "const require = () => \"ok\";\nprocess.stdout.write(require());\n");
+    await verifySelfContained({
+      name: "sidecar-node-js-wrapper-esm-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
         metadata: {
           allowedBuiltins: [],
           sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
