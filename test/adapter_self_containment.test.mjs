@@ -3861,6 +3861,29 @@ test("Node ESM sidecars reject unbound CommonJS-named export specifiers", async 
   }
 });
 
+test("Node ESM TypeScript sidecars do not count type-only imports as CommonJS global bindings", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-esm-type-only-commonjs-binding-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mts"), "import { type __dirname } from \"./types.mts\";\nvoid __dirname;\nprocess.stdout.write(\"ok\");\n");
+    await writeFile(join(dir, "types.mts"), "export type __dirname = string;\n");
+    await expect(verifySelfContained({
+      name: "sidecar-node-esm-type-only-commonjs-binding-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mts", role: "sidecar" }, { path: "types.mts", role: "helper" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Node sidecar unsupported module syntax rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node ESM sidecar syntax scans allow top-level await regex literals", async () => {
   for (const [name, artifactPath, source] of [
     ["mjs-module-require", "sidecar.mjs", "const ok = await /module.require/.test(\"safe\");\nprocess.stdout.write(String(ok));\n"],

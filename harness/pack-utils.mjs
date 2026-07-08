@@ -1908,8 +1908,9 @@ function importClauseBindsIdentifier(clause, name) {
 
 function namedImportClauseBindsIdentifier(clause, name) {
   for (const rawPart of clause.split(",")) {
-    const part = rawPart.trim().replace(/^type\s+/, "");
+    const part = rawPart.trim();
     if (!part) continue;
+    if (/^type\s+(?!as(?:\s|$))/.test(part)) continue;
     const alias = part.match(/\bas\s+([A-Za-z_$][A-Za-z0-9_$]*)$/u);
     if (alias) {
       if (alias[1] === name) return true;
