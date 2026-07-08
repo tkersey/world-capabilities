@@ -2100,7 +2100,7 @@ test("top-level await before array and regex literals is allowed in ESM artifact
   try {
     const dir = join(root, "pack");
     await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "const value = \"safe\";\nconst xs = await [value];\nconst ok = await /process/.test(String(xs));\nexport default { xs, ok };\n");
+    await writeFile(join(dir, "adapter.mjs"), "const value = \"safe\";\nconst xs = await [value];\nconst ok = await /process/.test(String(xs));\nconst req = await /require/.test(String(xs));\nexport default { xs, ok, req };\n");
     await verifySelfContained({
       name: "loader-top-level-await-literal-pack",
       dir,
@@ -3441,6 +3441,33 @@ test("Node JavaScript sidecars infer ESM from side-effect imports", async () => 
     });
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Node ESM sidecar syntax scans allow top-level await regex literals", async () => {
+  for (const [name, artifactPath, source] of [
+    ["mjs-module-require", "sidecar.mjs", "const ok = await /module.require/.test(\"safe\");\nprocess.stdout.write(String(ok));\n"],
+    ["mts-typescript-keyword", "sidecar.mts", "const ok = await /enum Foo/.test(\"safe\");\nprocess.stdout.write(String(ok));\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-esm-await-regex-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, artifactPath), source);
+      await verifySelfContained({
+        name: `sidecar-node-esm-await-regex-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: artifactPath, role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", artifactPath], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 

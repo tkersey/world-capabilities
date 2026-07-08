@@ -1124,8 +1124,8 @@ function artifactUsesCommonJsWrapper(artifactPath, nodeModuleKind) {
   return /\.(?:cjs|cts)$/.test(artifactPath) || nodeModuleKind === "cjs";
 }
 
-function nodeStripOnlyTypeScriptSyntaxSource(source) {
-  return eraseNodeTypeScriptDeclarations(normalizeExecutableIdentifierEscapes(withoutStringLiterals(stripShebang(source))));
+function nodeStripOnlyTypeScriptSyntaxSource(source, scanOptions = {}) {
+  return eraseNodeTypeScriptDeclarations(normalizeExecutableIdentifierEscapes(withoutStringLiterals(stripShebang(source), true, scanOptions)));
 }
 
 function eraseNodeTypeScriptDeclarations(source) {
@@ -2038,9 +2038,13 @@ export async function verifySelfContained(pack) {
     const packageType = packageTypeInput?.type ?? null;
     const moduleSyntaxSource = executableCodeSource(loaderScanSource(source, artifact.path));
     const nodeModuleKind = nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, packageType, source, moduleSyntaxSource);
+    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource) };
+    const moduleScanSource = scanOptions.allowTopLevelAwait
+      ? executableCodeSource(loaderScanSource(source, artifact.path), scanOptions)
+      : moduleSyntaxSource;
     assert(!nodeSidecarUsesUnsupportedRuntimeArtifact(sidecarRuntimeName, artifact, isAdapterArtifact), `${pack.name}: Node sidecar unsupported runtime artifact rejected in ${artifact.path}`);
     const typeScriptSyntaxSource = nodeSidecarRequiresStripOnlyTypeScript(sidecarRuntimeName, artifact, isAdapterArtifact)
-      ? nodeStripOnlyTypeScriptSyntaxSource(source)
+      ? nodeStripOnlyTypeScriptSyntaxSource(source, scanOptions)
       : null;
     if (typeScriptSyntaxSource) {
       for (const pattern of NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX) {
@@ -2051,8 +2055,8 @@ export async function verifySelfContained(pack) {
       const nodeModuleSyntaxSource = typeScriptSyntaxSource && nodeModuleKind === "cjs"
         ? typeScriptSyntaxSource
         : PLAIN_JAVASCRIPT_ARTIFACT.test(artifact.path)
-          ? executableCodeSource(stripShebang(source))
-          : moduleSyntaxSource;
+          ? executableCodeSource(stripShebang(source), scanOptions)
+          : moduleScanSource;
       for (const check of nodeUnsupportedTypeScriptModuleSyntax(nodeModuleKind)) {
         assert(!sourceCheckMatches(check, nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       }
@@ -2060,7 +2064,6 @@ export async function verifySelfContained(pack) {
       assert(nodeModuleKind !== "esm" || !nodeEsmHasTopLevelReturn(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
-    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource) };
     const scanInputs = loaderScanInputs(source, artifact.path, scanOptions);
     const importEntries = [
       ...scanImportEntries(source, artifact.path),
@@ -2089,7 +2092,7 @@ export async function verifySelfContained(pack) {
         assert(!hasComputedMemberAccess(codeSource, scanOptions) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
       }
       if (loaderSource.includes("require")) {
-        assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);
+        assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries), true, scanOptions)), `${pack.name}: dynamic require rejected in ${artifact.path}`);
       }
     }
     for (const specifier of specifiers) {
