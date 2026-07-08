@@ -3443,6 +3443,38 @@ test("Node CommonJS JavaScript sidecars reject top-level await", async () => {
   }
 });
 
+test("Node CommonJS sidecars reject lexical wrapper redeclarations", async () => {
+  for (const [name, artifactPath, packageJson, source] of [
+    ["cjs-exports", "sidecar.cjs", null, "const exports = {};\nprocess.stdout.write(\"ok\");\n"],
+    ["cjs-require", "sidecar.cjs", null, "let require = () => {};\nprocess.stdout.write(\"ok\");\n"],
+    ["commonjs-js-module", "sidecar.js", "{\"type\":\"commonjs\"}\n", "class module {}\nprocess.stdout.write(\"ok\");\n"],
+    ["cts-dirname", "sidecar.cts", null, "const __dirname: string = \"\";\nprocess.stdout.write(\"ok\");\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-cjs-wrapper-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      if (packageJson) await writeFile(join(dir, "package.json"), packageJson);
+      await writeFile(join(dir, artifactPath), source);
+      const artifacts = [{ path: artifactPath, role: "sidecar" }];
+      if (packageJson) artifacts.push({ path: "package.json", role: "helper" });
+      await expect(verifySelfContained({
+        name: `sidecar-node-cjs-wrapper-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts,
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", artifactPath], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/Node sidecar unsupported module syntax rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("Node TypeScript sidecars reject incompatible module syntax", async () => {
   for (const [name, artifactPath, source, helperPath, helperSource] of [
     ["cts-esm-import", "sidecar.cts", "import \"./helper.cjs\";\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],

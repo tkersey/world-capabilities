@@ -1227,7 +1227,7 @@ function sourceCheckMatches(check, source) {
 function nodeCommonJsSyntaxParses(source, artifactPath) {
   try {
     if (nodeCtsHasDisallowedAwait(source)) return false;
-    new Function(loaderScanSource(source, artifactPath));
+    new Function("exports", "require", "module", "__filename", "__dirname", loaderScanSource(source, artifactPath));
     return true;
   } catch {
     return false;
