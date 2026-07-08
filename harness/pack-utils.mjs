@@ -1673,9 +1673,9 @@ function hasNodeMtsCommonJsGlobalRead(source) {
       if (identifierIsFunctionParameterBinding(source, i, name, delimiterPairs)) continue;
       if (identifierIsBoundByFunctionParameter(source, i, name, delimiterPairs)) continue;
       if (identifierIsBoundByArrowParameter(source, i, name, delimiterPairs)) continue;
-      if (identifierIsImportExportSpecifier(source, i, delimiterPairs)) continue;
       if (identifierHasPriorImportBinding(source, i, name)) continue;
       if (identifierHasPriorLexicalBinding(source, i, name, delimiterPairs)) continue;
+      if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
       const previous = previousSignificant(source, i);
       if (previous?.ch === ".") continue;
       const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
@@ -1687,9 +1687,10 @@ function hasNodeMtsCommonJsGlobalRead(source) {
   return false;
 }
 
-function identifierIsImportExportSpecifier(source, index, delimiterPairs) {
+function identifierIsImportOrReExportSpecifier(source, index, delimiterPairs) {
   const braceStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
-  if (braceStart >= 0 && importExportKeywordBefore(source, braceStart)) {
+  const keyword = braceStart >= 0 ? importExportKeywordBefore(source, braceStart) : "";
+  if (keyword === "import" || (keyword === "export" && exportSpecifierListHasFrom(source, braceStart, delimiterPairs))) {
     const previous = previousSignificant(source, index, braceStart);
     const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
     const next = nextSignificant(source, index + identifierStartingAt(source, index).length);
@@ -1712,7 +1713,14 @@ function importExportKeywordBefore(source, index) {
     previous = previousSignificant(source, previous.index - keyword.length + 1);
     keyword = previous ? identifierEndingAt(source, previous.index) : "";
   }
-  return keyword === "import" || keyword === "export";
+  return keyword === "import" || keyword === "export" ? keyword : "";
+}
+
+function exportSpecifierListHasFrom(source, braceStart, delimiterPairs) {
+  const braceEnd = findMatchingDelimiter(source, braceStart, "{", "}", delimiterPairs);
+  if (braceEnd < 0) return false;
+  const next = nextSignificant(source, braceEnd + 1);
+  return next ? identifierStartingAt(source, next.index) === "from" : false;
 }
 
 function identifierHasPriorImportBinding(source, index, name) {

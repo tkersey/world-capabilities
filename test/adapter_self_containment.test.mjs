@@ -3692,6 +3692,11 @@ test("Node ESM sidecars allow CommonJS-named import specifiers", async () => {
       "local-export-binding",
       "import { value as exports } from \"./helper.mjs\";\nprocess.stdout.write(exports);\n",
       "export const value = \"ok\";\n"
+    ],
+    [
+      "re-export-name",
+      "export { exports as helperExports } from \"./helper.mjs\";\nimport { value } from \"./helper.mjs\";\nprocess.stdout.write(value);\n",
+      "export const exports = \"ok\";\nexport const value = \"ok\";\n"
     ]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-esm-commonjs-import-pack-"));
@@ -3714,6 +3719,28 @@ test("Node ESM sidecars allow CommonJS-named import specifiers", async () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  }
+});
+
+test("Node ESM sidecars reject unbound CommonJS-named export specifiers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-esm-unbound-commonjs-export-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.mjs"), "export { exports };\nprocess.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-node-esm-unbound-commonjs-export-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Node sidecar unsupported module syntax rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
