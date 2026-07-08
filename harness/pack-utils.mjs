@@ -150,7 +150,7 @@ const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
   new RegExp(String.raw`(?:${identifierTokenSource("declare")}\s+)?(?<!\.)${identifierTokenSource("export")}\s*=`, "u")
 ];
 const NODE_CTS_UNSUPPORTED_MODULE_SYNTAX = [
-  new RegExp(String.raw`\bimport\s+(?!type\b)(?:["'{*]|${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u"),
+  new RegExp(String.raw`\bimport(?:\s+(?!type\b)(?:["'{*]|${NODE_TYPESCRIPT_IDENTIFIER_START})|(?=["']))`, "u"),
   new RegExp(String.raw`\bexport\s+(?!type\b)(?:["'{*]|default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u")
 ];
 const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [

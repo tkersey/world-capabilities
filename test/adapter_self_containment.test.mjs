@@ -3333,6 +3333,32 @@ test("Node JavaScript sidecars respect package module kind", async () => {
   }
 });
 
+test("Node JavaScript sidecars infer ESM from side-effect imports", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-side-effect-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.js"), "import \"./helper.cjs\";\nprocess.stdout.write(\"ok\");\n");
+    await writeFile(join(dir, "helper.cjs"), "module.exports = true;\n");
+    await verifySelfContained({
+      name: "sidecar-node-js-side-effect-import-pack",
+      dir,
+      manifest: {
+        artifacts: [
+          { path: "sidecar.js", role: "sidecar" },
+          { path: "helper.cjs", role: "helper" }
+        ],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node CommonJS JavaScript sidecars reject top-level await", async () => {
   for (const [name, artifactPath, packageJson] of [
     ["cjs", "sidecar.cjs", null],
