@@ -1673,6 +1673,8 @@ function hasNodeMtsCommonJsGlobalRead(source) {
       if (identifierIsFunctionParameterBinding(source, i, name, delimiterPairs)) continue;
       if (identifierIsBoundByFunctionParameter(source, i, name, delimiterPairs)) continue;
       if (identifierIsBoundByArrowParameter(source, i, name, delimiterPairs)) continue;
+      if (identifierIsImportExportSpecifier(source, i, delimiterPairs)) continue;
+      if (identifierHasPriorImportBinding(source, i, name)) continue;
       if (identifierHasPriorLexicalBinding(source, i, name, delimiterPairs)) continue;
       const previous = previousSignificant(source, i);
       if (previous?.ch === ".") continue;
@@ -1681,6 +1683,70 @@ function hasNodeMtsCommonJsGlobalRead(source) {
       if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
       return true;
     }
+  }
+  return false;
+}
+
+function identifierIsImportExportSpecifier(source, index, delimiterPairs) {
+  const braceStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  if (braceStart >= 0 && importExportKeywordBefore(source, braceStart)) {
+    const previous = previousSignificant(source, index, braceStart);
+    const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+    const next = nextSignificant(source, index + identifierStartingAt(source, index).length);
+    const nextToken = next ? identifierStartingAt(source, next.index) : "";
+    return previous?.ch === "{" || previous?.ch === "," || previousToken === "as" ||
+      next?.ch === "," || next?.ch === "}" || nextToken === "as";
+  }
+  const previous = previousSignificant(source, index);
+  const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+  if (previousToken === "import") return true;
+  if (previousToken !== "as") return false;
+  const beforeAs = previousSignificant(source, previous.index - "as".length + 1);
+  return beforeAs?.ch === "*" && importExportKeywordBefore(source, beforeAs.index);
+}
+
+function importExportKeywordBefore(source, index) {
+  let previous = previousSignificant(source, index);
+  let keyword = previous ? identifierEndingAt(source, previous.index) : "";
+  if (keyword === "type") {
+    previous = previousSignificant(source, previous.index - keyword.length + 1);
+    keyword = previous ? identifierEndingAt(source, previous.index) : "";
+  }
+  return keyword === "import" || keyword === "export";
+}
+
+function identifierHasPriorImportBinding(source, index, name) {
+  const prefix = source.slice(0, index);
+  for (const match of prefix.matchAll(/\bimport\s+(?!\()([\s\S]*?)\s+from\s*(["'`])/g)) {
+    const clause = match[1].trim();
+    if (clause.startsWith("type ")) continue;
+    if (importClauseBindsIdentifier(clause, name)) return true;
+  }
+  return false;
+}
+
+function importClauseBindsIdentifier(clause, name) {
+  const first = identifierStartingAt(clause, 0);
+  if (first === name) return true;
+  const comma = clause.indexOf(",");
+  const rest = comma >= 0 ? clause.slice(comma + 1).trim() : clause;
+  if (rest.startsWith("*") && new RegExp(String.raw`^\*\s+as\s+${identifierTokenSource(name)}$`, "u").test(rest)) return true;
+  const braceStart = rest.indexOf("{");
+  const braceEnd = rest.lastIndexOf("}");
+  if (braceStart < 0 || braceEnd < braceStart) return false;
+  return namedImportClauseBindsIdentifier(rest.slice(braceStart + 1, braceEnd), name);
+}
+
+function namedImportClauseBindsIdentifier(clause, name) {
+  for (const rawPart of clause.split(",")) {
+    const part = rawPart.trim().replace(/^type\s+/, "");
+    if (!part) continue;
+    const alias = part.match(/\bas\s+([A-Za-z_$][A-Za-z0-9_$]*)$/u);
+    if (alias) {
+      if (alias[1] === name) return true;
+      continue;
+    }
+    if (identifierStartingAt(part, 0) === name) return true;
   }
   return false;
 }

@@ -3681,6 +3681,42 @@ test("Node JavaScript sidecars infer ESM from side-effect imports", async () => 
   }
 });
 
+test("Node ESM sidecars allow CommonJS-named import specifiers", async () => {
+  for (const [name, sidecarSource, helperSource] of [
+    [
+      "imported-export-name",
+      "import { exports as localExports } from \"./helper.mjs\";\nprocess.stdout.write(localExports);\n",
+      "export const exports = \"ok\";\n"
+    ],
+    [
+      "local-export-binding",
+      "import { value as exports } from \"./helper.mjs\";\nprocess.stdout.write(exports);\n",
+      "export const value = \"ok\";\n"
+    ]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-esm-commonjs-import-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "sidecar.mjs"), sidecarSource);
+      await writeFile(join(dir, "helper.mjs"), helperSource);
+      await verifySelfContained({
+        name: `sidecar-node-esm-commonjs-import-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "sidecar.mjs", role: "sidecar" }, { path: "helper.mjs", role: "helper" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("Node ESM sidecar syntax scans allow top-level await regex literals", async () => {
   for (const [name, artifactPath, source] of [
     ["mjs-module-require", "sidecar.mjs", "const ok = await /module.require/.test(\"safe\");\nprocess.stdout.write(String(ok));\n"],
