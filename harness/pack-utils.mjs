@@ -1103,11 +1103,12 @@ function nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, 
   return nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) ? "esm" : "cjs";
 }
 
-function artifactAllowsTopLevelAwait(artifactPath, nodeModuleKind, moduleSyntaxSource) {
+function artifactAllowsTopLevelAwait(artifactPath, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName = null, isAdapterArtifact = false) {
   if (nodeModuleKind === "cjs") return false;
   if (nodeModuleKind === "esm") return true;
   if (/\.(mjs|mts)$/.test(artifactPath)) return true;
   if (/\.(cjs|cts)$/.test(artifactPath)) return false;
+  if (["bun", "deno"].includes(sidecarRuntimeName) && !isAdapterArtifact && /\.(?:js|jsx|ts|tsx)$/.test(artifactPath)) return true;
   return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource));
 }
 
@@ -2038,7 +2039,7 @@ export async function verifySelfContained(pack) {
     const packageType = packageTypeInput?.type ?? null;
     const moduleSyntaxSource = executableCodeSource(loaderScanSource(source, artifact.path));
     const nodeModuleKind = nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, packageType, source, moduleSyntaxSource);
-    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource) };
+    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName, isAdapterArtifact) };
     const moduleScanSource = scanOptions.allowTopLevelAwait
       ? executableCodeSource(loaderScanSource(source, artifact.path), scanOptions)
       : moduleSyntaxSource;

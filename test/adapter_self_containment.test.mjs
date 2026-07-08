@@ -3717,6 +3717,33 @@ test("sidecar IO allowance follows the declared runtime", async () => {
   }
 });
 
+test("Bun and Deno TypeScript sidecars allow top-level await regex literals", async () => {
+  for (const [name, runtime, command, source] of [
+    ["bun", "bun", ["bun", "sidecar.ts"], "const ok = await /process/.test(\"safe\");\nprocess.stdout.write(String(ok));\n"],
+    ["deno", "deno", ["deno", "run", "sidecar.ts"], "const ok = await /Deno/.test(\"safe\");\nawait Deno.stdout.write(new Uint8Array());\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), `world-sidecar-${name}-ts-await-regex-pack-`));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "sidecar.ts"), source);
+      await verifySelfContained({
+        name: `${runtime}-sidecar-ts-await-regex-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "sidecar.ts", role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command, stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("sidecar IO allowance is bound to the declared entrypoint", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-entrypoint-pack-"));
   try {
