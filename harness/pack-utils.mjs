@@ -118,6 +118,7 @@ const EVAL_PATTERNS = [
   new RegExp(String.raw`${identifierTokenSource("new")}\s+${identifierTokenSource("Worker")}\s*\(`, "u")
 ];
 const JS_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$))*`;
+const JS_REQUIRED_INTERTOKEN_SPACE = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\r\n\u2028\u2029]*(?:\r\n|[\r\n\u2028\u2029]|$))+`;
 const COMMONJS_REQUIRE = new RegExp(`\\brequire${JS_INTERTOKEN_SPACE}\\(${JS_INTERTOKEN_SPACE}(["'\`])([^"'\`]+)\\1${JS_INTERTOKEN_SPACE}\\)`, "g");
 const ANY_COMMONJS_REQUIRE = identifierToken("require");
 const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("module")}\s*(?:\.|\?\.)\s*(?:constructor|require)(?!${JS_IDENTIFIER_CONTINUE})`, "u");
@@ -150,9 +151,13 @@ const NODE_UNSUPPORTED_TYPESCRIPT_SYNTAX = [
   new RegExp(String.raw`(?:${identifierTokenSource("declare")}\s+)?(?<!\.)${identifierTokenSource("export")}\s*=`, "u")
 ];
 const NODE_CTS_UNSUPPORTED_MODULE_SYNTAX = [
-  new RegExp(String.raw`\bimport(?:\s+(?!type\b)(?:["'{*]|${NODE_TYPESCRIPT_IDENTIFIER_START})|(?=["']))`, "u"),
-  new RegExp(String.raw`\bexport\s+(?!type\b)(?:["'{*]|default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u")
+  new RegExp(String.raw`\bimport(?:${JS_INTERTOKEN_SPACE}(?:["'{*])|${JS_REQUIRED_INTERTOKEN_SPACE}(?!type\b)${NODE_TYPESCRIPT_IDENTIFIER_START})`, "u"),
+  new RegExp(String.raw`\bexport(?:${JS_INTERTOKEN_SPACE}(?:["'{*])|${JS_REQUIRED_INTERTOKEN_SPACE}(?!type\b)(?:default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START}))`, "u")
 ];
+const NODE_TYPESCRIPT_INLINE_TYPE_FROM_IMPORT = new RegExp(
+  String.raw`\b(?:import|export)${JS_INTERTOKEN_SPACE}\{[\s\S]*?\btype\b[\s\S]*?\}${JS_INTERTOKEN_SPACE}from${JS_INTERTOKEN_SPACE}(["'\x60])([^"'\x60]+)\1`,
+  "gu"
+);
 const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [
   hasNodeMtsBareRequireCall,
   hasNodeMtsCommonJsModuleMember
@@ -339,6 +344,21 @@ export function parseImports(source) {
 
 export function scanImportEntries(source, artifactPath = "artifact.js") {
   return scannerForPath(artifactPath).scanImports(stripShebang(source));
+}
+
+function nodeTypeScriptRuntimeTypeImportEntries(source, artifactPath, sidecarRuntimeName, isAdapterArtifact, nodeModuleKind) {
+  if (sidecarRuntimeName !== "node" || isAdapterArtifact || nodeModuleKind !== "esm" || !NODE_TYPESCRIPT_ARTIFACT.test(artifactPath)) return [];
+  const entries = [];
+  const scanSource = stripShebang(source);
+  for (const match of scanSource.matchAll(NODE_TYPESCRIPT_INLINE_TYPE_FROM_IMPORT)) {
+    const offset = match.index ?? 0;
+    if (!isExecutableSourceOffset(scanSource, offset)) continue;
+    const path = match[2];
+    if (typeof path === "string" && path.length > 0) {
+      entries.push({ kind: "node-type-only-runtime-import", path });
+    }
+  }
+  return entries;
 }
 
 function scannerForPath(artifactPath) {
@@ -2027,7 +2047,10 @@ export async function verifySelfContained(pack) {
       assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
     const scanInputs = loaderScanInputs(source, artifact.path);
-    const importEntries = scanImportEntries(source, artifact.path);
+    const importEntries = [
+      ...scanImportEntries(source, artifact.path),
+      ...nodeTypeScriptRuntimeTypeImportEntries(source, artifact.path, sidecarRuntimeName, isAdapterArtifact, nodeModuleKind)
+    ];
     const specifiers = [...new Set(importEntries
       .map((entry) => entry.path)
       .filter((path) => typeof path === "string" && path.length > 0))];

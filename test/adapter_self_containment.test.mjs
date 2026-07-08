@@ -3029,6 +3029,35 @@ test("non-Bun TypeScript sidecar type-only syntax is ignored by raw scans", asyn
   }
 });
 
+test("Node ESM TypeScript sidecars cover inline type specifier imports", async () => {
+  for (const [name, source] of [
+    ["inline-type-import", "import{ type Helper }from \"./types.ts\";\nprocess.stdout.write(\"ok\");\n"],
+    ["inline-type-export", "export { type Helper } from \"./types.ts\";\nprocess.stdout.write(\"ok\");\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-sidecar-inline-type-runtime-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "package.json"), "{\"type\":\"module\"}\n");
+      await writeFile(join(dir, "sidecar.ts"), source);
+      await writeFile(join(dir, "types.ts"), "console.log(\"runtime type module\");\nexport type Helper = string;\n");
+      await expect(verifySelfContained({
+        name: `sidecar-inline-type-runtime-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "package.json" }, { path: "sidecar.ts", role: "sidecar" }],
+          metadata: {
+            allowedBuiltins: [],
+            sidecar: { command: ["node", "sidecar.ts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+          }
+        }
+      })).rejects.toThrow(/local import \.\/types\.ts not checksum-covered/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("non-Bun TypeScript sidecar multiline type aliases are ignored by raw scans", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-multiline-type-pack-"));
   try {
@@ -3393,8 +3422,10 @@ test("Node TypeScript sidecars reject incompatible module syntax", async () => {
   for (const [name, artifactPath, source, helperPath, helperSource] of [
     ["cts-esm-import", "sidecar.cts", "import \"./helper.cjs\";\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["cts-inline-type-import", "sidecar.cts", "import { type Helper } from \"./helper.cts\";\nprocess.stdout.write(\"ok\");\n", "helper.cts", "export interface Helper { value: string }\n"],
+    ["cts-compact-inline-type-import", "sidecar.cts", "import{ type Helper }from \"./helper.cts\";\nprocess.stdout.write(\"ok\");\n", "helper.cts", "export interface Helper { value: string }\n"],
     ["ts-inline-type-import", "sidecar.ts", "import { type Helper } from \"./helper.cts\";\nprocess.stdout.write(\"ok\");\n", "helper.cts", "export interface Helper { value: string }\n"],
     ["cts-inline-type-export", "sidecar.cts", "interface Helper { value: string }\nexport { type Helper };\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
+    ["ts-compact-inline-type-export", "sidecar.ts", "export{ type Helper }from \"./helper.cts\";\nprocess.stdout.write(\"ok\");\n", "helper.cts", "export interface Helper { value: string }\n"],
     ["ts-inline-type-export", "sidecar.ts", "interface Helper { value: string }\nexport { type Helper };\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["cts-top-level-await", "sidecar.cts", "await Promise.resolve();\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["cts-dead-top-level-await", "sidecar.cts", "if (false) await Promise.resolve();\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
