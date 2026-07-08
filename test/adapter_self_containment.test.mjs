@@ -160,6 +160,25 @@ test("covered extensionless import artifacts are scanned", async () => {
   }
 });
 
+test("Bun-injected transform imports are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-bun-transform-import-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "using value = { [Symbol.dispose]() {} };\nexport default value;\n");
+    await expect(verifySelfContained({
+      name: "bun-transform-import-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/package import bun:wrap rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("explicit non-scannable local imports are rejected even when covered", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-non-scannable-import-pack-"));
   try {

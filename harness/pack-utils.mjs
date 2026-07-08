@@ -2467,6 +2467,7 @@ export async function verifySelfContained(pack) {
     const scanInputs = loaderScanInputs(source, artifact.path, scanOptions);
     const importEntries = [
       ...scanImportEntries(source, artifact.path),
+      ...scanInputs.flatMap(({ loaderSource }) => scanImportEntries(loaderSource, artifact.path)),
       ...nodeTypeScriptRuntimeTypeImportEntries(source, artifact.path, sidecarRuntimeName, isAdapterArtifact, nodeModuleKind)
     ];
     const specifiers = [...new Set(importEntries
