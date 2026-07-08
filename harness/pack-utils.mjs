@@ -1566,10 +1566,18 @@ function hasNodeMtsBareRequireCall(source) {
 }
 
 function hasNodeMtsCommonJsModuleMember(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
   for (let i = source.indexOf("module"); i >= 0; i = source.indexOf("module", i + "module".length)) {
     if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "module".length])) continue;
+    if (identifierIsFunctionParameterBinding(source, i, "module", delimiterPairs)) continue;
+    if (identifierIsBoundByFunctionParameter(source, i, "module", delimiterPairs)) continue;
+    if (identifierIsBoundByArrowParameter(source, i, "module", delimiterPairs)) continue;
+    if (identifierHasPriorLexicalBinding(source, i, "module", delimiterPairs)) continue;
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
+    const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+    if (["const", "let", "var", "function", "class", "typeof"].includes(previousToken)) continue;
+    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
     const next = nextSignificant(source, i + "module".length);
     if (next?.ch === "." || next?.ch === "[") return true;
     if (next?.ch === "?" && source[next.index + 1] === ".") return true;
@@ -1594,6 +1602,26 @@ function hasNodeMtsCommonJsExportsAssignment(source) {
     if (next?.ch === "." || next?.ch === "[") return true;
     if (next && isSingleAssignmentAt(source, next.index)) return true;
     if (identifierIsCommonJsExportsMutatorArgument(source, i)) return true;
+  }
+  return false;
+}
+
+function hasNodeMtsCommonJsGlobalRead(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
+  for (const name of ["require", "module", "exports", "__dirname", "__filename"]) {
+    for (let i = source.indexOf(name); i >= 0; i = source.indexOf(name, i + name.length)) {
+      if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + name.length])) continue;
+      if (identifierIsFunctionParameterBinding(source, i, name, delimiterPairs)) continue;
+      if (identifierIsBoundByFunctionParameter(source, i, name, delimiterPairs)) continue;
+      if (identifierIsBoundByArrowParameter(source, i, name, delimiterPairs)) continue;
+      if (identifierHasPriorLexicalBinding(source, i, name, delimiterPairs)) continue;
+      const previous = previousSignificant(source, i);
+      if (previous?.ch === ".") continue;
+      const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
+      if (["const", "let", "var", "function", "class", "typeof"].includes(previousToken)) continue;
+      if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
+      return true;
+    }
   }
   return false;
 }
@@ -2293,10 +2321,12 @@ export async function verifySelfContained(pack) {
         : PLAIN_JAVASCRIPT_ARTIFACT.test(artifact.path)
           ? executableCodeSource(stripShebang(source), scanOptions)
           : moduleScanSource;
+      const nodeCommonJsGlobalSyntaxSource = typeScriptSyntaxSource ?? executableCodeSource(stripShebang(source), scanOptions);
       for (const check of nodeUnsupportedTypeScriptModuleSyntax(nodeModuleKind)) {
         assert(!sourceCheckMatches(check, nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       }
       assert(nodeModuleKind !== "esm" || !hasNodeMtsCommonJsExportsAssignment(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
+      assert(nodeModuleKind !== "esm" || !hasNodeMtsCommonJsGlobalRead(nodeCommonJsGlobalSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       assert(nodeModuleKind !== "esm" || !nodeEsmHasTopLevelReturn(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
