@@ -155,7 +155,7 @@ const NODE_CTS_UNSUPPORTED_MODULE_SYNTAX = [
   new RegExp(String.raw`\bexport(?:${JS_INTERTOKEN_SPACE}(?:["'{*])|${JS_REQUIRED_INTERTOKEN_SPACE}(?!type\b)(?:default\b|class\b|const\b|function\b|let\b|var\b|${NODE_TYPESCRIPT_IDENTIFIER_START}))`, "u")
 ];
 const NODE_TYPESCRIPT_INLINE_TYPE_FROM_IMPORT = new RegExp(
-  String.raw`\b(?:import|export)${JS_INTERTOKEN_SPACE}\{[\s\S]*?\btype\b[\s\S]*?\}${JS_INTERTOKEN_SPACE}from${JS_INTERTOKEN_SPACE}(["'\x60])([^"'\x60]+)\1`,
+  String.raw`\b(?:import|export)${JS_INTERTOKEN_SPACE}\{[^{}]*?\btype\b[^{}]*?\}${JS_INTERTOKEN_SPACE}from${JS_INTERTOKEN_SPACE}(["'\x60])([^"'\x60]+)\1`,
   "gu"
 );
 const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [

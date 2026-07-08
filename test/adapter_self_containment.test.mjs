@@ -3153,6 +3153,33 @@ test("Node ESM TypeScript sidecars ignore ambient declaration type imports", asy
   }
 });
 
+test("Node ESM TypeScript sidecar type import scan stays within one clause", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-inline-type-clause-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "package.json"), "{\"type\":\"module\"}\n");
+    await writeFile(join(dir, "helper.ts"), "export const value = \"ok\";\n");
+    await writeFile(
+      join(dir, "sidecar.ts"),
+      "import { value } from \"./helper.ts\";\nconst text = 'type Missing } from \"./missing.ts\"';\nprocess.stdout.write(value + text.length);\n"
+    );
+    await verifySelfContained({
+      name: "sidecar-inline-type-clause-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "package.json" }, { path: "sidecar.ts", role: "sidecar" }, { path: "helper.ts" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.ts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("non-Bun TypeScript sidecar multiline type aliases are ignored by raw scans", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-multiline-type-pack-"));
   try {
