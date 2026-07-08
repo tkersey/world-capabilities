@@ -1356,6 +1356,7 @@ function hasNodeMtsCommonJsModuleMember(source) {
     if (previous?.ch === ".") continue;
     const next = nextSignificant(source, i + "module".length);
     if (next?.ch === "." || next?.ch === "[") return true;
+    if (next?.ch === "?" && source[next.index + 1] === ".") return true;
   }
   return false;
 }

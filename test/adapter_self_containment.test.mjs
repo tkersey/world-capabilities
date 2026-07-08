@@ -3401,6 +3401,7 @@ test("Node TypeScript sidecars reject incompatible module syntax", async () => {
     ["mts-top-level-return", "sidecar.mts", "return;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-require", "sidecar.mts", "require(\"./helper.cjs\");\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-export", "sidecar.mts", "module.exports = {};\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
+    ["mts-commonjs-optional-module", "sidecar.mts", "void module?.exports;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-bare-exports", "sidecar.mts", "exports = {};\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-exports-member", "sidecar.mts", "exports.foo = 1;\nexports[\"bar\"] = 2;\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"],
     ["mts-commonjs-exports-value", "sidecar.mts", "Object.defineProperty(exports, \"__esModule\", { value: true });\nprocess.stdout.write(\"ok\");\n", "helper.cjs", "module.exports = true;\n"]
