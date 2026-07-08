@@ -459,7 +459,7 @@ function stripShebang(source) {
   return source.startsWith("#!") ? source.replace(/^#![^\r\n]*(?:\r?\n|$)/, "") : source;
 }
 
-function withoutStringLiterals(source, stripRegex = true) {
+function withoutStringLiterals(source, stripRegex = true, scanOptions = {}) {
   let result = "";
   for (let i = 0; i < source.length;) {
     const ch = source[i];
@@ -469,7 +469,7 @@ function withoutStringLiterals(source, stripRegex = true) {
       continue;
     }
     if (ch === "`") {
-      const stripped = stripTemplateLiteral(source, i, stripRegex);
+      const stripped = stripTemplateLiteral(source, i, stripRegex, scanOptions);
       result += stripped.text;
       i = stripped.end;
       continue;
@@ -484,7 +484,7 @@ function withoutStringLiterals(source, stripRegex = true) {
       result += " ";
       continue;
     }
-    if (stripRegex && ch === "/" && isRegexLiteralStart(result)) {
+    if (stripRegex && ch === "/" && isRegexLiteralStart(result, scanOptions)) {
       const end = skipRegexLiteral(source, i);
       if (end > i) {
         result += "/ /";
@@ -526,7 +526,7 @@ function skipBlockComment(source, start) {
   return end === -1 ? source.length : end + 2;
 }
 
-function stripTemplateLiteral(source, start, stripRegex = true) {
+function stripTemplateLiteral(source, start, stripRegex = true, scanOptions = {}) {
   let result = "`";
   let i = start + 1;
   while (i < source.length) {
@@ -536,8 +536,8 @@ function stripTemplateLiteral(source, start, stripRegex = true) {
     }
     if (source[i] === "`") return { text: `${result}\``, end: i + 1 };
     if (source[i] === "$" && source[i + 1] === "{") {
-      const expression = readTemplateExpression(source, i + 2);
-      result += `\${${withoutStringLiterals(expression.text, stripRegex)}}`;
+      const expression = readTemplateExpression(source, i + 2, scanOptions);
+      result += `\${${withoutStringLiterals(expression.text, stripRegex, scanOptions)}}`;
       i = expression.end;
       continue;
     }
@@ -546,7 +546,7 @@ function stripTemplateLiteral(source, start, stripRegex = true) {
   return { text: result, end: i };
 }
 
-function readTemplateExpression(source, start) {
+function readTemplateExpression(source, start, scanOptions = {}) {
   let depth = 1;
   let i = start;
   let prefix = "";
@@ -572,7 +572,7 @@ function readTemplateExpression(source, start) {
       prefix += " ";
       continue;
     }
-    if (ch === "/" && isRegexLiteralStart(prefix)) {
+    if (ch === "/" && isRegexLiteralStart(prefix, scanOptions)) {
       const end = skipRegexLiteral(source, i);
       if (end > i) {
         prefix += "/ /";
@@ -612,7 +612,7 @@ function skipTemplateLiteral(source, start) {
   return i;
 }
 
-function isRegexLiteralStart(result) {
+function isRegexLiteralStart(result, scanOptions = {}) {
   const trimmed = result.trimEnd();
   if (!trimmed) return true;
   if (/\+\+$|--$/.test(trimmed)) return false;
@@ -626,13 +626,13 @@ function isRegexLiteralStart(result) {
   if (tokenStart > 0 && isIdentifierPartChar(trimmed[tokenStart - 1])) return false;
   const beforeKeyword = trimmed.slice(0, tokenStart).trimEnd();
   if (beforeKeyword.endsWith(".")) return false;
-  if (["await", "yield"].includes(token[1]) && !contextualKeywordMayPrefixExpression(trimmed, tokenStart, token[1])) return false;
+  if (["await", "yield"].includes(token[1]) && !contextualKeywordMayPrefixExpression(trimmed, tokenStart, token[1], scanOptions)) return false;
   return token[1] !== "of" || isForOfOperatorPrefix(beforeKeyword);
 }
 
-function contextualKeywordMayPrefixExpression(source, tokenStart, keyword) {
+function contextualKeywordMayPrefixExpression(source, tokenStart, keyword, scanOptions = {}) {
   const body = nearestEnclosingFunctionBody(source, tokenStart);
-  if (!body) return false;
+  if (!body) return keyword === "await" && scanOptions.allowTopLevelAwait === true;
   return keyword === "await" ? body.async : body.generator;
 }
 
@@ -822,12 +822,12 @@ function loaderScanSource(source, artifactPath) {
   return scannerForPath(artifactPath).transformSync(stripShebang(source));
 }
 
-function loaderScanInputs(source, artifactPath) {
+function loaderScanInputs(source, artifactPath, scanOptions = {}) {
   const transformed = loaderScanSource(source, artifactPath);
   const optimizerResistant = optimizerResistantLoaderScanSources(source, artifactPath);
   return [...new Set([transformed, ...optimizerResistant])].map((loaderSource) => ({
     loaderSource,
-    codeSource: executableCodeSource(loaderSource)
+    codeSource: executableCodeSource(loaderSource, scanOptions)
   }));
 }
 
@@ -838,8 +838,8 @@ function optimizerResistantLoaderScanSources(source, artifactPath) {
   return [transformed];
 }
 
-function executableCodeSource(source) {
-  return normalizeIdentifierEscapes(withoutStringLiterals(source));
+function executableCodeSource(source, scanOptions = {}) {
+  return normalizeIdentifierEscapes(withoutStringLiterals(source, true, scanOptions));
 }
 
 export function scannerExecutableCodeSourceForTest(source) {
@@ -1101,6 +1101,14 @@ function nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, 
   if (packageType === "module") return "esm";
   if (packageType === "commonjs") return "cjs";
   return nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) ? "esm" : "cjs";
+}
+
+function artifactAllowsTopLevelAwait(artifactPath, nodeModuleKind, moduleSyntaxSource) {
+  if (nodeModuleKind === "cjs") return false;
+  if (nodeModuleKind === "esm") return true;
+  if (/\.(mjs|mts)$/.test(artifactPath)) return true;
+  if (/\.(cjs|cts)$/.test(artifactPath)) return false;
+  return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource));
 }
 
 function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
@@ -1501,7 +1509,7 @@ function hasComputedObjectPattern(source, start = 0, end = source.length, inheri
   return false;
 }
 
-function hasComputedMemberAccess(source) {
+function hasComputedMemberAccess(source, scanOptions = {}) {
   if (!source.includes("[")) return false;
   const delimiterPairs = buildDelimiterPairs(source);
   for (let i = 0; i < source.length; i += 1) {
@@ -1517,7 +1525,7 @@ function hasComputedMemberAccess(source) {
     if (!identifier) continue;
     const start = previous.index - identifier.length + 1;
     if (ARRAY_LITERAL_PREFIX_KEYWORDS.has(identifier) && !identifierFollowsPropertyAccess(source, start)) continue;
-    if (["await", "yield"].includes(identifier) && !identifierFollowsPropertyAccess(source, start) && contextualKeywordMayPrefixExpression(source, start, identifier)) continue;
+    if (["await", "yield"].includes(identifier) && !identifierFollowsPropertyAccess(source, start) && contextualKeywordMayPrefixExpression(source, start, identifier, scanOptions)) continue;
     if (identifier === "of" && identifierLooksLikeForOfKeyword(source, start, delimiterPairs)) continue;
     return true;
   }
@@ -2048,7 +2056,8 @@ export async function verifySelfContained(pack) {
       assert(nodeModuleKind !== "esm" || !nodeEsmHasTopLevelReturn(nodeModuleSyntaxSource), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
       assert(nodeModuleKind !== "cjs" || nodeCommonJsSyntaxParses(source, artifact.path), `${pack.name}: Node sidecar unsupported module syntax rejected in ${artifact.path}`);
     }
-    const scanInputs = loaderScanInputs(source, artifact.path);
+    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource) };
+    const scanInputs = loaderScanInputs(source, artifact.path, scanOptions);
     const importEntries = [
       ...scanImportEntries(source, artifact.path),
       ...nodeTypeScriptRuntimeTypeImportEntries(source, artifact.path, sidecarRuntimeName, isAdapterArtifact, nodeModuleKind)
@@ -2073,7 +2082,7 @@ export async function verifySelfContained(pack) {
         for (const pattern of EVAL_PATTERNS) {
           assert(!pattern.test(codeSource), `${pack.name}: unsafe loader rejected in ${artifact.path}`);
         }
-        assert(!hasComputedMemberAccess(codeSource) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
+        assert(!hasComputedMemberAccess(codeSource, scanOptions) && !hasComputedObjectPattern(codeSource), `${pack.name}: computed member access rejected in ${artifact.path}`);
       }
       if (loaderSource.includes("require")) {
         assert(!ANY_COMMONJS_REQUIRE.test(withoutStringLiterals(stripScannedRequireCalls(loaderSource, importEntries))), `${pack.name}: dynamic require rejected in ${artifact.path}`);

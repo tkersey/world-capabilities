@@ -2089,6 +2089,25 @@ test("array and regex literals after await and yield are not unsafe loaders", as
   }
 });
 
+test("top-level await before array and regex literals is allowed in ESM artifacts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-loader-top-level-await-literal-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const value = \"safe\";\nconst xs = await [value];\nconst ok = await /process/.test(String(xs));\nexport default { xs, ok };\n");
+    await verifySelfContained({
+      name: "loader-top-level-await-literal-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assignment destructured computed members are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
   try {
