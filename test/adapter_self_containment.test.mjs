@@ -1076,6 +1076,44 @@ test("regex literals after statement blocks are allowed", async () => {
   }
 });
 
+test("regex literals after declaration blocks are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-declaration-regex-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const value = \"process\";\nfunction marker() {}\n/process|require/.test(value);\nclass Holder {}\n/Function|globalThis/.test(value);\nexport default value;\n");
+    await verifySelfContained({
+      name: "declaration-regex-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("function expression divisions after braces still expose host globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-function-expression-division-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "const value = function () {} / process.env / 1;\nexport default value;\n");
+    await expect(verifySelfContained({
+      name: "function-expression-division-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("object literal divisions after braces still expose host globals", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-object-division-pack-"));
   try {

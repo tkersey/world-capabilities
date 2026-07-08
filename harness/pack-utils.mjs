@@ -716,10 +716,35 @@ function isAfterStatementBlock(prefix) {
   if (open < 0) return false;
   const beforeBrace = prefix.slice(0, open).trimEnd();
   if (isAfterControlStatementHead(beforeBrace)) return true;
+  if (isAfterDeclarationStatementBlock(beforeBrace)) return true;
   const token = beforeBrace.match(/([A-Za-z_$#][\w$#]*)$/);
   if (!token || !["do", "else", "finally", "try"].includes(token[1])) return false;
   const tokenStart = token.index ?? 0;
   return tokenStart === 0 || !isIdentifierPartChar(beforeBrace[tokenStart - 1]);
+}
+
+function isAfterDeclarationStatementBlock(beforeBrace) {
+  return isAfterFunctionDeclarationBlock(beforeBrace) || isAfterClassDeclarationBlock(beforeBrace);
+}
+
+function isAfterFunctionDeclarationBlock(beforeBrace) {
+  if (!beforeBrace.endsWith(")")) return false;
+  const openParen = findOpeningDelimiter(beforeBrace, beforeBrace.length - 1, "(", ")");
+  if (openParen < 0) return false;
+  const head = statementHeadAfterLastBoundary(beforeBrace.slice(0, openParen));
+  const match = head.match(/^(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?(?:\s+([A-Za-z_$][\w$]*))?$/);
+  return !!match && (!!match[1] || /\bexport\s+default\b/.test(head));
+}
+
+function isAfterClassDeclarationBlock(beforeBrace) {
+  const head = statementHeadAfterLastBoundary(beforeBrace);
+  const match = head.match(/^(?:export\s+(?:default\s+)?)?class(?:\s+([A-Za-z_$][\w$]*))?(?:\s+extends\b[\s\S]+)?$/);
+  return !!match && (!!match[1] || /\bexport\s+default\b/.test(head));
+}
+
+function statementHeadAfterLastBoundary(source) {
+  const boundary = Math.max(source.lastIndexOf(";"), source.lastIndexOf("{"), source.lastIndexOf("}"));
+  return source.slice(boundary + 1).trim();
 }
 
 function matchingOpenBrace(source, closeIndex) {
