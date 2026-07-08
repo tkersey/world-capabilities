@@ -1447,14 +1447,61 @@ function commonJsWrapperArgumentScanSource(source, artifactPath) {
 }
 
 function tokenIsObjectPropertyName(source, index, delimiterPairs) {
-  const previous = previousSignificant(source, index);
+  const previous = propertyNameBoundaryPrevious(source, index);
   if (!previous || !["{", ","].includes(previous.ch)) return false;
+  const objectStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  if (objectStart >= 0 && objectDelimiterIsPatternContext(source, objectStart, delimiterPairs)) return false;
   const next = nextSignificant(source, index + identifierStartingAt(source, index).length);
   if (next?.ch === ":") return true;
   if (next?.ch !== "(") return false;
   const close = findMatchingDelimiter(source, next.index, "(", ")", delimiterPairs);
   const after = close >= 0 ? nextSignificant(source, close + 1) : null;
   return after?.ch === "{";
+}
+
+function propertyNameBoundaryPrevious(source, index) {
+  let start = index;
+  for (;;) {
+    const previous = previousSignificant(source, start);
+    if (previous?.ch === "*") {
+      start = previous.index;
+      continue;
+    }
+    const modifier = previous ? identifierEndingAt(source, previous.index) : "";
+    if (["async", "get", "set", "static"].includes(modifier)) {
+      start = previous.index - modifier.length + 1;
+      continue;
+    }
+    return previous;
+  }
+}
+
+function objectDelimiterIsPatternContext(source, start, delimiterPairs) {
+  const cache = delimiterPairs.objectPatternContexts ??= new Map();
+  const cached = cache.get(start);
+  if (cached !== undefined) return cached;
+  const starts = [];
+  for (let objectStart = start; objectStart >= 0;) {
+    starts.unshift(objectStart);
+    objectStart = enclosingDelimiterStart(source, objectStart, "{", "}", delimiterPairs);
+  }
+  let inheritedPattern = false;
+  for (const objectStart of starts) {
+    const cachedPattern = cache.get(objectStart);
+    if (cachedPattern !== undefined) {
+      inheritedPattern = cachedPattern;
+      continue;
+    }
+    const objectEnd = findMatchingDelimiter(source, objectStart, "{", "}", delimiterPairs);
+    if (objectEnd < 0) {
+      cache.set(objectStart, false);
+      inheritedPattern = false;
+      continue;
+    }
+    inheritedPattern = isObjectPatternContext(source, objectStart, objectEnd, inheritedPattern, delimiterPairs);
+    cache.set(objectStart, inheritedPattern);
+  }
+  return inheritedPattern;
 }
 
 function sourceMatchesOutsideObjectPropertyName(source, pattern, delimiterPairs = buildDelimiterPairs(source)) {
@@ -1922,6 +1969,7 @@ function buildDelimiterPairs(source) {
   ]);
   const pairs = new Map();
   const enclosingStarts = new Map([
+    ["{", new Int32Array(source.length).fill(-1)],
     ["[", new Int32Array(source.length).fill(-1)],
     ["(", new Int32Array(source.length).fill(-1)]
   ]);
@@ -2460,10 +2508,10 @@ export async function verifySelfContained(pack) {
         assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
       }
       if (HOST_GLOBAL_HINT.test(codeSource)) {
-        assert(!PROCESS_ACCESS.test(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo)), `${pack.name}: process access rejected in ${artifact.path}`);
-        assert(!BUN_ACCESS.test(withoutAllowedBunAccess(codeSource, allowSidecarBunIo)), `${pack.name}: Bun access rejected in ${artifact.path}`);
-        assert(!DENO_ACCESS.test(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo)), `${pack.name}: Deno access rejected in ${artifact.path}`);
-        assert(allowNetworkGlobals || !NETWORK_GLOBAL_ACCESS.test(codeSource), `${pack.name}: network global access rejected in ${artifact.path}`);
+        assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo), PROCESS_ACCESS), `${pack.name}: process access rejected in ${artifact.path}`);
+        assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedBunAccess(codeSource, allowSidecarBunIo), BUN_ACCESS), `${pack.name}: Bun access rejected in ${artifact.path}`);
+        assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo), DENO_ACCESS), `${pack.name}: Deno access rejected in ${artifact.path}`);
+        assert(allowNetworkGlobals || !sourceMatchesOutsideObjectPropertyName(codeSource, NETWORK_GLOBAL_ACCESS), `${pack.name}: network global access rejected in ${artifact.path}`);
       }
     }
   }

@@ -1184,6 +1184,52 @@ test("host global names inside preserved comments are allowed", async () => {
   }
 });
 
+test("host global names in object property positions are allowed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-benign-global-property-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), [
+      "export const schema = { process: false, fetch: { type: \"boolean\" } };",
+      "export const methods = { async fetch() { return \"label\"; }, get process() { return false; }, set Bun(value) { this.value = value; }, *Deno() { yield \"label\"; }, XMLHttpRequest() { return null; } };",
+      "export default { schema, methods };",
+      ""
+    ].join("\n"));
+    await verifySelfContained({
+      name: "benign-global-property-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("destructured host global names are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-destructured-host-global-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.cjs"),
+      "function leak() { const { process: p, fetch: f } = this; return Boolean(p || f); }\nmodule.exports = leak();\n"
+    );
+    await expect(verifySelfContained({
+      name: "destructured-host-global-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.cjs" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/process access rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("host global names in executable code are still rejected after regex stripping", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-global-code-after-regex-pack-"));
   try {
