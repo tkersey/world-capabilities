@@ -1635,9 +1635,10 @@ function hasNodeMtsCommonJsModuleMember(source) {
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
     const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
-    if (["const", "let", "var", "function", "class", "typeof"].includes(previousToken)) continue;
-    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
+    if (["const", "let", "var", "function", "class"].includes(previousToken)) continue;
     const next = nextSignificant(source, i + "module".length);
+    if (previousToken === "typeof" && !identifierIsDereferenced(source, next)) continue;
+    if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
     if (next?.ch === "." || next?.ch === "[") return true;
     if (next?.ch === "?" && source[next.index + 1] === ".") return true;
   }
@@ -1679,12 +1680,18 @@ function hasNodeMtsCommonJsGlobalRead(source) {
       const previous = previousSignificant(source, i);
       if (previous?.ch === ".") continue;
       const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
-      if (["const", "let", "var", "function", "class", "typeof"].includes(previousToken)) continue;
+      const next = nextSignificant(source, i + name.length);
+      if (["const", "let", "var", "function", "class"].includes(previousToken)) continue;
+      if (previousToken === "typeof" && !identifierIsDereferenced(source, next)) continue;
       if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
       return true;
     }
   }
   return false;
+}
+
+function identifierIsDereferenced(source, next) {
+  return next?.ch === "." || next?.ch === "[" || (next?.ch === "?" && source[next.index + 1] === ".");
 }
 
 function identifierIsImportOrReExportSpecifier(source, index, delimiterPairs) {
