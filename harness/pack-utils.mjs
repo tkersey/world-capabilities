@@ -1276,10 +1276,107 @@ function commonJsWrapperArgumentsAccessed(source) {
   const delimiterPairs = buildDelimiterPairs(source);
   for (let i = source.indexOf("arguments"); i >= 0; i = source.indexOf("arguments", i + "arguments".length)) {
     if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "arguments".length])) continue;
+    if (identifierIsFunctionParameterBinding(source, i, "arguments", delimiterPairs)) continue;
+    if (identifierIsBoundByFunctionParameter(source, i, "arguments", delimiterPairs)) continue;
+    if (identifierIsBoundByArrowParameter(source, i, "arguments", delimiterPairs)) continue;
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
     if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
     if (!nearestArgumentsBindingFunctionBody(source, i)) return true;
+  }
+  return false;
+}
+
+function identifierIsFunctionParameterBinding(source, index, name, delimiterPairs) {
+  const parenStart = enclosingDelimiterStart(source, index, "(", ")", delimiterPairs);
+  if (parenStart >= 0) {
+    const parenEnd = findMatchingDelimiter(source, parenStart, "(", ")", delimiterPairs);
+    if (index < parenEnd && parameterListOwnsFunctionOrArrow(source, parenStart, parenEnd) && parameterListContainsIdentifier(source.slice(parenStart + 1, parenEnd), name)) return true;
+  }
+  const next = nextSignificant(source, index + name.length);
+  return next?.ch === "=" && source[next.index + 1] === ">";
+}
+
+function parameterListOwnsFunctionOrArrow(source, parenStart, parenEnd) {
+  const after = nextSignificant(source, parenEnd + 1);
+  if (after?.ch === "=" && source[after.index + 1] === ">") return true;
+  return after?.ch === "{" && !!functionBodyBeforeBrace(source, after.index);
+}
+
+function identifierIsBoundByFunctionParameter(source, index, name, delimiterPairs) {
+  const stack = [];
+  for (let i = 0; i < index; i += 1) {
+    if (source[i] === "{") {
+      stack.push(i);
+      continue;
+    }
+    if (source[i] === "}") stack.pop();
+  }
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const params = functionParameterSourceBeforeBrace(source, stack[i], delimiterPairs);
+    if (params !== null && parameterListContainsIdentifier(params, name)) return true;
+  }
+  return false;
+}
+
+function functionParameterSourceBeforeBrace(source, openBrace, delimiterPairs) {
+  const head = source.slice(0, openBrace).trimEnd();
+  if (/=>\s*$/.test(head)) return arrowParameterSourceBeforeArrow(source, head.lastIndexOf("=>"), delimiterPairs);
+  if (!head.endsWith(")") || !functionBodyBeforeBrace(source, openBrace)) return null;
+  const openParen = findOpeningDelimiter(head, head.length - 1, "(", ")");
+  return openParen >= 0 ? head.slice(openParen + 1, -1) : null;
+}
+
+function identifierIsBoundByArrowParameter(source, index, name, delimiterPairs) {
+  for (let arrow = source.lastIndexOf("=>", index); arrow >= 0; arrow = source.lastIndexOf("=>", arrow - 1)) {
+    const params = arrowParameterSourceBeforeArrow(source, arrow, delimiterPairs);
+    if (!parameterListContainsIdentifier(params ?? "", name)) continue;
+    if (arrowBodyContainsIndex(source, arrow + 2, index, delimiterPairs)) return true;
+  }
+  return false;
+}
+
+function arrowParameterSourceBeforeArrow(source, arrowIndex, delimiterPairs) {
+  const previous = previousSignificant(source, arrowIndex);
+  if (!previous) return null;
+  if (previous.ch === ")") {
+    const openParen = enclosingDelimiterStart(source, previous.index, "(", ")", delimiterPairs);
+    return openParen >= 0 ? source.slice(openParen + 1, previous.index) : null;
+  }
+  const parameter = identifierEndingAt(source, previous.index);
+  return parameter || null;
+}
+
+function arrowBodyContainsIndex(source, bodyStartHint, index, delimiterPairs) {
+  const bodyStart = nextSignificant(source, bodyStartHint)?.index ?? bodyStartHint;
+  if (index < bodyStart) return false;
+  if (source[bodyStart] === "{") {
+    const bodyEnd = findMatchingDelimiter(source, bodyStart, "{", "}", delimiterPairs);
+    return bodyEnd < 0 || index < bodyEnd;
+  }
+  return index < conciseArrowBodyEnd(source, bodyStart);
+}
+
+function conciseArrowBodyEnd(source, bodyStart) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = bodyStart; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") braceDepth += 1;
+    else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (ch === "[") bracketDepth += 1;
+    else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    else if (ch === "(") parenDepth += 1;
+    else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    else if ((ch === "," || ch === ";") && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) return i;
+  }
+  return source.length;
+}
+
+function parameterListContainsIdentifier(source, name) {
+  for (let index = source.indexOf(name); index >= 0; index = source.indexOf(name, index + name.length)) {
+    if (!isIdentifierPartChar(source[index - 1]) && !isIdentifierPartChar(source[index + name.length])) return true;
   }
   return false;
 }
@@ -1421,8 +1518,13 @@ function hasNodeMtsCommonJsModuleMember(source) {
 }
 
 function hasNodeMtsCommonJsExportsAssignment(source) {
+  const delimiterPairs = buildDelimiterPairs(source);
   for (let i = source.indexOf("exports"); i >= 0; i = source.indexOf("exports", i + 1)) {
     if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "exports".length])) continue;
+    if (identifierIsFunctionParameterBinding(source, i, "exports", delimiterPairs)) continue;
+    if (identifierIsBoundByFunctionParameter(source, i, "exports", delimiterPairs)) continue;
+    if (identifierIsBoundByArrowParameter(source, i, "exports", delimiterPairs)) continue;
+    if (identifierHasPriorLexicalBinding(source, i, "exports", delimiterPairs)) continue;
     const previous = previousSignificant(source, i);
     if (previous?.ch === ".") continue;
     const previousToken = previous ? identifierEndingAt(source, previous.index) : "";
@@ -1431,9 +1533,22 @@ function hasNodeMtsCommonJsExportsAssignment(source) {
     if (next?.ch === ":") continue;
     if (next?.ch === "." || next?.ch === "[") return true;
     if (next && isSingleAssignmentAt(source, next.index)) return true;
-    return true;
+    if (identifierIsCommonJsExportsMutatorArgument(source, i)) return true;
   }
   return false;
+}
+
+function identifierHasPriorLexicalBinding(source, index, name, delimiterPairs) {
+  const blockStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  const prefix = source.slice(blockStart >= 0 ? blockStart + 1 : 0, index);
+  const pattern = new RegExp(String.raw`(?:^|[;{}\n\r])\s*(?:const|let|var|function|class)\s+${name}(?!${JS_IDENTIFIER_CONTINUE})`, "u");
+  return pattern.test(prefix);
+}
+
+function identifierIsCommonJsExportsMutatorArgument(source, index) {
+  const previous = previousSignificant(source, index);
+  if (previous?.ch !== "(") return false;
+  return /(?:^|[^A-Za-z0-9_$])Object\s*\.\s*(?:defineProperty|assign)$/.test(source.slice(0, previous.index).trimEnd());
 }
 
 function specifierUsesRuntimeResolution(artifactPath, specifier) {

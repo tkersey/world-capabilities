@@ -1320,9 +1320,21 @@ test("CommonJS wrapper arguments check allows nested function arguments", async 
       { allowedBuiltins: [] }
     ],
     [
+      "adapter-arrow-param-cjs",
+      "adapter.cjs",
+      "const count = (arguments) => arguments.length;\nmodule.exports = count([1, 2]);\n",
+      { allowedBuiltins: [] }
+    ],
+    [
       "node-cts",
       "sidecar.cts",
       "function count() { return arguments.length; }\nfunction outer() { return () => arguments.length; }\nprocess.stdout.write(String(count(1, 2) + outer(1, 2)()));\n",
+      { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
+    ],
+    [
+      "node-arrow-param-cts",
+      "sidecar.cts",
+      "const count = (arguments) => arguments.length;\nprocess.stdout.write(String(count([1, 2])));\n",
       { allowedBuiltins: [], sidecar: { command: ["node", "sidecar.cts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 } }
     ]
   ]) {
@@ -3325,6 +3337,8 @@ test("Node TypeScript sidecar module checks ignore type-only syntax", async () =
     ["ts-interface-generic-constraint-await", "sidecar.ts", "interface AwaitShape<T extends {}> { await(): void }\nprocess.stdout.write(\"ok\");\n"],
     ["cts-type-alias-await-member", "sidecar.cts", "type AwaitShape = { value: string; await(): void };\nprocess.stdout.write(\"ok\");\n"],
     ["mts-type-module-exports", "sidecar.mts", "type ExportsShape = typeof module.exports;\nprocess.stdout.write(\"ok\");\n"],
+    ["mts-local-exports-param", "sidecar.mts", "function f(exports) { return exports; }\nprocess.stdout.write(String(f(\"ok\")));\n"],
+    ["mts-local-exports-binding", "sidecar.mts", "const exports = { value: \"ok\" };\nexports.value += \"\";\nprocess.stdout.write(exports.value);\n"],
     ["mts-abstract-class", "sidecar.mts", "abstract class Base { abstract run(): void }\nprocess.stdout.write(\"ok\");\n"],
     ["cts-abstract-class", "sidecar.cts", "abstract class Base { abstract run(): void }\nprocess.stdout.write(\"ok\");\n"],
     ["mts-readonly-constructor-type", "sidecar.mts", "class Box { constructor(xs: readonly string[]) { void xs; } }\nnew Box([]);\nprocess.stdout.write(\"ok\");\n"],
