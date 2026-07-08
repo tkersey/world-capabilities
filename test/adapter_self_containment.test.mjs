@@ -3720,6 +3720,28 @@ test("Node JavaScript sidecars infer ESM from side-effect imports", async () => 
   }
 });
 
+test("Node JavaScript sidecars infer ESM from import.meta", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-import-meta-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.js"), "process.stdout.write(new URL(\".\", import.meta.url).protocol);\n");
+    await verifySelfContained({
+      name: "sidecar-node-js-import-meta-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node JavaScript sidecars infer ESM from wrapper redeclarations", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-wrapper-esm-pack-"));
   try {

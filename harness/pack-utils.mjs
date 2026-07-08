@@ -1172,8 +1172,24 @@ async function bunStaticModuleArtifacts(pack, covered) {
 
 function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
   return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource)) ||
+    nodeHasImportMetaSyntax(moduleSyntaxSource) ||
     nodeCtsHasDisallowedAwait(source) ||
     nodeHasCommonJsWrapperLexicalRedeclaration(executableCodeSource(stripShebang(source)));
+}
+
+function nodeHasImportMetaSyntax(source) {
+  for (let i = source.indexOf("import"); i >= 0; i = source.indexOf("import", i + "import".length)) {
+    if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + "import".length])) continue;
+    const previous = previousSignificant(source, i);
+    if (previous?.ch === ".") continue;
+    const dot = nextSignificant(source, i + "import".length);
+    if (dot?.ch !== ".") continue;
+    const meta = nextSignificant(source, dot.index + 1);
+    if (!meta || identifierStartingAt(source, meta.index) !== "meta") continue;
+    if (isIdentifierPartChar(source[meta.index + "meta".length])) continue;
+    return true;
+  }
+  return false;
 }
 
 function nodeHasCommonJsWrapperLexicalRedeclaration(source) {
