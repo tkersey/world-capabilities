@@ -2164,6 +2164,26 @@ test("top-level await before array and regex literals is allowed in ESM artifact
   }
 });
 
+test("Bun side-effect helpers allow top-level await array literals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-bun-side-effect-helper-await-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import \"./helper.js\";\nexport default true;\n");
+    await writeFile(join(dir, "helper.js"), "const xs = await [1];\nvoid xs;\n");
+    await verifySelfContained({
+      name: "bun-side-effect-helper-await-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }, { path: "helper.js" }],
+        metadata: { allowedBuiltins: [] }
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assignment destructured computed members are rejected", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-assignment-computed-pack-"));
   try {

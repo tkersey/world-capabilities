@@ -1128,13 +1128,44 @@ function nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, 
   return nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) ? "esm" : "cjs";
 }
 
-function artifactAllowsTopLevelAwait(artifactPath, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName = null, isAdapterArtifact = false) {
+function artifactAllowsTopLevelAwait(artifactPath, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName = null, isAdapterArtifact = false, isBunModuleArtifact = false) {
   if (nodeModuleKind === "cjs") return false;
   if (nodeModuleKind === "esm") return true;
   if (/\.(mjs|mts)$/.test(artifactPath)) return true;
   if (/\.(cjs|cts)$/.test(artifactPath)) return false;
+  if (isBunModuleArtifact && /\.(?:js|jsx|ts|tsx)$/.test(artifactPath)) return true;
   if (["bun", "deno"].includes(sidecarRuntimeName) && !isAdapterArtifact && /\.(?:js|jsx|ts|tsx)$/.test(artifactPath)) return true;
   return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource));
+}
+
+async function bunStaticModuleArtifacts(pack, covered) {
+  const staticImports = new Map();
+  const modules = new Set();
+  for (const artifact of pack.manifest.artifacts) {
+    if (!isScannableArtifact(artifact.path)) continue;
+    const source = await readFile(await resolvePackPath(pack, artifact.path), "utf8");
+    staticImports.set(
+      artifact.path,
+      scanImportEntries(source, artifact.path).filter((entry) => entry.kind === "import-statement" && typeof entry.path === "string" && entry.path.startsWith("."))
+    );
+    const moduleSyntaxSource = executableCodeSource(loaderScanSource(source, artifact.path));
+    if (/\.(?:mjs|mts)$/.test(artifact.path) || NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource))) {
+      modules.add(artifact.path);
+    }
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const artifactPath of [...modules]) {
+      for (const entry of staticImports.get(artifactPath) ?? []) {
+        for (const candidate of localImportDirectCandidates(pack, artifactPath, entry.path)) {
+          if (!covered.has(candidate) || !isScannableArtifact(candidate) || modules.has(candidate)) continue;
+          modules.add(candidate);
+          changed = true;
+        }
+      }
+    }
+  }
+  return modules;
 }
 
 function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
@@ -2165,6 +2196,7 @@ export async function verifySelfContained(pack) {
     ? await resolvePackPath(pack, sidecarEntry)
     : null;
   const sidecarEntryReal = sidecarEntryPath ? await realpath(sidecarEntryPath) : null;
+  const bunModuleArtifacts = sidecarRuntimeName === "node" ? new Set() : await bunStaticModuleArtifacts(pack, covered);
   for (const artifact of pack.manifest.artifacts) {
     const full = await resolvePackPath(pack, artifact.path);
     if (!isScannableArtifact(artifact.path)) continue;
@@ -2179,7 +2211,7 @@ export async function verifySelfContained(pack) {
     const packageType = packageTypeInput?.type ?? null;
     const moduleSyntaxSource = executableCodeSource(loaderScanSource(source, artifact.path));
     const nodeModuleKind = nodeSidecarModuleKind(sidecarRuntimeName, artifact, isAdapterArtifact, packageType, source, moduleSyntaxSource);
-    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName, isAdapterArtifact) };
+    const scanOptions = { allowTopLevelAwait: artifactAllowsTopLevelAwait(artifact.path, nodeModuleKind, moduleSyntaxSource, sidecarRuntimeName, isAdapterArtifact, bunModuleArtifacts.has(artifact.path)) };
     const moduleScanSource = scanOptions.allowTopLevelAwait
       ? executableCodeSource(loaderScanSource(source, artifact.path), scanOptions)
       : moduleSyntaxSource;
