@@ -2019,7 +2019,7 @@ async function fileExists(path) {
 async function packPackageType(root, artifactPath) {
   const packRoot = resolve(root);
   let dir = dirname(resolve(packRoot, artifactPath));
-  while (true) {
+  while (pathInside(packRoot, dir)) {
     const candidate = join(dir, "package.json");
     if (await fileExists(candidate)) {
       const packageJson = await readJson(candidate);
@@ -2028,6 +2028,7 @@ async function packPackageType(root, artifactPath) {
         type: typeof packageJson.type === "string" ? packageJson.type : null
       };
     }
+    if (dir === packRoot) break;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;

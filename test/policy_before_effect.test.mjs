@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { importAdapter, loadPack, packageNames } from "../harness/pack-utils.mjs";
 import { resolve } from "../packages/generic-http-json/adapter.mjs";
-import { resolve as resolveHumanApproval } from "../packages/human-approval/adapter.mjs";
+import { dryRun as dryRunHumanApproval, resolve as resolveHumanApproval } from "../packages/human-approval/adapter.mjs";
 import { dryRun as dryRunFile, resolve as resolveFile } from "../packages/sandbox-files/adapter.mjs";
 
 test("missing idempotency key prevents effect", async () => {
@@ -49,6 +49,22 @@ test("human approval unsupported schema fallback is advertised", async () => {
   });
   expect(result.status).toBe("failed");
   expect(result.payload.reason).toBe("unsupported_response_schema");
+});
+
+test("human approval dry-run validation failures do not look deferred", async () => {
+  const result = await dryRunHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
+    requestId: "human-dry-run-failure-status",
+    idempotencyKey: "world:idem:human-dry-run-failure-status",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["deferred"] },
+    payload: { anchor: "not-a-world-anchor" }
+  });
+  expect(result.status).toBe("failed");
+  expect(result.payload.reason).toBe("missing_world_host_request_anchor");
 });
 
 test("human approval resolve does not require dry-run-only statuses", async () => {

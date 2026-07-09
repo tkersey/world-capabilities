@@ -41,8 +41,15 @@ function status(hostRequest, wanted, fallback = "rejected") {
   return "failed";
 }
 
-function reject(hostRequest, reason) {
-  return { requestId: hostRequest?.requestId ?? "unknown", status: status(hostRequest, "rejected"), payload: { reason } };
+function dryRunFailureStatus(hostRequest) {
+  const statuses = hostRequest?.responseSchema?.statuses ?? [];
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.includes("rejected")) return "rejected";
+  return "failed";
+}
+
+function reject(hostRequest, reason, responseStatus = status(hostRequest, "rejected")) {
+  return { requestId: hostRequest?.requestId ?? "unknown", status: responseStatus, payload: { reason } };
 }
 
 function responseSchemaSupports(hostRequest, requiredStatuses) {
@@ -106,7 +113,7 @@ export async function resolve(context, hostRequest) {
 
 export async function dryRun(context, hostRequest) {
   const denied = reason({ ...context, policy: { ...(context?.policy ?? {}), humanLive: true, auditOnly: false } }, hostRequest, ["deferred"]);
-  if (denied) return reject(hostRequest, denied);
+  if (denied) return reject(hostRequest, denied, dryRunFailureStatus(hostRequest));
   return { requestId: hostRequest.requestId, status: "deferred", payload: { promptWouldBeShown: false } };
 }
 

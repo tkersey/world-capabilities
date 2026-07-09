@@ -534,30 +534,25 @@ test("Node sidecar helpers cannot import adapter modules", async () => {
 });
 
 test("Node sidecar package type must be checksum covered", async () => {
-  for (const [name, packageJsonDir] of [
-    ["pack", "pack"],
-    ["parent", "."]
-  ]) {
-    const root = await mkdtemp(join(tmpdir(), "world-node-package-type-covered-pack-"));
-    try {
-      const dir = join(root, "pack");
-      await mkdir(dir);
-      await writeFile(join(root, packageJsonDir, "package.json"), "{\"type\":\"module\"}\n");
-      await writeFile(join(dir, "sidecar.js"), "process.stdout.write(\"ok\");\n");
-      await expect(verifySelfContained({
-        name: `node-package-type-covered-${name}-pack`,
-        dir,
-        manifest: {
-          artifacts: [{ path: "sidecar.js", role: "sidecar" }],
-          metadata: {
-            allowedBuiltins: [],
-            sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
-          }
+  const root = await mkdtemp(join(tmpdir(), "world-node-package-type-covered-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "package.json"), "{\"type\":\"module\"}\n");
+    await writeFile(join(dir, "sidecar.js"), "process.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "node-package-type-covered-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
         }
-      })).rejects.toThrow(/Node sidecar package\.json not checksum-covered/);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+      }
+    })).rejects.toThrow(/Node sidecar package\.json not checksum-covered/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
@@ -3692,6 +3687,29 @@ test("Node TypeScript sidecars respect package module kind", async () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  }
+});
+
+test("Node sidecar package type lookup stops at the pack root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-package-root-pack-"));
+  try {
+    await writeFile(join(root, "package.json"), "{\"type\":\"module\"}\n");
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.js"), "module.exports = {};\nprocess.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-node-package-root-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).resolves.toBeUndefined();
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
