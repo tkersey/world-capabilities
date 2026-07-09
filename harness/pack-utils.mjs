@@ -165,6 +165,7 @@ const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [
 const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module", "node:process"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
+const NETWORK_BUILTINS = new Set(["node:http", "node:https", "node:http2"]);
 const IMPORT_SCANNERS = {
   cjs: new Bun.Transpiler({ loader: "js" }),
   cts: new Bun.Transpiler({ loader: "ts" }),
@@ -2592,6 +2593,7 @@ function identifierStartingAt(source, start) {
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
+  const allowNetworkAuthority = pack.manifest.authorityLabels?.includes("network.http") === true;
   const sidecarEntry = sidecarEntrypoint(pack);
   const sidecarRuntimeName = sidecarRuntime(pack);
   const root = resolve(pack.dir);
@@ -2681,6 +2683,7 @@ export async function verifySelfContained(pack) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
         assert(allowedBuiltins.has(specifier), `${pack.name}: unchecked builtin ${specifier}`);
+        assert(!NETWORK_BUILTINS.has(specifier) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
         assert(!FORBIDDEN_EXECUTION_BUILTINS.has(specifier), `${pack.name}: code execution builtin ${specifier} rejected`);
         continue;
       }
@@ -2756,7 +2759,6 @@ export async function verifySelfContained(pack) {
     const allowSidecarProcessIo = allowSidecarIo && ["node", "bun"].includes(sidecarRuntimeName);
     const allowSidecarBunIo = allowSidecarIo && sidecarRuntimeName === "bun";
     const allowSidecarDenoIo = allowSidecarIo && sidecarRuntimeName === "deno";
-    const allowNetworkGlobals = pack.manifest.authorityLabels?.includes("network.http") === true;
     for (const { codeSource } of scanInputs) {
       if (codeSource.includes("module")) {
         assert(!COMMONJS_MODULE_LOADER.test(codeSource), `${pack.name}: CommonJS module loader rejected in ${artifact.path}`);
@@ -2766,7 +2768,7 @@ export async function verifySelfContained(pack) {
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedBunAccess(codeSource, allowSidecarBunIo), BUN_ACCESS), `${pack.name}: Bun access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo), DENO_ACCESS), `${pack.name}: Deno access rejected in ${artifact.path}`);
         const globalThisReceiver = nodeModuleKind === "cjs" || /\.(?:cjs|cts)$/.test(artifact.path);
-        assert(allowNetworkGlobals || !hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver }), `${pack.name}: network global access rejected in ${artifact.path}`);
+        assert(allowNetworkAuthority || !hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver }), `${pack.name}: network global access rejected in ${artifact.path}`);
       }
     }
   }

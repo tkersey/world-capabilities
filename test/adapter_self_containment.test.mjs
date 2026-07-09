@@ -1349,6 +1349,25 @@ test("network authority labels allow network globals", async () => {
   }
 });
 
+test("network builtins require network authority labels", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-network-builtin-authority-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "import http from \"node:http\";\nexport default http;\n");
+    await expect(verifySelfContained({
+      name: "network-builtin-authority-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        metadata: { allowedBuiltins: ["node:http"] }
+      }
+    })).rejects.toThrow(/network builtin node:http requires network\.http authority/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("node module loader builtin is rejected even with computed access", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-node-module-pack-"));
   try {
