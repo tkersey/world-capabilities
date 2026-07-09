@@ -167,7 +167,8 @@ const NODE_MTS_UNSUPPORTED_MODULE_SYNTAX = [
 const PRELOAD_FLAGS = ["--import", "--require", "--import-map", "--preload", "--loader", "--experimental-loader"];
 const FORBIDDEN_LOADER_BUILTINS = new Set(["node:module", "node:process"]);
 const FORBIDDEN_EXECUTION_BUILTINS = new Set(["node:child_process", "node:cluster", "node:vm", "node:worker_threads"]);
-const NETWORK_BUILTINS = new Set(["node:dgram", "node:dns", "node:http", "node:https", "node:http2", "node:net", "node:tls"]);
+const HTTP_NETWORK_BUILTINS = new Set(["node:http", "node:https", "node:http2"]);
+const RAW_NETWORK_BUILTINS = new Set(["node:dgram", "node:dns", "node:net", "node:tls"]);
 const IMPORT_SCANNERS = {
   cjs: new Bun.Transpiler({ loader: "js" }),
   cts: new Bun.Transpiler({ loader: "ts" }),
@@ -2704,7 +2705,8 @@ export async function verifySelfContained(pack) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
         assert(allowedBuiltins.has(specifier), `${pack.name}: unchecked builtin ${specifier}`);
-        assert(!NETWORK_BUILTINS.has(specifier) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
+        assert(!RAW_NETWORK_BUILTINS.has(specifier), `${pack.name}: raw network builtin ${specifier} rejected`);
+        assert(!HTTP_NETWORK_BUILTINS.has(specifier) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
         assert(!FORBIDDEN_EXECUTION_BUILTINS.has(specifier), `${pack.name}: code execution builtin ${specifier} rejected`);
         continue;
       }

@@ -19,7 +19,7 @@ test("missing idempotency key prevents effect", async () => {
   expect(context.effectAttempted).toBe(0);
 });
 
-test("human approval rejection fallback stays schema compatible", async () => {
+test("human approval rejection fallback does not use deferred for schema errors", async () => {
   const result = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
     requestId: "human-schema-fallback",
     idempotencyKey: "world:idem:human-schema-fallback",
@@ -31,7 +31,7 @@ test("human approval rejection fallback stays schema compatible", async () => {
     responseSchema: { statuses: ["ok", "deferred"] },
     payload: { anchor: "world:host-request:1" }
   });
-  expect(result.status).toBe("deferred");
+  expect(result.status).toBe("failed");
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
@@ -95,7 +95,7 @@ test("human approval dry-run requires a failure status for validation failures",
     responseSchema: { statuses: ["deferred"] },
     payload: { anchor: "world:host-request:1" }
   });
-  expect(result.status).toBe("deferred");
+  expect(result.status).toBe("failed");
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 

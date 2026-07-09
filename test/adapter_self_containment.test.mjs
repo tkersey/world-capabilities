@@ -1370,7 +1370,10 @@ test("network http authority does not allow websocket globals", async () => {
 });
 
 test("network builtins require network authority labels", async () => {
-  for (const specifier of ["node:http", "node:net"]) {
+  for (const [specifier, pattern] of [
+    ["node:http", /network builtin node:http requires network\.http authority/],
+    ["node:net", /raw network builtin node:net rejected/]
+  ]) {
     const root = await mkdtemp(join(tmpdir(), "world-network-builtin-authority-pack-"));
     try {
       const dir = join(root, "pack");
@@ -1383,7 +1386,7 @@ test("network builtins require network authority labels", async () => {
           artifacts: [{ path: "adapter.mjs" }],
           metadata: { allowedBuiltins: [specifier] }
         }
-      })).rejects.toThrow(new RegExp(`network builtin ${specifier} requires network\\.http authority`));
+      })).rejects.toThrow(pattern);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
