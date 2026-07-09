@@ -1664,7 +1664,7 @@ function hasUnboundCommonJsRequireReference(source) {
   return false;
 }
 
-function hasUnboundNetworkGlobalReference(source) {
+function hasUnboundNetworkGlobalReference(source, { globalThisReceiver = false } = {}) {
   const delimiterPairs = buildDelimiterPairs(source);
   for (const name of NETWORK_GLOBAL_NAMES) {
     for (let i = source.indexOf(name); i >= 0; i = source.indexOf(name, i + name.length)) {
@@ -1673,7 +1673,7 @@ function hasUnboundNetworkGlobalReference(source) {
       if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
       const previous = previousSignificant(source, i);
       if (previous?.ch === ".") {
-        if (networkGlobalReceiverBeforeMemberAccess(source, previous.index, delimiterPairs)) return true;
+        if (networkGlobalReceiverBeforeMemberAccess(source, previous.index, delimiterPairs, globalThisReceiver)) return true;
         continue;
       }
       if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
@@ -1683,13 +1683,13 @@ function hasUnboundNetworkGlobalReference(source) {
   return false;
 }
 
-function networkGlobalReceiverBeforeMemberAccess(source, dotIndex, delimiterPairs) {
+function networkGlobalReceiverBeforeMemberAccess(source, dotIndex, delimiterPairs, globalThisReceiver = false) {
   let receiverEnd = dotIndex - 1;
   while (receiverEnd >= 0 && /\s/.test(source[receiverEnd])) receiverEnd -= 1;
   if (source[receiverEnd] === "?") receiverEnd -= 1;
   while (receiverEnd >= 0 && /\s/.test(source[receiverEnd])) receiverEnd -= 1;
   const receiver = identifierEndingAt(source, receiverEnd);
-  if (!NETWORK_GLOBAL_RECEIVER_NAMES.includes(receiver)) return false;
+  if (!NETWORK_GLOBAL_RECEIVER_NAMES.includes(receiver) && !(globalThisReceiver && receiver === "this")) return false;
   const receiverStart = receiverEnd - receiver.length + 1;
   return !identifierIsLocalBindingOrBoundReference(source, receiverStart, receiver, delimiterPairs);
 }
@@ -2766,7 +2766,8 @@ export async function verifySelfContained(pack) {
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedProcessAccess(codeSource, allowSidecarProcessIo), PROCESS_ACCESS), `${pack.name}: process access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedBunAccess(codeSource, allowSidecarBunIo), BUN_ACCESS), `${pack.name}: Bun access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo), DENO_ACCESS), `${pack.name}: Deno access rejected in ${artifact.path}`);
-        assert(allowNetworkGlobals || !hasUnboundNetworkGlobalReference(codeSource), `${pack.name}: network global access rejected in ${artifact.path}`);
+        const globalThisReceiver = nodeModuleKind === "cjs" || /\.(?:cjs|cts)$/.test(artifact.path);
+        assert(allowNetworkGlobals || !hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver }), `${pack.name}: network global access rejected in ${artifact.path}`);
       }
     }
   }

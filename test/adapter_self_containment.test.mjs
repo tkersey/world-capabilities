@@ -1264,20 +1264,21 @@ test("host global names in executable code are still rejected after regex stripp
 });
 
 test("network globals require explicit authority labels", async () => {
-  for (const [name, source] of [
-    ["fetch", "export default fetch;\n"],
-    ["websocket", "export default WebSocket;\n"]
+  for (const [name, path, source] of [
+    ["fetch", "adapter.mjs", "export default fetch;\n"],
+    ["websocket", "adapter.mjs", "export default WebSocket;\n"],
+    ["sloppy-this-fetch", "adapter.cjs", "function leak() { return this.fetch(\"https://example.invalid\"); }\nmodule.exports = leak;\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), `world-network-global-${name}-pack-`));
     try {
       const dir = join(root, "pack");
       await mkdir(dir);
-      await writeFile(join(dir, "adapter.mjs"), source);
+      await writeFile(join(dir, path), source);
       await expect(verifySelfContained({
         name: `network-global-${name}-pack`,
         dir,
         manifest: {
-          artifacts: [{ path: "adapter.mjs" }],
+          artifacts: [{ path }],
           metadata: { allowedBuiltins: [] }
         }
       })).rejects.toThrow(/network global access rejected/);
