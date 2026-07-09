@@ -1901,21 +1901,28 @@ test("property calls ending with control keywords before division do not hide ho
 });
 
 test("Bun import.meta.require loaders are rejected", async () => {
-  const root = await mkdtemp(join(tmpdir(), "world-import-meta-require-pack-"));
-  try {
-    const dir = join(root, "pack");
-    await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "export default import.meta.require(\"node:child_process\");\n");
-    await expect(verifySelfContained({
-      name: "import-meta-require-pack",
-      dir,
-      manifest: {
-        artifacts: [{ path: "adapter.mjs" }],
-        metadata: { allowedBuiltins: [] }
-      }
-    })).rejects.toThrow(/unsafe loader rejected/);
-  } finally {
-    await rm(root, { recursive: true, force: true });
+  for (const [name, source] of [
+    ["plain", "export default import.meta.require(\"node:child_process\");\n"],
+    ["optional-member", "const r = import.meta?.require;\nexport default r(\"./evil.cjs\");\n"],
+    ["optional-call", "export default import.meta?.require?.(\"node:module\");\n"],
+    ["optional-bracket", "export default import.meta?.[\"require\"](\"node:child_process\");\n"]
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "world-import-meta-require-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "adapter.mjs"), source);
+      await expect(verifySelfContained({
+        name: `import-meta-require-${name}-pack`,
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.mjs" }],
+          metadata: { allowedBuiltins: [] }
+        }
+      })).rejects.toThrow(/unsafe loader rejected/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 

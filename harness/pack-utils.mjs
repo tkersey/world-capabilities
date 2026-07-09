@@ -111,8 +111,8 @@ const EVAL_PATTERNS = [
   new RegExp(String.raw`${identifierTokenSource("process")}\s*\[\s*["']mainModule["']\s*\]`, "u"),
   new RegExp(String.raw`${identifierTokenSource("globalThis")}\s*\[\s*["']process["']\s*\]`, "u"),
   new RegExp(String.raw`=\s*${identifierTokenSource("process")}`, "u"),
-  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*\.\s*require(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
-  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*\[\s*["']require["']\s*\]`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*(?:\.|\?\.)\s*require(?!${JS_IDENTIFIER_CONTINUE})`, "u"),
+  new RegExp(String.raw`${identifierTokenSource("import")}\s*\.\s*meta\s*(?:\[|\?\.\[)\s*["']require["']\s*\]`, "u"),
   identifierToken("createRequire"),
   new RegExp(String.raw`${identifierTokenSource("new")}\s+${identifierTokenSource("Worker")}\s*\(`, "u")
 ];
