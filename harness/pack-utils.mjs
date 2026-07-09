@@ -123,7 +123,9 @@ const COMMONJS_MODULE_LOADER = new RegExp(String.raw`${identifierTokenSource("mo
 const PROCESS_ACCESS = identifierToken("process");
 const BUN_ACCESS = identifierToken("Bun");
 const DENO_ACCESS = identifierToken("Deno");
-const NETWORK_GLOBAL_NAMES = ["fetch", "WebSocket", "EventSource", "XMLHttpRequest"];
+const HTTP_NETWORK_GLOBAL_NAMES = ["fetch", "EventSource", "XMLHttpRequest"];
+const WEBSOCKET_NETWORK_GLOBAL_NAMES = ["WebSocket"];
+const NETWORK_GLOBAL_NAMES = [...HTTP_NETWORK_GLOBAL_NAMES, ...WEBSOCKET_NETWORK_GLOBAL_NAMES];
 const NETWORK_GLOBAL_RECEIVER_NAMES = ["globalThis", "self", "window"];
 const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
@@ -1665,9 +1667,9 @@ function hasUnboundCommonJsRequireReference(source) {
   return false;
 }
 
-function hasUnboundNetworkGlobalReference(source, { globalThisReceiver = false } = {}) {
+function hasUnboundNetworkGlobalReference(source, { globalThisReceiver = false, names = NETWORK_GLOBAL_NAMES } = {}) {
   const delimiterPairs = buildDelimiterPairs(source);
-  for (const name of NETWORK_GLOBAL_NAMES) {
+  for (const name of names) {
     for (let i = source.indexOf(name); i >= 0; i = source.indexOf(name, i + name.length)) {
       if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + name.length])) continue;
       if (identifierIsLocalBindingOrBoundReference(source, i, name, delimiterPairs)) continue;
@@ -2016,15 +2018,26 @@ async function fileExists(path) {
   }
 }
 
-async function packPackageType(root, artifactPath) {
+async function packPackageType(root, artifactPath, covered) {
   const packRoot = resolve(root);
+  const packRootReal = await realpath(packRoot);
   let dir = dirname(resolve(packRoot, artifactPath));
   while (pathInside(packRoot, dir)) {
     const candidate = join(dir, "package.json");
-    if (await fileExists(candidate)) {
-      const packageJson = await readJson(candidate);
+    const candidateEntry = await maybeLstat(candidate);
+    if (candidateEntry && (candidateEntry.isFile() || candidateEntry.isSymbolicLink())) {
+      const candidateReal = await realpath(candidate);
+      const artifactPath = relative(packRoot, candidate);
+      if (!pathInside(packRootReal, candidateReal) || !covered.has(artifactPath)) {
+        return { artifactPath: null, type: null };
+      }
+      const candidateRealStat = await stat(candidateReal);
+      if (!candidateRealStat.isFile()) {
+        return { artifactPath: null, type: null };
+      }
+      const packageJson = await readJson(candidateReal);
       return {
-        artifactPath: pathInside(packRoot, candidate) ? relative(packRoot, candidate) : null,
+        artifactPath,
         type: typeof packageJson.type === "string" ? packageJson.type : null
       };
     }
@@ -2034,6 +2047,14 @@ async function packPackageType(root, artifactPath) {
     dir = parent;
   }
   return null;
+}
+
+async function maybeLstat(path) {
+  try {
+    return await lstat(path);
+  } catch {
+    return null;
+  }
 }
 
 function nodeSidecarUsesPackageType(sidecarRuntimeName, artifact, isAdapterArtifact) {
@@ -2611,7 +2632,7 @@ export async function verifySelfContained(pack) {
     const isAdapterArtifact = adapterReal !== null && artifactReal === adapterReal;
     const source = await readFile(full, "utf8");
     const packageTypeInput = nodeSidecarUsesPackageType(sidecarRuntimeName, artifact, isAdapterArtifact)
-      ? await packPackageType(root, artifact.path)
+      ? await packPackageType(root, artifact.path, covered)
       : null;
     assert(!packageTypeInput || (packageTypeInput.artifactPath && covered.has(packageTypeInput.artifactPath)), `${pack.name}: Node sidecar package.json not checksum-covered for ${artifact.path}`);
     const packageType = packageTypeInput?.type ?? null;
@@ -2768,7 +2789,11 @@ export async function verifySelfContained(pack) {
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedBunAccess(codeSource, allowSidecarBunIo), BUN_ACCESS), `${pack.name}: Bun access rejected in ${artifact.path}`);
         assert(!sourceMatchesOutsideObjectPropertyName(withoutAllowedDenoAccess(codeSource, allowSidecarDenoIo), DENO_ACCESS), `${pack.name}: Deno access rejected in ${artifact.path}`);
         const globalThisReceiver = nodeModuleKind === "cjs" || /\.(?:cjs|cts)$/.test(artifact.path);
-        assert(allowNetworkAuthority || !hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver }), `${pack.name}: network global access rejected in ${artifact.path}`);
+        assert(
+          allowNetworkAuthority || !hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver, names: HTTP_NETWORK_GLOBAL_NAMES }),
+          `${pack.name}: network global access rejected in ${artifact.path}`
+        );
+        assert(!hasUnboundNetworkGlobalReference(codeSource, { globalThisReceiver, names: WEBSOCKET_NETWORK_GLOBAL_NAMES }), `${pack.name}: WebSocket global access rejected in ${artifact.path}`);
       }
     }
   }

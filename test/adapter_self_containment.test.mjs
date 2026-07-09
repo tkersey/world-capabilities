@@ -1281,7 +1281,7 @@ test("network globals require explicit authority labels", async () => {
           artifacts: [{ path }],
           metadata: { allowedBuiltins: [] }
         }
-      })).rejects.toThrow(/network global access rejected/);
+      })).rejects.toThrow(/network global access rejected|WebSocket global access rejected/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1344,6 +1344,26 @@ test("network authority labels allow network globals", async () => {
         metadata: { allowedBuiltins: [] }
       }
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("network http authority does not allow websocket globals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-websocket-authority-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "adapter.mjs"), "export default WebSocket;\n");
+    await expect(verifySelfContained({
+      name: "websocket-authority-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        authorityLabels: ["network.http"],
+        metadata: { allowedBuiltins: [] }
+      }
+    })).rejects.toThrow(/WebSocket global access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -3732,6 +3752,30 @@ test("Node sidecar package type lookup stops at the pack root", async () => {
         }
       }
     })).resolves.toBeUndefined();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Node sidecar package type rejects outside symlink before reading", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-package-symlink-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(root, "package.json"), "{ outside json is not parsed\n");
+    await symlink(join(root, "package.json"), join(dir, "package.json"));
+    await writeFile(join(dir, "sidecar.js"), "export default true;\n");
+    await expect(verifySelfContained({
+      name: "sidecar-node-package-symlink-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Node sidecar package.json not checksum-covered/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
