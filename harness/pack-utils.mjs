@@ -1680,13 +1680,13 @@ function hasUnboundNetworkGlobalReference(source, { globalThisReceiver = false, 
   for (const name of names) {
     for (let i = source.indexOf(name); i >= 0; i = source.indexOf(name, i + name.length)) {
       if (isIdentifierPartChar(source[i - 1]) || isIdentifierPartChar(source[i + name.length])) continue;
-      if (identifierIsLocalBindingOrBoundReference(source, i, name, delimiterPairs)) continue;
-      if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
       const previous = previousSignificant(source, i);
       if (previous?.ch === ".") {
         if (networkGlobalReceiverBeforeMemberAccess(source, previous.index, delimiterPairs, globalThisReceiver)) return true;
         continue;
       }
+      if (identifierIsLocalBindingOrBoundReference(source, i, name, delimiterPairs)) continue;
+      if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
       if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
       return true;
     }
@@ -1702,7 +1702,20 @@ function networkGlobalReceiverBeforeMemberAccess(source, dotIndex, delimiterPair
   const receiver = identifierEndingAt(source, receiverEnd);
   if (!NETWORK_GLOBAL_RECEIVER_NAMES.includes(receiver) && !(globalThisReceiver && receiver === "this")) return false;
   const receiverStart = receiverEnd - receiver.length + 1;
+  if (globalThisReceiver && ["self", "window"].includes(receiver) && identifierHasPriorThisAliasBinding(source, receiverStart, receiver, delimiterPairs)) return true;
   return !identifierIsLocalBindingOrBoundReference(source, receiverStart, receiver, delimiterPairs);
+}
+
+function identifierHasPriorThisAliasBinding(source, index, name, delimiterPairs) {
+  let blockStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  let scopeEnd = index;
+  for (;;) {
+    const scopeStart = blockStart >= 0 ? blockStart + 1 : 0;
+    if (scopeHasPriorThisAliasBinding(source, scopeStart, scopeEnd, name)) return true;
+    if (blockStart < 0) return false;
+    scopeEnd = blockStart;
+    blockStart = enclosingDelimiterStart(source, blockStart, "{", "}", delimiterPairs);
+  }
 }
 
 function identifierIsLocalBindingOrBoundReference(source, index, name, delimiterPairs) {
@@ -1995,6 +2008,50 @@ function scopeHasPriorLexicalBinding(source, start, end, name) {
     if (!["const", "let", "var", "function", "class"].includes(keyword)) continue;
     const next = nextSignificant(source, i + keyword.length);
     if (next && identifierStartingAt(source, next.index) === name) return true;
+    i += keyword.length - 1;
+  }
+  return false;
+}
+
+function scopeHasPriorThisAliasBinding(source, start, end, name) {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  for (let i = start; i < end; i += 1) {
+    const ch = source[i];
+    if (ch === "{") {
+      braceDepth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === "(") {
+      parenDepth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+    if (braceDepth > 0 || bracketDepth > 0 || parenDepth > 0 || isIdentifierPartChar(source[i - 1])) continue;
+    const keyword = identifierStartingAt(source, i);
+    if (!["const", "let", "var"].includes(keyword)) continue;
+    const binding = nextSignificant(source, i + keyword.length);
+    if (!binding || identifierStartingAt(source, binding.index) !== name) continue;
+    const afterBinding = nextSignificant(source, binding.index + name.length);
+    if (afterBinding?.ch !== "=") continue;
+    const value = nextSignificant(source, afterBinding.index + 1);
+    if (value && identifierStartingAt(source, value.index) === "this") return true;
     i += keyword.length - 1;
   }
   return false;

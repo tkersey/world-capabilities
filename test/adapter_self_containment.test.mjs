@@ -1267,7 +1267,9 @@ test("network globals require explicit authority labels", async () => {
   for (const [name, path, source] of [
     ["fetch", "adapter.mjs", "export default fetch;\n"],
     ["websocket", "adapter.mjs", "export default WebSocket;\n"],
-    ["sloppy-this-fetch", "adapter.cjs", "function leak() { return this.fetch(\"https://example.invalid\"); }\nmodule.exports = leak;\n"]
+    ["sloppy-this-fetch", "adapter.cjs", "function leak() { return this.fetch(\"https://example.invalid\"); }\nmodule.exports = leak;\n"],
+    ["sloppy-this-fetch-with-local-fetch", "adapter.cjs", "const fetch = () => \"local\";\nfunction leak() { return this.fetch(\"https://example.invalid\"); }\nmodule.exports = leak();\n"],
+    ["sloppy-this-window-alias-fetch", "adapter.cjs", "function leak() { const window = this; return window.fetch(\"https://example.invalid\"); }\nmodule.exports = leak();\n"]
   ]) {
     const root = await mkdtemp(join(tmpdir(), `world-network-global-${name}-pack-`));
     try {
@@ -1309,6 +1311,9 @@ test("local network global bindings do not require authority labels", async () =
     }],
     ["local-window-fetch", {
       "adapter.mjs": "const window = { fetch: () => \"local\" };\nexport default window.fetch;\n"
+    }],
+    ["local-cjs-window-fetch", {
+      "adapter.cjs": "const window = { fetch: () => \"local\" };\nmodule.exports = window.fetch();\n"
     }]
   ]) {
     const root = await mkdtemp(join(tmpdir(), `world-network-local-binding-${name}-pack-`));
