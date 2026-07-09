@@ -1171,10 +1171,12 @@ async function bunStaticModuleArtifacts(pack, covered) {
 }
 
 function nodeSourceUsesEsmSyntax(source, moduleSyntaxSource) {
+  const rawSyntaxSource = executableCodeSource(stripShebang(source));
   return NODE_CTS_UNSUPPORTED_MODULE_SYNTAX.some((check) => sourceCheckMatches(check, moduleSyntaxSource)) ||
     nodeHasImportMetaSyntax(moduleSyntaxSource) ||
+    nodeHasImportMetaSyntax(rawSyntaxSource) ||
     nodeCtsHasDisallowedAwait(source) ||
-    nodeHasCommonJsWrapperLexicalRedeclaration(executableCodeSource(stripShebang(source)));
+    nodeHasCommonJsWrapperLexicalRedeclaration(rawSyntaxSource);
 }
 
 function nodeHasImportMetaSyntax(source) {

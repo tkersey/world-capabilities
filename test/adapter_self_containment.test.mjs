@@ -3776,6 +3776,28 @@ test("Node JavaScript sidecars infer ESM from import.meta", async () => {
   }
 });
 
+test("Node JavaScript sidecars reject CommonJS globals when import.meta is optimizer-erased", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-erased-import-meta-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(join(dir, "sidecar.js"), "void import.meta.url;\nmodule.exports = {};\nprocess.stdout.write(\"ok\");\n");
+    await expect(verifySelfContained({
+      name: "sidecar-node-js-erased-import-meta-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.js", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["node", "sidecar.js"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/Node sidecar unsupported module syntax rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Node JavaScript sidecars infer ESM from wrapper redeclarations", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-sidecar-node-js-wrapper-esm-pack-"));
   try {
