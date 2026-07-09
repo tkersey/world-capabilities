@@ -5,7 +5,7 @@ const packManifest = {
   supportedActuationClasses: ["approval"],
   supportedActuatorRefs: ["actuator.human-approval"],
   supportedDescriptorFingerprints: ["desc.human-approval.v0"],
-  supportedResponseStatuses: ["ok", "rejected", "deferred"],
+  supportedResponseStatuses: ["ok", "rejected", "deferred", "failed"],
   secretRequirements: []
 };
 

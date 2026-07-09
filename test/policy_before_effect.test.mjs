@@ -35,6 +35,22 @@ test("human approval rejection fallback stays schema compatible", async () => {
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
+test("human approval unsupported schema fallback is advertised", async () => {
+  const result = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
+    requestId: "human-schema-failed-fallback",
+    idempotencyKey: "world:idem:human-schema-failed-fallback",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["ok", "failed"] },
+    payload: { anchor: "world:host-request:1" }
+  });
+  expect(result.status).toBe("failed");
+  expect(result.payload.reason).toBe("unsupported_response_schema");
+});
+
 test("human approval resolve does not require dry-run-only statuses", async () => {
   const request = {
     requestId: "human-resolve-schema",
