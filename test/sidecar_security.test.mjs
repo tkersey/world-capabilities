@@ -14,7 +14,7 @@ test("sidecar fixture schema rejection uses an allowed failure status", async ()
       actuatorRef: "actuator.sidecar-fixture",
       actuationClass: "sidecar"
     },
-    responseSchema: { statuses: ["ok", "failed"] },
+    responseSchema: { statuses: ["failed"] },
     payload: {}
   });
   expect(result.status).toBe("failed");

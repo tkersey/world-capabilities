@@ -320,6 +320,12 @@ test("all adapters reject unsupported targets and status sets before effects", a
       });
       expect(supersetSchema.status).toBe("ok");
 
+      const operationSchema = await adapter.preflight(context, {
+        ...request,
+        responseSchema: { statuses: ["ok", "rejected"] }
+      });
+      expect(operationSchema.status).toBe("ok");
+
       const deniedContext = {
         ...context,
         policy: { ...context.policy, denyPackages: [pack.manifest.packageName] },

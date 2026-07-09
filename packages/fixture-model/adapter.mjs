@@ -64,9 +64,7 @@ function baseCheck(context, hostRequest) {
   if (!packManifest.supportedActuatorRefs.includes(hostRequest.target.actuatorRef)) return "unsupported_actuator_ref";
   if (!hostRequest.target.actuationClass) return "missing_actuation_class";
   if (!packManifest.supportedActuationClasses.includes(hostRequest.target.actuationClass)) return "unsupported_actuation_class";
-  const statuses = hostRequest.responseSchema?.statuses;
-  if (!Array.isArray(statuses) || statuses.length === 0) return "unsupported_response_schema";
-  if (!packManifest.supportedResponseStatuses.every((item) => statuses.includes(item))) return "unsupported_response_schema";
+  if (!responseSchemaSupports(hostRequest)) return "unsupported_response_schema";
   const policyReason = packagePolicyReason(context);
   if (policyReason) return policyReason;
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
@@ -79,7 +77,13 @@ function status(hostRequest, wanted, fallback = "failed") {
   const statuses = hostRequest?.responseSchema?.statuses ?? [];
   if (statuses.includes(wanted)) return wanted;
   if (statuses.includes(fallback)) return fallback;
-  return "failed";
+  const compatibleFallback = ["failed", "rejected"].find((item) => statuses.includes(item));
+  return compatibleFallback ?? "failed";
+}
+
+function responseSchemaSupports(hostRequest) {
+  const statuses = hostRequest.responseSchema?.statuses;
+  return Array.isArray(statuses) && statuses.includes("ok") && statuses.some((item) => item === "rejected" || item === "failed");
 }
 
 function rejection(hostRequest, reason) {

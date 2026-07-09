@@ -9,7 +9,7 @@
     "file.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "45cf8426c6a077e16e55f5b639ef3d7dd62abe58452beee191de7ecc41ed11e9"
+    "adapter.mjs": "2f45faec3e234691973eabef8a7b1edb21f69b45ac907e0730bc2db8a56bbbfe"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
@@ -27,7 +27,7 @@
   },
   "packageName": "@tkersey/world-capabilities/sandbox-files",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "7368371693e242fd824f82d157bde9ca9fdfe0e916dccdb3a6d3ee158ad95c99",
+  "packFingerprint": "7dc2fbd0164a16a2163fe8c7e92ed30deaeff1d1bc1d6a06ef7b6327824c2bff",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "idempotent",

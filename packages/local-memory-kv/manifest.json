@@ -9,7 +9,7 @@
     "memory.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "686674f15a2a183c0541b5853f6d3d7fa6cfff521dddb017efa4417bb8c8f552"
+    "adapter.mjs": "07777721e9d152667a9be4c4995af56617fcfe0d42943c337a30d49e4ad3ae24"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
@@ -23,7 +23,7 @@
   },
   "packageName": "@tkersey/world-capabilities/local-memory-kv",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "5c6b975448d9c570854804d77745b0b002bcb58897af16ee818a5039fb2a8a45",
+  "packFingerprint": "95eeeb77a18ec72738dbce6e7b411c935255dc067b96a6f7498bae4be6202e08",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",
