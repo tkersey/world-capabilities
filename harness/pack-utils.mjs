@@ -1902,8 +1902,7 @@ function exportSpecifierListHasFrom(source, braceStart, delimiterPairs) {
 }
 
 function identifierHasPriorImportBinding(source, index, name) {
-  const prefix = source.slice(0, index);
-  for (const match of prefix.matchAll(/\bimport\s+(?!\()([\s\S]*?)\s+from\s*(["'`])/g)) {
+  for (const match of source.matchAll(/\bimport\s+(?!\()([\s\S]*?)\s+from\s*(["'`])/g)) {
     const clause = match[1].trim();
     if (clause.startsWith("type ")) continue;
     if (importClauseBindsIdentifier(clause, name)) return true;

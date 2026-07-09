@@ -1300,6 +1300,10 @@ test("local network global bindings do not require authority labels", async () =
       "adapter.mjs": "import { EventSource } from \"./helper.mjs\";\nexport default EventSource;\n",
       "helper.mjs": "export const EventSource = true;\n"
     }],
+    ["hoisted-import-fetch", {
+      "adapter.mjs": "export default fetch();\nimport { fetch } from \"./helper.mjs\";\n",
+      "helper.mjs": "export function fetch() { return \"local\"; }\n"
+    }],
     ["local-window-fetch", {
       "adapter.mjs": "const window = { fetch: () => \"local\" };\nexport default window.fetch;\n"
     }]
