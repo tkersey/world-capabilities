@@ -36,7 +36,7 @@ function status(hostRequest, wanted, fallback = "rejected") {
   const statuses = hostRequest?.responseSchema?.statuses ?? [];
   if (statuses.includes(wanted)) return wanted;
   if (statuses.includes(fallback)) return fallback;
-  const compatibleFallback = packManifest.supportedResponseStatuses.find((item) => item !== "ok" && statuses.includes(item));
+  const compatibleFallback = ["failed", "rejected", "deferred"].find((item) => packManifest.supportedResponseStatuses.includes(item) && statuses.includes(item));
   if (compatibleFallback) return compatibleFallback;
   return "failed";
 }

@@ -51,6 +51,22 @@ test("human approval unsupported schema fallback is advertised", async () => {
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
+test("human approval schema errors prefer failed over deferred", async () => {
+  const result = await resolveHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
+    requestId: "human-schema-failed-before-deferred",
+    idempotencyKey: "world:idem:human-schema-failed-before-deferred",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["ok", "deferred", "failed"] },
+    payload: { anchor: "world:host-request:1" }
+  });
+  expect(result.status).toBe("failed");
+  expect(result.payload.reason).toBe("unsupported_response_schema");
+});
+
 test("human approval dry-run validation failures do not look deferred", async () => {
   const result = await dryRunHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
     requestId: "human-dry-run-failure-status",
