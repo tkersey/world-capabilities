@@ -33,6 +33,18 @@ test("non-string sidecar command arguments are rejected", async () => {
   expect(() => validateSidecarCommand(pack)).toThrow(/sidecar command must contain strings/);
 });
 
+test("sidecar resource bounds must be numeric safe integers", async () => {
+  for (const [field, value, message] of [
+    ["stdoutBytes", null, /stdout bound must be an integer/],
+    ["stderrBytes", -1, /stderr bound too low/],
+    ["timeoutMs", "1000", /timeout bound must be an integer/]
+  ]) {
+    const pack = await loadPack("sidecar-fixture");
+    pack.manifest.metadata.sidecar[field] = value;
+    expect(() => validateSidecarCommand(pack)).toThrow(message);
+  }
+});
+
 test("package-scheme sidecar entrypoint is rejected before artifact binding", async () => {
   const pack = await loadPack("sidecar-fixture");
   pack.manifest.metadata.sidecar.command = ["deno", "run", "npm:pkg/mod.mjs"];

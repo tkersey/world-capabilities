@@ -2836,9 +2836,15 @@ export function validateSidecarCommand(pack) {
   assert(!(runtime === "node" && NODE_UNSUPPORTED_RUNTIME_ARTIFACT.test(entry)), `${pack.name}: Node sidecar unsupported runtime entrypoint rejected`);
   assert(pack.manifest.artifacts.some((artifact) => artifact.path === entry), `${pack.name}: sidecar entrypoint not artifact-bound`);
   assert(!sidecarEntrypointAliasesAdapter(pack, entry), `${pack.name}: sidecar adapter entrypoint rejected`);
-  assert(sidecar.stdoutBytes <= 8192, `${pack.name}: stdout bound too high`);
-  assert(sidecar.stderrBytes <= 8192, `${pack.name}: stderr bound too high`);
-  assert(sidecar.timeoutMs > 0 && sidecar.timeoutMs <= 5000, `${pack.name}: timeout bound missing`);
+  assertSidecarBound(pack, sidecar.stdoutBytes, "stdout", { min: 0, max: 8192 });
+  assertSidecarBound(pack, sidecar.stderrBytes, "stderr", { min: 0, max: 8192 });
+  assertSidecarBound(pack, sidecar.timeoutMs, "timeout", { min: 1, max: 5000 });
+}
+
+function assertSidecarBound(pack, value, label, { min, max }) {
+  assert(Number.isSafeInteger(value), `${pack.name}: ${label} bound must be an integer`);
+  assert(value >= min, `${pack.name}: ${label} bound too low`);
+  assert(value <= max, `${pack.name}: ${label} bound too high`);
 }
 
 function sidecarEntrypointAliasesAdapter(pack, entry) {
