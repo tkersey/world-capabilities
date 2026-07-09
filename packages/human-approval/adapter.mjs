@@ -89,6 +89,13 @@ function hostilePayloadReason(value) {
   return null;
 }
 
+function packagePolicyReason(context) {
+  const policy = context?.policy;
+  if (Array.isArray(policy?.denyPackages) && policy.denyPackages.includes(packManifest.packageName)) return "package_denied";
+  if (policy && Object.prototype.hasOwnProperty.call(policy, "allowPackages") && (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(packManifest.packageName))) return "package_not_allowed";
+  return null;
+}
+
 function reason(context, hostRequest, requiredStatuses = packManifest.supportedResponseStatuses) {
   if (!hostRequest?.requestId) return "missing_request_id";
   if (!hostRequest?.target?.descriptorFingerprint) return "missing_descriptor_fingerprint";
@@ -99,8 +106,8 @@ function reason(context, hostRequest, requiredStatuses = packManifest.supportedR
   if (!hostRequest.target.actuationClass) return "missing_actuation_class";
   if (!packManifest.supportedActuationClasses.includes(hostRequest.target.actuationClass)) return "unsupported_actuation_class";
   if (!responseSchemaSupports(hostRequest, requiredStatuses)) return "unsupported_response_schema";
-  if (context?.policy?.denyPackages?.includes(packManifest.packageName)) return "package_denied";
-  if (context?.policy?.allowPackages && !context.policy.allowPackages.includes(packManifest.packageName)) return "package_not_allowed";
+  const policyReason = packagePolicyReason(context);
+  if (policyReason) return policyReason;
   if (tooDeep(hostRequest.payload)) return "excessive_nesting";
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;

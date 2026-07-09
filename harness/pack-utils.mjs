@@ -301,8 +301,8 @@ export function redactString(value) {
 export function policyAllows(context, hostRequest, kind) {
   const policy = context?.policy ?? {};
   if (policy.auditOnly) return false;
-  if (policy.denyPackages?.includes(context?.packageName)) return false;
-  if (policy.allowPackages && !policy.allowPackages.includes(context?.packageName)) return false;
+  if (Array.isArray(policy.denyPackages) && policy.denyPackages.includes(context?.packageName)) return false;
+  if (Object.prototype.hasOwnProperty.call(policy, "allowPackages") && (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(context?.packageName))) return false;
   if (policy.live === true) return true;
   if (policy[`${kind}Live`] === true) return true;
   return false;
@@ -2622,7 +2622,7 @@ function identifierStartingAt(source, start) {
 export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
-  const allowNetworkAuthority = pack.manifest.authorityLabels?.includes("network.http") === true;
+  const allowNetworkAuthority = Array.isArray(pack.manifest.authorityLabels) && pack.manifest.authorityLabels.includes("network.http");
   const sidecarEntry = sidecarEntrypoint(pack);
   const sidecarRuntimeName = sidecarRuntime(pack);
   const root = resolve(pack.dir);

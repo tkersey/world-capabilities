@@ -97,6 +97,16 @@ test("package deny policy prevents HTTP effect", async () => {
   expect(context.effectAttempted).toBe(0);
 });
 
+test("package allow policy must be an array before HTTP effect", async () => {
+  const context = {
+    policy: { networkLive: true, allowPackages: "@tkersey/world-capabilities/generic-http-json-extra" },
+    effectAttempted: 0
+  };
+  const result = await resolve(context, request());
+  expect(result.payload.reason).toBe("package_not_allowed");
+  expect(context.effectAttempted).toBe(0);
+});
+
 test("package deny policy precedes secret lookup", async () => {
   const context = {
     policy: { networkLive: true, denyPackages: ["@tkersey/world-capabilities/generic-http-json"] },
