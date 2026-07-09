@@ -70,6 +70,15 @@ function hostilePayloadReason(value) {
   return null;
 }
 
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function preEffectReason(context, hostRequest) {
   if (!hostRequest || typeof hostRequest !== "object") return "host_request_not_object";
   if (!hostRequest.requestId) return "missing_request_id";
@@ -87,6 +96,7 @@ function preEffectReason(context, hostRequest) {
   const hostile = hostilePayloadReason(hostRequest.payload);
   if (hostile) return hostile;
   if (!hostRequest.payload?.url || typeof hostRequest.payload.url !== "string") return "malformed_target";
+  if (!isHttpUrl(hostRequest.payload.url)) return "malformed_target";
   if (!["GET", "POST", "PUT", "DELETE"].includes(hostRequest.payload.method)) return "method_not_allowed";
   if (context?.policy?.auditOnly) return "audit_only";
   if (!context?.policy?.live && !context?.policy?.networkLive) return "network_denied";

@@ -71,6 +71,22 @@ test("target and schema compatibility prevent HTTP effect", async () => {
   expect(wrongClass.effectAttempted).toBe(0);
 });
 
+test("non-http urls are rejected before effects", async () => {
+  const live = { policy: { networkLive: true }, effectAttempted: 0 };
+  const liveResult = await resolve(live, request({
+    payload: { url: "file:///etc/passwd", method: "GET" }
+  }));
+  expect(liveResult.payload.reason).toBe("malformed_target");
+  expect(live.effectAttempted).toBe(0);
+
+  const dry = { effectAttempted: 0 };
+  const dryResult = await dryRun(dry, request({
+    payload: { url: "file:///etc/passwd", method: "GET" }
+  }));
+  expect(dryResult.payload.reason).toBe("malformed_target");
+  expect(dry.effectAttempted).toBe(0);
+});
+
 test("package deny policy prevents HTTP effect", async () => {
   const context = {
     policy: { networkLive: true, denyPackages: ["@tkersey/world-capabilities/generic-http-json"] },
