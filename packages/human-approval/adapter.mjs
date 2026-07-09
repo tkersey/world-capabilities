@@ -58,9 +58,20 @@ function responseSchemaSupports(hostRequest, requiredStatuses) {
 }
 
 function dryRunResponseSchemaSupports(hostRequest) {
-  const statuses = hostRequest.responseSchema?.statuses;
+  const statuses = hostRequest?.responseSchema?.statuses;
   return Array.isArray(statuses) && statuses.includes("deferred") && statuses.some((item) => item === "failed" || item === "rejected");
 }
+
+const STRUCTURAL_REQUEST_REASONS = new Set([
+  "missing_request_id",
+  "missing_descriptor_fingerprint",
+  "missing_idempotency_key",
+  "missing_actuator_ref",
+  "missing_actuation_class",
+  "unsupported_descriptor_fingerprint",
+  "unsupported_actuator_ref",
+  "unsupported_actuation_class"
+]);
 
 function hostilePayloadReason(value) {
   if (!value || typeof value !== "object") return null;
@@ -117,9 +128,13 @@ export async function resolve(context, hostRequest) {
 }
 
 export async function dryRun(context, hostRequest) {
-  if (!dryRunResponseSchemaSupports(hostRequest)) return reject(hostRequest, "unsupported_response_schema");
   const denied = reason({ ...context, policy: { ...(context?.policy ?? {}), humanLive: true, auditOnly: false } }, hostRequest, ["deferred"]);
-  if (denied) return reject(hostRequest, denied, dryRunFailureStatus(hostRequest));
+  if (denied) {
+    if (STRUCTURAL_REQUEST_REASONS.has(denied)) return reject(hostRequest, denied);
+    if (!dryRunResponseSchemaSupports(hostRequest)) return reject(hostRequest, "unsupported_response_schema");
+    return reject(hostRequest, denied, dryRunFailureStatus(hostRequest));
+  }
+  if (!dryRunResponseSchemaSupports(hostRequest)) return reject(hostRequest, "unsupported_response_schema");
   return { requestId: hostRequest.requestId, status: "deferred", payload: { promptWouldBeShown: false } };
 }
 

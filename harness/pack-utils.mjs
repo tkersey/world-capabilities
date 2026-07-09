@@ -184,6 +184,13 @@ function identifierTokenSource(pattern) {
   return String.raw`(?<!${JS_IDENTIFIER_CONTINUE})(?:${pattern})(?!${JS_IDENTIFIER_CONTINUE})`;
 }
 
+function builtinMatches(specifier, builtins) {
+  for (const builtin of builtins) {
+    if (specifier === builtin || specifier.startsWith(`${builtin}/`)) return true;
+  }
+  return false;
+}
+
 function identifierToken(pattern) {
   return new RegExp(identifierTokenSource(pattern), "u");
 }
@@ -2705,8 +2712,8 @@ export async function verifySelfContained(pack) {
       if (specifier.startsWith("node:")) {
         assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
         assert(allowedBuiltins.has(specifier), `${pack.name}: unchecked builtin ${specifier}`);
-        assert(!RAW_NETWORK_BUILTINS.has(specifier), `${pack.name}: raw network builtin ${specifier} rejected`);
-        assert(!HTTP_NETWORK_BUILTINS.has(specifier) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
+        assert(!builtinMatches(specifier, RAW_NETWORK_BUILTINS), `${pack.name}: raw network builtin ${specifier} rejected`);
+        assert(!builtinMatches(specifier, HTTP_NETWORK_BUILTINS) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
         assert(!FORBIDDEN_EXECUTION_BUILTINS.has(specifier), `${pack.name}: code execution builtin ${specifier} rejected`);
         continue;
       }

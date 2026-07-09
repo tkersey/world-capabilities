@@ -1372,7 +1372,8 @@ test("network http authority does not allow websocket globals", async () => {
 test("network builtins require network authority labels", async () => {
   for (const [specifier, pattern] of [
     ["node:http", /network builtin node:http requires network\.http authority/],
-    ["node:net", /raw network builtin node:net rejected/]
+    ["node:net", /raw network builtin node:net rejected/],
+    ["node:dns/promises", /raw network builtin node:dns\/promises rejected/]
   ]) {
     const root = await mkdtemp(join(tmpdir(), "world-network-builtin-authority-pack-"));
     try {

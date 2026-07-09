@@ -99,6 +99,12 @@ test("human approval dry-run requires a failure status for validation failures",
   expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
+test("human approval dry-run returns structured errors for missing requests", async () => {
+  const result = await dryRunHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, null);
+  expect(result.status).toBe("failed");
+  expect(result.payload.reason).toBe("missing_request_id");
+});
+
 test("human approval resolve does not require dry-run-only statuses", async () => {
   const request = {
     requestId: "human-resolve-schema",
