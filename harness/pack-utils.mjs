@@ -124,6 +124,7 @@ const PROCESS_ACCESS = identifierToken("process");
 const BUN_ACCESS = identifierToken("Bun");
 const DENO_ACCESS = identifierToken("Deno");
 const NETWORK_GLOBAL_NAMES = ["fetch", "WebSocket", "EventSource", "XMLHttpRequest"];
+const NETWORK_GLOBAL_RECEIVER_NAMES = ["globalThis", "self", "window"];
 const ARRAY_LITERAL_PREFIX_KEYWORDS = new Set(["return", "throw", "case", "delete", "void", "typeof", "new", "in", "instanceof"]);
 const EXECUTABLE_ARTIFACT = /\.(mjs|js|cjs|jsx|ts|tsx|mts|cts)$/;
 const PLAIN_JAVASCRIPT_ARTIFACT = /\.(mjs|js|cjs)$/;
@@ -1671,12 +1672,26 @@ function hasUnboundNetworkGlobalReference(source) {
       if (identifierIsLocalBindingOrBoundReference(source, i, name, delimiterPairs)) continue;
       if (identifierIsImportOrReExportSpecifier(source, i, delimiterPairs)) continue;
       const previous = previousSignificant(source, i);
-      if (previous?.ch === ".") continue;
+      if (previous?.ch === ".") {
+        if (networkGlobalReceiverBeforeMemberAccess(source, previous.index, delimiterPairs)) return true;
+        continue;
+      }
       if (tokenIsObjectPropertyName(source, i, delimiterPairs)) continue;
       return true;
     }
   }
   return false;
+}
+
+function networkGlobalReceiverBeforeMemberAccess(source, dotIndex, delimiterPairs) {
+  let receiverEnd = dotIndex - 1;
+  while (receiverEnd >= 0 && /\s/.test(source[receiverEnd])) receiverEnd -= 1;
+  if (source[receiverEnd] === "?") receiverEnd -= 1;
+  while (receiverEnd >= 0 && /\s/.test(source[receiverEnd])) receiverEnd -= 1;
+  const receiver = identifierEndingAt(source, receiverEnd);
+  if (!NETWORK_GLOBAL_RECEIVER_NAMES.includes(receiver)) return false;
+  const receiverStart = receiverEnd - receiver.length + 1;
+  return !identifierIsLocalBindingOrBoundReference(source, receiverStart, receiver, delimiterPairs);
 }
 
 function identifierIsLocalBindingOrBoundReference(source, index, name, delimiterPairs) {

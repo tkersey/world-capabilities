@@ -1303,6 +1303,9 @@ test("local network global bindings do not require authority labels", async () =
     ["imported-eventsource", {
       "adapter.mjs": "import { EventSource } from \"./helper.mjs\";\nexport default EventSource;\n",
       "helper.mjs": "export const EventSource = true;\n"
+    }],
+    ["local-window-fetch", {
+      "adapter.mjs": "const window = { fetch: () => \"local\" };\nexport default window.fetch;\n"
     }]
   ]) {
     const root = await mkdtemp(join(tmpdir(), `world-network-local-binding-${name}-pack-`));
@@ -4613,6 +4616,19 @@ test("Deno host globals are rejected in sidecar artifacts", async () => {
         }
       }
     })).rejects.toThrow(/Deno access rejected/);
+
+    await writeFile(join(dir, "sidecar.mjs"), "await window.fetch(\"https://example.invalid\");\n");
+    await expect(verifySelfContained({
+      name: "deno-window-fetch-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "sidecar.mjs", role: "sidecar" }],
+        metadata: {
+          allowedBuiltins: [],
+          sidecar: { command: ["deno", "run", "sidecar.mjs"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
+        }
+      }
+    })).rejects.toThrow(/network global access rejected/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
