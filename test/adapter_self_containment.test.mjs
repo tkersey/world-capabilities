@@ -1293,6 +1293,9 @@ test("local network global bindings do not require authority labels", async () =
     ["lexical-fetch", {
       "adapter.mjs": "const fetch = () => \"local\";\nexport default fetch;\n"
     }],
+    ["outer-block-lexical-fetch", {
+      "adapter.mjs": "const fetch = () => \"local\";\nif (true) {\n  fetch();\n}\nexport default fetch;\n"
+    }],
     ["parameter-websocket", {
       "adapter.mjs": "export default function use(WebSocket) { return WebSocket; }\n"
     }],

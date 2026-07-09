@@ -1949,11 +1949,22 @@ function namedImportClauseBindsIdentifier(clause, name) {
 }
 
 function identifierHasPriorLexicalBinding(source, index, name, delimiterPairs) {
-  const blockStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  let blockStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
+  let scopeEnd = index;
+  for (;;) {
+    const scopeStart = blockStart >= 0 ? blockStart + 1 : 0;
+    if (scopeHasPriorLexicalBinding(source, scopeStart, scopeEnd, name)) return true;
+    if (blockStart < 0) return false;
+    scopeEnd = blockStart;
+    blockStart = enclosingDelimiterStart(source, blockStart, "{", "}", delimiterPairs);
+  }
+}
+
+function scopeHasPriorLexicalBinding(source, start, end, name) {
   let braceDepth = 0;
   let bracketDepth = 0;
   let parenDepth = 0;
-  for (let i = blockStart >= 0 ? blockStart + 1 : 0; i < index; i += 1) {
+  for (let i = start; i < end; i += 1) {
     const ch = source[i];
     if (ch === "{") {
       braceDepth += 1;
