@@ -76,11 +76,27 @@ test("human approval dry-run validation failures do not look deferred", async ()
       actuatorRef: "actuator.human-approval",
       actuationClass: "approval"
     },
-    responseSchema: { statuses: ["deferred"] },
+    responseSchema: { statuses: ["deferred", "failed"] },
     payload: { anchor: "not-a-world-anchor" }
   });
   expect(result.status).toBe("failed");
   expect(result.payload.reason).toBe("missing_world_host_request_anchor");
+});
+
+test("human approval dry-run requires a failure status for validation failures", async () => {
+  const result = await dryRunHumanApproval({ policy: { humanLive: true }, approvalMode: "deny" }, {
+    requestId: "human-dry-run-failure-schema",
+    idempotencyKey: "world:idem:human-dry-run-failure-schema",
+    target: {
+      descriptorFingerprint: "desc.human-approval.v0",
+      actuatorRef: "actuator.human-approval",
+      actuationClass: "approval"
+    },
+    responseSchema: { statuses: ["deferred"] },
+    payload: { anchor: "world:host-request:1" }
+  });
+  expect(result.status).toBe("deferred");
+  expect(result.payload.reason).toBe("unsupported_response_schema");
 });
 
 test("human approval resolve does not require dry-run-only statuses", async () => {

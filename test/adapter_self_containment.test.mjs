@@ -1370,21 +1370,23 @@ test("network http authority does not allow websocket globals", async () => {
 });
 
 test("network builtins require network authority labels", async () => {
-  const root = await mkdtemp(join(tmpdir(), "world-network-builtin-authority-pack-"));
-  try {
-    const dir = join(root, "pack");
-    await mkdir(dir);
-    await writeFile(join(dir, "adapter.mjs"), "import http from \"node:http\";\nexport default http;\n");
-    await expect(verifySelfContained({
-      name: "network-builtin-authority-pack",
-      dir,
-      manifest: {
-        artifacts: [{ path: "adapter.mjs" }],
-        metadata: { allowedBuiltins: ["node:http"] }
-      }
-    })).rejects.toThrow(/network builtin node:http requires network\.http authority/);
-  } finally {
-    await rm(root, { recursive: true, force: true });
+  for (const specifier of ["node:http", "node:net"]) {
+    const root = await mkdtemp(join(tmpdir(), "world-network-builtin-authority-pack-"));
+    try {
+      const dir = join(root, "pack");
+      await mkdir(dir);
+      await writeFile(join(dir, "adapter.mjs"), `import builtin from "${specifier}";\nexport default builtin;\n`);
+      await expect(verifySelfContained({
+        name: "network-builtin-authority-pack",
+        dir,
+        manifest: {
+          artifacts: [{ path: "adapter.mjs" }],
+          metadata: { allowedBuiltins: [specifier] }
+        }
+      })).rejects.toThrow(new RegExp(`network builtin ${specifier} requires network\\.http authority`));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 

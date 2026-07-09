@@ -57,6 +57,11 @@ function responseSchemaSupports(hostRequest, requiredStatuses) {
   return Array.isArray(statuses) && statuses.length > 0 && requiredStatuses.every((item) => statuses.includes(item));
 }
 
+function dryRunResponseSchemaSupports(hostRequest) {
+  const statuses = hostRequest.responseSchema?.statuses;
+  return Array.isArray(statuses) && statuses.includes("deferred") && statuses.some((item) => item === "failed" || item === "rejected");
+}
+
 function hostilePayloadReason(value) {
   if (!value || typeof value !== "object") return null;
   for (const key of FORBIDDEN_EVIDENCE_KEYS) {
@@ -112,6 +117,7 @@ export async function resolve(context, hostRequest) {
 }
 
 export async function dryRun(context, hostRequest) {
+  if (!dryRunResponseSchemaSupports(hostRequest)) return reject(hostRequest, "unsupported_response_schema");
   const denied = reason({ ...context, policy: { ...(context?.policy ?? {}), humanLive: true, auditOnly: false } }, hostRequest, ["deferred"]);
   if (denied) return reject(hostRequest, denied, dryRunFailureStatus(hostRequest));
   return { requestId: hostRequest.requestId, status: "deferred", payload: { promptWouldBeShown: false } };
