@@ -301,7 +301,7 @@ export function redactString(value) {
 export function policyAllows(context, hostRequest, kind) {
   const policy = context?.policy ?? {};
   if (policy.auditOnly) return false;
-  if (Array.isArray(policy.denyPackages) && policy.denyPackages.includes(context?.packageName)) return false;
+  if (Object.prototype.hasOwnProperty.call(policy, "denyPackages") && (!Array.isArray(policy.denyPackages) || policy.denyPackages.includes(context?.packageName))) return false;
   if (Object.prototype.hasOwnProperty.call(policy, "allowPackages") && (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(context?.packageName))) return false;
   if (policy.live === true) return true;
   if (policy[`${kind}Live`] === true) return true;

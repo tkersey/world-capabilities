@@ -91,7 +91,7 @@ function hostilePayloadReason(value) {
 
 function packagePolicyReason(context) {
   const policy = context?.policy;
-  if (Array.isArray(policy?.denyPackages) && policy.denyPackages.includes(packManifest.packageName)) return "package_denied";
+  if (policy && Object.prototype.hasOwnProperty.call(policy, "denyPackages") && (!Array.isArray(policy.denyPackages) || policy.denyPackages.includes(packManifest.packageName))) return "package_denied";
   if (policy && Object.prototype.hasOwnProperty.call(policy, "allowPackages") && (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(packManifest.packageName))) return "package_not_allowed";
   return null;
 }
