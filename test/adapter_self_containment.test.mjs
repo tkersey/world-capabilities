@@ -1206,6 +1206,7 @@ test("host global names in object property positions are allowed", async () => {
     await writeFile(join(dir, "adapter.mjs"), [
       "export const schema = { process: false, fetch: { type: \"boolean\" } };",
       "export const methods = { async fetch() { return \"label\"; }, get process() { return false; }, set Bun(value) { this.value = value; }, *Deno() { yield \"label\"; }, XMLHttpRequest() { return null; } };",
+      "export class Fields { fetch = false; process = null; static XMLHttpRequest = null; }",
       "export default { schema, methods };",
       ""
     ].join("\n"));

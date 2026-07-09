@@ -1482,11 +1482,13 @@ function commonJsWrapperArgumentScanSource(source, artifactPath) {
 
 function tokenIsObjectPropertyName(source, index, delimiterPairs) {
   const previous = propertyNameBoundaryPrevious(source, index);
-  if (!previous || !["{", ","].includes(previous.ch)) return false;
+  if (!previous || !["{", ",", ";"].includes(previous.ch)) return false;
   const objectStart = enclosingDelimiterStart(source, index, "{", "}", delimiterPairs);
-  if (objectStart >= 0 && objectDelimiterIsPatternContext(source, objectStart, delimiterPairs)) return false;
+  const classBody = objectStart >= 0 && braceStartsClassBody(source, objectStart);
+  if (!classBody && objectStart >= 0 && objectDelimiterIsPatternContext(source, objectStart, delimiterPairs)) return false;
   const next = nextSignificant(source, index + identifierStartingAt(source, index).length);
   if (next?.ch === ":") return true;
+  if (classBody && ["=", ";"].includes(next?.ch)) return true;
   if (next?.ch !== "(") return false;
   const close = findMatchingDelimiter(source, next.index, "(", ")", delimiterPairs);
   const after = close >= 0 ? nextSignificant(source, close + 1) : null;
