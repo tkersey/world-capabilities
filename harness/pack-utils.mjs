@@ -1627,7 +1627,7 @@ function isAsyncFunctionBodyStart(source, bodyStart, delimiterPairs) {
   const paramStart = findOpeningDelimiter(source, paramClose, "(", ")");
   if (paramStart < 0) return false;
   const beforeParams = source.slice(0, paramStart).trimEnd();
-  return new RegExp(String.raw`${identifierTokenSource("async")}\s+(?:function(?:\s+\*?\s*${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})?|(?:\*?\s*)?${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})$`, "u").test(beforeParams);
+  return new RegExp(String.raw`${identifierTokenSource("async")}\s+(?:function(?:\s*\*\s*${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS}|\s+${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})?|(?:\*?\s*)?${NODE_TYPESCRIPT_IDENTIFIER}\s*${NODE_TYPESCRIPT_NESTED_TYPE_PARAMETERS})$`, "u").test(beforeParams);
 }
 
 function asyncFunctionParamCloseBeforeBody(source, bodyStart) {

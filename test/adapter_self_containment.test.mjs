@@ -3568,7 +3568,7 @@ test("Node cts sidecars allow await inside async functions", async () => {
     await mkdir(dir);
     await writeFile(
       join(dir, "sidecar.cts"),
-      "async function main(): Promise<void> { await Promise.resolve(); }\nasync function generic<T extends Promise<string>>(value: T): Promise<T> { await Promise.resolve(); return value; }\nconst alsoOk = async (): Promise<void> => await Promise.resolve();\nconst genericArrow = async <T extends Promise<string>>(value: T): Promise<T> => await Promise.resolve(value);\nvoid main();\nvoid generic;\nvoid alsoOk;\nvoid genericArrow;\nprocess.stdout.write(\"ok\");\n"
+      "async function main(): Promise<void> { await Promise.resolve(); }\nasync function generic<T extends Promise<string>>(value: T): Promise<T> { await Promise.resolve(); return value; }\nasync function* stream(): AsyncGenerator<number> { await Promise.resolve(); yield 1; }\nconst alsoOk = async (): Promise<void> => await Promise.resolve();\nconst genericArrow = async <T extends Promise<string>>(value: T): Promise<T> => await Promise.resolve(value);\nvoid main();\nvoid generic;\nvoid stream;\nvoid alsoOk;\nvoid genericArrow;\nprocess.stdout.write(\"ok\");\n"
     );
     await verifySelfContained({
       name: "sidecar-node-cts-async-pack",
