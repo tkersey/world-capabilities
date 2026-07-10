@@ -9,9 +9,9 @@
     "file.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "475b3072b20906fb9f535651093ebaf25da06a247d6c1f9b310daa811849ac46"
+    "adapter.mjs": "2f5ea5b5801f53e955f86dfe2968b74711430c4d4a143597256241a6f36ba397"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "sandbox-files",
   "dryRunSupport": true,
@@ -27,7 +27,7 @@
   },
   "packageName": "@tkersey/world-capabilities/sandbox-files",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "60cedc15d685922b22d4dbd55441356057014d2d7b607346923df6f4a8a71e6c",
+  "packFingerprint": "c70f30abbbb1680f35ce0286f47f9af0d08e8629dbad542d0a4984467643cd2b",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "idempotent",

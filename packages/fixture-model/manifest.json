@@ -9,9 +9,9 @@
     "model.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "7f5f29f359e57dd20457246180bc784d915d81bd9d98cc4c7e35ba4eda769702"
+    "adapter.mjs": "07be1e02012fb4075e97d7c5aeccc25125185f0a2dc10e1aa221f2552e6b9ac1"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "fixture-model",
   "dryRunSupport": true,
@@ -23,7 +23,7 @@
   },
   "packageName": "@tkersey/world-capabilities/fixture-model",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "5df133eb148a4b0865450f3c53b7546cd9744527e107e329b1fe48cec5540505",
+  "packFingerprint": "de206e9818c4245cfa4b4be93f6131a5a76fac6cd22371db5abe26b87f526da6",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",

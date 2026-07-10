@@ -8,7 +8,7 @@ const approval = await approve({ approvalMode: "allow", policy: { humanLive: tru
   requestId: "example-approval",
   idempotencyKey: "world:idem:example-approval",
   target: { descriptorFingerprint: "desc.human-approval.v0", actuatorRef: "actuator.human-approval", actuationClass: "approval" },
-  responseSchema: { statuses: ["ok", "rejected"] },
+  responseSchema: { statuses: ["ok", "rejected", "deferred"] },
   payload: { anchor: "world:host-request:1", prompt: "Approve write?" }
 });
 

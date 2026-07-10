@@ -17,11 +17,11 @@
     "sidecar.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "7de9c56564cd7391afa32dec11ad931e578e5df578674811315dbb092a9cd9d2",
+    "adapter.mjs": "26fbc17045f45ee685a26f472504d10604e24279637efde84650b422b5059bf0",
     "helper.mjs": "579547e7032209f5eabc9597a52d910b2ad83f9994585c2a256366bb78d881ce",
     "sidecar.mjs": "7f43ff884fcf4d4bc6eadf6cfae709b34d878c295072ffab6549dbafa264043a"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "sidecar-fixture",
   "dryRunSupport": true,
@@ -41,7 +41,7 @@
   },
   "packageName": "@tkersey/world-capabilities/sidecar-fixture",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "565538cfc752c5622beaa06656f2bba8575b19b9f01eb3cd2b18780ac8378d28",
+  "packFingerprint": "937af8202129dc8c022868e05a2ebd8bf203d852d526d6d8d81729f5ea8910f5",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",

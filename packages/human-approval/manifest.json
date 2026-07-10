@@ -9,9 +9,9 @@
     "human.approval"
   ],
   "checksums": {
-    "adapter.mjs": "1e7a66492c967d51e651909418e53079be1055a91d5888d49bfa8a54effaad2a"
+    "adapter.mjs": "9c6001412108e7e02d8b11695cdb33bfcb4e31e0c2c03331ad9aba08aae27fc7"
   },
-  "conformanceCorpusFingerprint": "b1620fa9ce108ca6b1fc06baa6a56b2b5fedde377d31f1cba8787101fba24e3a",
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "human-approval",
   "dryRunSupport": true,
@@ -27,7 +27,7 @@
   },
   "packageName": "@tkersey/world-capabilities/human-approval",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "06187470a96ef29f9f1956d36caef44f5d03b77852a2ed2dbe13c91836462c0e",
+  "packFingerprint": "2e0b8b8526c2b1820911f9585b6ffad7cc14ff5c30a26ea637b0b67bcef0d9c3",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",
@@ -49,7 +49,8 @@
   "supportedResponseStatuses": [
     "ok",
     "rejected",
-    "deferred"
+    "deferred",
+    "failed"
   ],
   "supportedTurnClosureVersions": [
     "turn-closure-v0"
