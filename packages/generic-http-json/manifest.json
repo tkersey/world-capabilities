@@ -15,6 +15,17 @@
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "generic-http-json",
   "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "authorityRequirements": "8",
+        "interfaceId": "d76c3e36f0bd57a0ea54caa9c5399252855478db4df16b251b6d3ddae6699189",
+        "interfaceLabel": "host.http.json.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      }
+    ]
+  },
   "idempotencySupport": "required-before-effect",
   "maximumRequestBytes": 16384,
   "maximumResponseBytes": 16384,
@@ -23,7 +34,7 @@
   },
   "packageName": "@tkersey/world-capabilities/generic-http-json",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "c602def53f7aaabefd8eb4418a34335d5bd54c6845784b3d8e84bced872ffc9e",
+  "packFingerprint": "422c48fb2ea07c2779af2392387f985904d213daf689d994389a082a8a55c6b6",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",
@@ -56,6 +67,7 @@
     "turn-closure-v0"
   ],
   "supportedWorldProtocolVersions": [
+    "world-effect-v1",
     "world-hostrequest-v0"
   ]
 }

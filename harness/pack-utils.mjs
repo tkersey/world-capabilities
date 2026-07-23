@@ -2950,6 +2950,7 @@ export async function verifyPack(pack) {
   for (const field of REQUIRED_MANIFEST_FIELDS) {
     assert(pack.manifest[field] !== undefined, `${pack.name}: missing manifest field ${field}`);
   }
+  verifyWorldProtocolDeclarations(pack);
   assert(!isAbsolute(pack.manifest.packageName), `${pack.name}: absolute package identity rejected`);
   assert(!stableStringify(pack.manifest).match(/AKIA|sk-[A-Za-z0-9_-]{8,}|password=/i), `${pack.name}: credential-shaped manifest value`);
   assert(pack.conformance.driverId === pack.manifest.driverId, `${pack.name}: conformance driverId mismatch`);
@@ -2976,7 +2977,55 @@ export async function expectedPackFingerprint(pack) {
     driverAbiVersion: pack.manifest.driverAbiVersion,
     conformanceCorpusFingerprint: pack.manifest.conformanceCorpusFingerprint,
     artifacts: pack.manifest.artifacts,
-    checksums: pack.manifest.checksums
+    checksums: pack.manifest.checksums,
+    ...(pack.manifest.supportedWorldProtocolVersions?.includes("world-effect-v1")
+      ? {
+          supportedWorldProtocolVersions: pack.manifest.supportedWorldProtocolVersions,
+          effectProtocolV1: pack.manifest.effectProtocolV1
+        }
+      : {})
   };
   return createHash("sha256").update(stableStringify(material)).digest("hex");
+}
+
+function verifyWorldProtocolDeclarations(pack) {
+  const versions = pack.manifest.supportedWorldProtocolVersions;
+  assert(Array.isArray(versions) && versions.length > 0, `${pack.name}: supportedWorldProtocolVersions must be non-empty`);
+  assert(versions.every((version) => typeof version === "string" && version.length > 0), `${pack.name}: invalid World protocol version`);
+  assert(new Set(versions).size === versions.length, `${pack.name}: duplicate World protocol version`);
+
+  const supportsV1 = versions.includes("world-effect-v1");
+  if (!supportsV1) {
+    assert(pack.manifest.effectProtocolV1 === undefined, `${pack.name}: undeclared Effect protocol v1 metadata`);
+    return;
+  }
+
+  const declaration = pack.manifest.effectProtocolV1;
+  assert(declaration && typeof declaration === "object" && !Array.isArray(declaration), `${pack.name}: missing Effect protocol v1 declaration`);
+  assert(Array.isArray(declaration.interfaces) && declaration.interfaces.length > 0, `${pack.name}: Effect protocol v1 interfaces must be non-empty`);
+  const labels = new Set();
+  const ids = new Set();
+  for (const entry of declaration.interfaces) {
+    assert(entry && typeof entry === "object" && !Array.isArray(entry), `${pack.name}: invalid Effect protocol v1 interface`);
+    assert(typeof entry.interfaceLabel === "string" && entry.interfaceLabel.length > 0, `${pack.name}: invalid Effect protocol v1 interface label`);
+    assert(isDigestHex(entry.interfaceId), `${pack.name}: invalid Effect protocol v1 interface id`);
+    assert(isDigestHex(entry.payloadSchemaId), `${pack.name}: invalid Effect protocol v1 payload schema id`);
+    assert(isDigestHex(entry.resultSchemaId), `${pack.name}: invalid Effect protocol v1 result schema id`);
+    assert(typeof entry.authorityRequirements === "string" && /^(?:0|[1-9][0-9]*)$/.test(entry.authorityRequirements), `${pack.name}: invalid Effect protocol v1 authority requirements`);
+    assert(BigInt(entry.authorityRequirements) <= 0xffffffffffffffffn, `${pack.name}: Effect protocol v1 authority requirements overflow`);
+    const expectedInterfaceId = createHash("sha256")
+      .update("world.effect-interface.v1")
+      .update(Buffer.from([0]))
+      .update(entry.interfaceLabel)
+      .digest("hex");
+    assert(entry.interfaceId === expectedInterfaceId, `${pack.name}: Effect protocol v1 interface identity mismatch`);
+    assert(!labels.has(entry.interfaceLabel), `${pack.name}: duplicate Effect protocol v1 interface label`);
+    assert(!ids.has(entry.interfaceId), `${pack.name}: duplicate Effect protocol v1 interface id`);
+    labels.add(entry.interfaceLabel);
+    ids.add(entry.interfaceId);
+  }
+}
+
+function isDigestHex(value) {
+  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }

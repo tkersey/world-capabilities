@@ -15,6 +15,17 @@
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "local-memory-kv",
   "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "authorityRequirements": "128",
+        "interfaceId": "745edb7226cf04676bca057ab26b7cf948da2b3b04ba15e8ef93f4674435c2f8",
+        "interfaceLabel": "host.memory.kv.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      }
+    ]
+  },
   "idempotencySupport": "fixture-only",
   "maximumRequestBytes": 8192,
   "maximumResponseBytes": 8192,
@@ -23,7 +34,7 @@
   },
   "packageName": "@tkersey/world-capabilities/local-memory-kv",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "fd9f22d62a53e6dd9f58480e3113d7c380fae7f35006eefb742bf9f6a1fee123",
+  "packFingerprint": "0dbb626abda18cf1d2f3ecf7de03ee5a4aeaf601c1528f3f34a2673daa560e81",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",
@@ -51,6 +62,7 @@
     "turn-closure-v0"
   ],
   "supportedWorldProtocolVersions": [
+    "world-effect-v1",
     "world-hostrequest-v0"
   ]
 }

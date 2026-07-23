@@ -15,6 +15,17 @@
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "fixture-model",
   "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "authorityRequirements": "1",
+        "interfaceId": "0cda6bbedbef3fc9d8eba2825b95fbbe55917f10897ffde397b35bbf1685c524",
+        "interfaceLabel": "agent.model.decide.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      }
+    ]
+  },
   "idempotencySupport": "preserves-full-key",
   "maximumRequestBytes": 8192,
   "maximumResponseBytes": 8192,
@@ -23,7 +34,7 @@
   },
   "packageName": "@tkersey/world-capabilities/fixture-model",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "de206e9818c4245cfa4b4be93f6131a5a76fac6cd22371db5abe26b87f526da6",
+  "packFingerprint": "ec41e18ab228e3fa995efe744806c56c287cc46c7086f1fe76ae9dc55c48a05b",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "pure",
@@ -51,6 +62,7 @@
     "turn-closure-v0"
   ],
   "supportedWorldProtocolVersions": [
+    "world-effect-v1",
     "world-hostrequest-v0"
   ]
 }
