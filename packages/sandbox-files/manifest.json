@@ -15,6 +15,24 @@
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "sandbox-files",
   "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "authorityRequirements": "2",
+        "interfaceId": "68e03731654ae26c9f15d114362b1d87b513bb95e6d42c8d5debf5dd24f101fd",
+        "interfaceLabel": "host.file.read.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      },
+      {
+        "authorityRequirements": "4",
+        "interfaceId": "ab0d64604184d8be92277e2fe992eb8d7ed00a901dc1350ae89cc2573018caaf",
+        "interfaceLabel": "host.file.write.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      }
+    ]
+  },
   "idempotencySupport": "full-world-key-bound",
   "maximumRequestBytes": 16384,
   "maximumResponseBytes": 16384,
@@ -27,7 +45,7 @@
   },
   "packageName": "@tkersey/world-capabilities/sandbox-files",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "c70f30abbbb1680f35ce0286f47f9af0d08e8629dbad542d0a4984467643cd2b",
+  "packFingerprint": "4274066446ec0c891962ad9d90b91361da1d3f6553081cb53d069ad1cbe8173e",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "idempotent",
@@ -55,6 +73,7 @@
     "turn-closure-v0"
   ],
   "supportedWorldProtocolVersions": [
+    "world-effect-v1",
     "world-hostrequest-v0"
   ]
 }

@@ -15,6 +15,17 @@
   "driverAbiVersion": "capability-driver-v0",
   "driverId": "human-approval",
   "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "authorityRequirements": "16",
+        "interfaceId": "e5a1be656cc7c864bd205f25351ee4ad7e3dc55bc43da3b3063a9b8850cf001d",
+        "interfaceLabel": "host.human.approval.v1",
+        "payloadSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182",
+        "resultSchemaId": "c0c747fa088e53a78edf901cf6d9fc7dfde00195e2ec58a16f891cb3aac95182"
+      }
+    ]
+  },
   "idempotencySupport": "operator-event-id-required",
   "maximumRequestBytes": 8192,
   "maximumResponseBytes": 8192,
@@ -27,7 +38,7 @@
   },
   "packageName": "@tkersey/world-capabilities/human-approval",
   "packageVersion": "0.0.0-foundry-v0",
-  "packFingerprint": "2e0b8b8526c2b1820911f9585b6ffad7cc14ff5c30a26ea637b0b67bcef0d9c3",
+  "packFingerprint": "545a2f2a29cf3dd2cd707312a6f3f79cd215ee67d947578cb668f6ae0dbd6a6f",
   "packFormatVersion": "foundry-pack-v0",
   "recoverSupport": false,
   "recoveryClass": "best_effort",
@@ -56,6 +67,7 @@
     "turn-closure-v0"
   ],
   "supportedWorldProtocolVersions": [
+    "world-effect-v1",
     "world-hostrequest-v0"
   ]
 }

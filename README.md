@@ -1,16 +1,16 @@
 # world-capabilities
 
 `world-capabilities` is the monorepo for host-side capability packs that resolve
-World HostRequests under receiver-local policy.
+World external effects under receiver-local policy.
 
-Boundary defines the program.
-World interprets and records the program.
-world-host operates the process and capability membrane.
-world-capabilities supplies conformant effect handlers.
+Boundary defines and defunctionalizes the program.
+World closes known handlers at comptime and emits the application runtime.
+world-host persists Frames and operates the capability membrane.
+world-capabilities resolves only genuinely external effects.
 
-This repository is private initially. PR #5 builds the Capability Plane
-membrane. `world-capabilities` pressure-tests and populates that membrane while
-staying compatible with the final PR #5 surface after it lands.
+This repository is private initially. world-host PR #5 supplies the hardened v0
+Capability Plane membrane. `world-capabilities` pressure-tests and populates
+that membrane while adding the narrower v1 effect boundary.
 
 ## Charter
 
@@ -33,6 +33,11 @@ Foundry v0 default conformance:
 - uses no npm runtime dependencies
 - publishes no packages
 
+World Effect protocol v1 is available alongside the v0 HostRequest adapter
+surface. The v1 router accepts a World-authored `EffectRequest`, runs
+receiver-local preflight before any effect, and authors only an untrusted
+`EffectResult`. It cannot author a `Frame` or other World evidence.
+
 ## Completion Equation
 
 ```text
@@ -53,6 +58,11 @@ a safe host effect handler
 - `local-memory-kv`: deterministic key/value fixture.
 - `sidecar-fixture`: sidecar packaging/security fixture.
 
+The first five packs declare their exact v1 interface, schema, and authority
+identities in `manifest.json`. `agent.invoke.v1` is a receiver-constructed
+built-in binding because its child runner is host authority rather than pack
+data.
+
 ## Proof
 
 ```bash
@@ -65,8 +75,14 @@ bun run proof:negative
 bun run proof:sidecars
 bun run proof:redaction
 bun run proof:policy
+bun run proof:v1
+bun run proof:agent-invoke
 bun run corpus:check
 ```
 
 `corpus:update` and `packs:build` are explicit maintainer commands. They never
 run as part of default proof.
+
+See [Effect protocol v1](docs/effect_protocol_v1.md),
+[agent invocation](docs/agent_invoke_v1.md), and the
+[v0/v1 adapter boundary](docs/v0_v1_adapter.md).
