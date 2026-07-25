@@ -133,8 +133,7 @@ function requestReason(context, hostRequest) {
     return "malformed_research_query";
   }
   if (typeof hostRequest.payload?.maximumItems !== "bigint" ||
-      hostRequest.payload.maximumItems < 1n ||
-      hostRequest.payload.maximumItems > MAXIMUM_ITEMS) {
+      hostRequest.payload.maximumItems !== MAXIMUM_ITEMS) {
     return "invalid_maximum_items";
   }
   if (query !== QUERY) return "unsupported_fixture_query";

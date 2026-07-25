@@ -19,6 +19,7 @@ import {
   sha256Bytes
 } from "../harness/pack-utils.mjs";
 import { stableStringify } from "../harness/assertions.mjs";
+import { buildPack } from "../scripts/build-packs.mjs";
 
 const packageRoot = "packages/research-lookup-fixture";
 const corpus = JSON.parse(await readFile(`${packageRoot}/corpus.json`, "utf8"));
@@ -69,6 +70,33 @@ describe("research.lookup.v1 fixture pack", () => {
       request
     );
     assert.equal(admitted.status, "ok");
+  });
+
+  it("rejects a request below the fixture's exact two-item response cardinality", async () => {
+    const pack = await loadPack("research-lookup-fixture");
+    const adapter = await importAdapter(pack.dir);
+    const rejected = await adapter.preflight(
+      context({ researchLookup: true }),
+      {
+        requestId: "research-one-item",
+        idempotencyKey: "world:idem:research-one-item",
+        target: {
+          descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
+          actuatorRef: pack.manifest.supportedActuatorRefs[0],
+          actuationClass: pack.manifest.supportedActuationClasses[0]
+        },
+        responseSchema: {
+          statuses: pack.manifest.supportedResponseStatuses
+        },
+        payload: {
+          query: corpus.request.query,
+          maximumItems: 1n
+        }
+      }
+    );
+
+    assert.equal(rejected.status, "rejected");
+    assert.equal(rejected.payload.reason, "invalid_maximum_items");
   });
 
   it("rejects malformed payload bytes before adapter preflight or effect", async () => {
@@ -209,6 +237,15 @@ describe("research.lookup.v1 fixture pack", () => {
           .join("\n") + "\n"
       );
 
+      await assert.rejects(
+        async () => inspectPack(await loadPack("research-lookup-fixture", root)),
+        /pack fingerprint mismatch/
+      );
+      pack.manifest.packFingerprint = await expectedPackFingerprint(pack);
+      await writeFile(
+        join(dir, "manifest.json"),
+        `${stableStringify(pack.manifest)}\n`
+      );
       await inspectPack(await loadPack("research-lookup-fixture", root));
       await assert.rejects(
         () => importAdapter(dir),
@@ -238,6 +275,47 @@ describe("research.lookup.v1 fixture pack", () => {
     );
     assert.deepEqual(receipt.vectors, vectorIds);
     assert.equal(receipt.receiptFingerprint, receiptFingerprint(receipt));
+  });
+
+  it("regenerates the conformance receipt when a pack artifact changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "research-lookup-build-pack-"));
+    try {
+      const dir = join(root, "research-lookup-fixture");
+      await cp(packageRoot, dir, { recursive: true });
+      const originalReceipt = JSON.parse(
+        await readFile(join(dir, "conformance-receipt.json"), "utf8")
+      );
+      await writeFile(
+        join(dir, "adapter.mjs"),
+        `${await readFile(join(dir, "adapter.mjs"), "utf8")}\n// rebuilt fixture\n`
+      );
+      const globalCorpusFingerprint = (
+        await loadPack("research-lookup-fixture")
+      ).manifest.conformanceCorpusFingerprint;
+
+      await buildPack("research-lookup-fixture", {
+        root,
+        globalCorpusFingerprint
+      });
+
+      const rebuiltPack = await loadPack("research-lookup-fixture", root);
+      const rebuiltReceipt = JSON.parse(
+        await readFile(join(dir, "conformance-receipt.json"), "utf8")
+      );
+      assert.notEqual(rebuiltPack.manifest.packFingerprint, originalReceipt.packFingerprint);
+      assert.equal(rebuiltReceipt.packFingerprint, rebuiltPack.manifest.packFingerprint);
+      assert.equal(
+        rebuiltReceipt.corpusFingerprint,
+        rebuiltPack.manifest.checksums["corpus.json"]
+      );
+      assert.equal(
+        rebuiltReceipt.globalConformanceCorpusFingerprint,
+        globalCorpusFingerprint
+      );
+      assert.equal(rebuiltReceipt.receiptFingerprint, receiptFingerprint(rebuiltReceipt));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

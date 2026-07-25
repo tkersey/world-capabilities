@@ -134,6 +134,38 @@ describe("CapabilityRouterV1 authority boundary", () => {
       code: "ERR_CAPABILITY_V1_RESULT"
     });
   });
+
+  it("derives the same handler identity from equivalent application ID sets", async () => {
+    const requestApplicationId = Buffer.from(REQUEST.subarray(44, 76));
+    const otherApplicationId = Buffer.alloc(32, 0xa5);
+    const adapter = {
+      preflight: async (_context, request) => ({
+        requestId: request.requestId,
+        status: "ok",
+        payload: {}
+      }),
+      resolve: async (_context, request) => ({
+        requestId: request.requestId,
+        status: "ok",
+        payload: { value: 41 }
+      })
+    };
+    const first = new CapabilityRouterV1({ bindings: [binding({
+      applicationIds: [requestApplicationId, otherApplicationId],
+      adapter
+    })] });
+    const second = new CapabilityRouterV1({ bindings: [binding({
+      applicationIds: [otherApplicationId, requestApplicationId],
+      adapter
+    })] });
+
+    const firstResult = await first.resolve({}, REQUEST);
+    const secondResult = await second.resolve({}, REQUEST);
+    assert.equal(
+      firstResult.handlerConfigurationIdentity,
+      secondResult.handlerConfigurationIdentity
+    );
+  });
 });
 
 function binding(overrides = {}) {
