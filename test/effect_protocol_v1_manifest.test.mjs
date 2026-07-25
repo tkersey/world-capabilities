@@ -6,7 +6,8 @@ import {
   fixtureAgentBindings,
   genericHttpJsonBinding,
   humanApprovalBinding,
-  localMemoryKvBinding
+  localMemoryKvBinding,
+  researchLookupFixtureBinding
 } from "../src/v1/index.mjs";
 
 const PACKAGES = [
@@ -14,6 +15,7 @@ const PACKAGES = [
   "generic-http-json",
   "human-approval",
   "local-memory-kv",
+  "research-lookup-fixture",
   "sandbox-files"
 ];
 
@@ -23,7 +25,8 @@ describe("Effect protocol v1 pack declarations", () => {
       ...fixtureAgentBindings(),
       genericHttpJsonBinding(),
       humanApprovalBinding(),
-      localMemoryKvBinding()
+      localMemoryKvBinding(),
+      researchLookupFixtureBinding()
     ];
 
     for (const packageName of PACKAGES) {
@@ -35,7 +38,14 @@ describe("Effect protocol v1 pack declarations", () => {
           authorityRequirements: binding.authorityRequirements.toString(),
           interfaceId: Buffer.from(binding.interfaceId).toString("hex"),
           payloadSchemaId: Buffer.from(binding.payloadSchemaId).toString("hex"),
-          resultSchemaId: Buffer.from(binding.resultSchemaId).toString("hex")
+          resultSchemaId: Buffer.from(binding.resultSchemaId).toString("hex"),
+          ...(binding.applicationIds === undefined
+            ? {}
+            : {
+                applicationIds: binding.applicationIds
+                  .map((applicationId) => Buffer.from(applicationId).toString("hex"))
+                  .sort()
+              })
         }))
         .sort(compareInterfaces);
       const declared = manifest.effectProtocolV1.interfaces
@@ -43,7 +53,10 @@ describe("Effect protocol v1 pack declarations", () => {
           authorityRequirements: entry.authorityRequirements,
           interfaceId: entry.interfaceId,
           payloadSchemaId: entry.payloadSchemaId,
-          resultSchemaId: entry.resultSchemaId
+          resultSchemaId: entry.resultSchemaId,
+          ...(entry.applicationIds === undefined
+            ? {}
+            : { applicationIds: entry.applicationIds })
         }))
         .sort(compareInterfaces);
 

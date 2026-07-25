@@ -288,6 +288,9 @@ function payloadFor(name) {
   if (name === "generic-http-json") return { url: "https://example.invalid/fixture", method: "GET" };
   if (name === "human-approval") return { anchor: "world:host-request:1" };
   if (name === "local-memory-kv") return { operation: "put", key: "k", value: "v" };
+  if (name === "research-lookup-fixture") {
+    return { query: "portable algebraic effects", maximumItems: 2n };
+  }
   if (name === "sandbox-files") return { operation: "read", path: "fixture.txt" };
   return { fixture: true };
 }
@@ -312,7 +315,13 @@ test("all adapters reject unsupported targets and status sets before effects", a
       };
       const context = {
         packageName: pack.manifest.packageName,
-        policy: { live: true, networkLive: true, fileWrite: true, humanLive: true },
+        policy: {
+          live: true,
+          networkLive: true,
+          fileWrite: true,
+          humanLive: true,
+          researchLookup: true
+        },
         approvalMode: "allow",
         fixtureRoot: root,
         effectAttempted: 0

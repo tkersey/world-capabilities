@@ -1,0 +1,19 @@
+{
+  "schema": "effect-v1-conformance-receipt/v1",
+  "packFingerprint": "c279c9ccb9458ec2ecf39189dc79803676d31895c07496b2c3d6cba25648f805",
+  "corpusFingerprint": "93b00d2b93f035f03bf8ed645a4fc82a60029d2e7f34a05ef0accf315c8944a5",
+  "globalConformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "vectors": [
+    "request-admission-before-effect",
+    "malformed-request-rejected",
+    "wrong-schema-rejected",
+    "wrong-application-rejected",
+    "wrong-request-identity-rejected",
+    "excessive-result-rejected",
+    "forbidden-world-evidence-rejected",
+    "retry-result-reused",
+    "static-inspection-does-not-execute-adapter",
+    "receipt-bound-to-pack-and-corpus"
+  ],
+  "receiptFingerprint": "a020a8435c157fc222a1682a56dfb12fe6cef3c899420d3db53dd917e21889e3"
+}

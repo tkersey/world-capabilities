@@ -2943,7 +2943,7 @@ export function assertAdapterManifestParity(pack, adapterManifest) {
   }
 }
 
-export async function verifyPack(pack) {
+export async function inspectPack(pack) {
   for (const file of REQUIRED_PACK_FILES) {
     await readFile(join(pack.dir, file));
   }
@@ -2962,6 +2962,10 @@ export async function verifyPack(pack) {
   }
   await verifyChecksums(pack);
   await verifySelfContained(pack);
+}
+
+export async function verifyPack(pack) {
+  await inspectPack(pack);
   const adapter = await importAdapter(pack.dir);
   for (const name of ["manifest", "preflight", "resolve", "dryRun"]) {
     assert(typeof adapter[name] === "function", `${pack.name}: adapter missing export ${name}`);
@@ -3011,6 +3015,12 @@ function verifyWorldProtocolDeclarations(pack) {
     assert(isDigestHex(entry.interfaceId), `${pack.name}: invalid Effect protocol v1 interface id`);
     assert(isDigestHex(entry.payloadSchemaId), `${pack.name}: invalid Effect protocol v1 payload schema id`);
     assert(isDigestHex(entry.resultSchemaId), `${pack.name}: invalid Effect protocol v1 result schema id`);
+    if (entry.applicationIds !== undefined) {
+      assert(Array.isArray(entry.applicationIds) && entry.applicationIds.length > 0, `${pack.name}: invalid Effect protocol v1 application identities`);
+      assert(entry.applicationIds.every(isDigestHex), `${pack.name}: invalid Effect protocol v1 application identity`);
+      assert(new Set(entry.applicationIds).size === entry.applicationIds.length, `${pack.name}: duplicate Effect protocol v1 application identity`);
+      assert([...entry.applicationIds].sort().every((value, index) => value === entry.applicationIds[index]), `${pack.name}: unsorted Effect protocol v1 application identities`);
+    }
     assert(typeof entry.authorityRequirements === "string" && /^(?:0|[1-9][0-9]*)$/.test(entry.authorityRequirements), `${pack.name}: invalid Effect protocol v1 authority requirements`);
     assert(BigInt(entry.authorityRequirements) <= 0xffffffffffffffffn, `${pack.name}: Effect protocol v1 authority requirements overflow`);
     const expectedInterfaceId = createHash("sha256")
