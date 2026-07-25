@@ -2961,6 +2961,10 @@ export async function inspectPack(pack) {
     assert(vector.passed === true, `${pack.name}: failed vector ${vector.id}`);
   }
   await verifyChecksums(pack);
+  assert(
+    pack.manifest.packFingerprint === await expectedPackFingerprint(pack),
+    `${pack.name}: pack fingerprint mismatch`
+  );
   await verifySelfContained(pack);
 }
 

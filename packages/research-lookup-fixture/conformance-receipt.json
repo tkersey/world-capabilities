@@ -1,8 +1,9 @@
 {
-  "schema": "effect-v1-conformance-receipt/v1",
-  "packFingerprint": "c279c9ccb9458ec2ecf39189dc79803676d31895c07496b2c3d6cba25648f805",
   "corpusFingerprint": "93b00d2b93f035f03bf8ed645a4fc82a60029d2e7f34a05ef0accf315c8944a5",
   "globalConformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "packFingerprint": "97f8684e8eeb722bb8020a2d6dee0236c75e0aac332f43e01aedb1a0920b93a3",
+  "receiptFingerprint": "18a7c0cdb195c3d49f9559348a69bb2373b6bd3ffb23b864efb6bd85dbc58dd9",
+  "schema": "effect-v1-conformance-receipt/v1",
   "vectors": [
     "request-admission-before-effect",
     "malformed-request-rejected",
@@ -14,6 +15,5 @@
     "retry-result-reused",
     "static-inspection-does-not-execute-adapter",
     "receipt-bound-to-pack-and-corpus"
-  ],
-  "receiptFingerprint": "a020a8435c157fc222a1682a56dfb12fe6cef3c899420d3db53dd917e21889e3"
+  ]
 }

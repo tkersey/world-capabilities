@@ -133,6 +133,8 @@ function assertBinding(binding) {
       !binding.adapter || typeof binding.adapter.preflight !== "function" || typeof binding.adapter.resolve !== "function") {
     fail("ERR_CAPABILITY_V1_BINDING");
   }
+  const applicationIds = normalizeApplicationIds(binding.applicationIds);
+  const target = Object.freeze({ ...(binding.target ?? {}) });
   return Object.freeze({
     ...binding,
     adapter: Object.freeze({
@@ -142,11 +144,15 @@ function assertBinding(binding) {
     interfaceId: Buffer.from(binding.interfaceId),
     payloadSchemaId: Buffer.from(binding.payloadSchemaId),
     resultSchemaId: Buffer.from(binding.resultSchemaId),
-    applicationIds: normalizeApplicationIds(binding.applicationIds),
+    applicationIds,
     authorityRequirements: asU64(binding.authorityRequirements ?? 0n, "authorityRequirements"),
-    target: Object.freeze({ ...(binding.target ?? {}) }),
+    target,
     handlerIdentity: binding.handlerIdentity ?? binding.driverId,
-    configurationIdentity: binding.configurationIdentity ?? (() => semanticConfigurationIdentity(binding)),
+    configurationIdentity: binding.configurationIdentity ?? (() => semanticConfigurationIdentity({
+      ...binding,
+      applicationIds,
+      target
+    })),
     recoveryClass: binding.recoveryClass ?? "pure",
     hostClaims: binding.hostClaims ?? (() => new Uint8Array(0))
   });
