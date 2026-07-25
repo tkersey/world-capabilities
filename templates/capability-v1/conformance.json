@@ -1,0 +1,26 @@
+{
+  "corpusFingerprint": "__GENERATED__",
+  "driverId": "__DRIVER_ID__",
+  "vectors": [
+    {
+      "id": "request-admission-before-effect",
+      "passed": false
+    },
+    {
+      "id": "wrong-identity-rejected",
+      "passed": false
+    },
+    {
+      "id": "bounded-outcome",
+      "passed": false
+    },
+    {
+      "id": "forbidden-world-evidence-rejected",
+      "passed": false
+    },
+    {
+      "id": "retry-result-reused",
+      "passed": false
+    }
+  ]
+}

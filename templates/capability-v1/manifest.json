@@ -1,0 +1,75 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    },
+    {
+      "path": "corpus.json",
+      "role": "conformance-corpus"
+    }
+  ],
+  "authorityLabels": [
+    "__AUTHORITY_LABEL__"
+  ],
+  "checksums": {
+    "adapter.mjs": "__GENERATED__",
+    "corpus.json": "__GENERATED__"
+  },
+  "conformanceCorpusFingerprint": "__GENERATED__",
+  "driverAbiVersion": "capability-driver-v1",
+  "driverId": "__DRIVER_ID__",
+  "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "applicationIds": [
+          "__OPTIONAL_APPLICATION_ID__"
+        ],
+        "authorityRequirements": "__AUTHORITY_REQUIREMENTS_U64__",
+        "interfaceId": "__INTERFACE_ID__",
+        "interfaceLabel": "__INTERFACE_LABEL__",
+        "payloadSchemaId": "__PAYLOAD_SCHEMA_ID__",
+        "resultSchemaId": "__RESULT_SCHEMA_ID__"
+      }
+    ]
+  },
+  "idempotencySupport": "full-world-key-bound",
+  "maximumRequestBytes": 65536,
+  "maximumResponseBytes": 65536,
+  "metadata": {
+    "mode": "__MODE__"
+  },
+  "packageName": "__PACKAGE_NAME__",
+  "packageVersion": "__PACKAGE_VERSION__",
+  "packFingerprint": "__GENERATED__",
+  "packFormatVersion": "foundry-effect-pack-v1",
+  "recoverSupport": false,
+  "recoveryClass": "pure",
+  "replaySupport": true,
+  "secretRequirements": [],
+  "shadowSupport": false,
+  "supportedActuationClasses": [
+    "__ACTUATION_CLASS__"
+  ],
+  "supportedActuatorRefs": [
+    "__ACTUATOR_REF__"
+  ],
+  "supportedApplianceAbiVersions": [
+    "world-application-abi-v1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "__DESCRIPTOR_FINGERPRINT__"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "world-frame-v1"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-effect-v1"
+  ]
+}
