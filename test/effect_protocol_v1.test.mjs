@@ -166,6 +166,30 @@ describe("CapabilityRouterV1 authority boundary", () => {
       secondResult.handlerConfigurationIdentity
     );
   });
+
+  it("keeps admitted application allowlists outside the public router surface", async () => {
+    const applicationId = Buffer.from(REQUEST.subarray(44, 76));
+    const configuredIds = [Buffer.from(applicationId)];
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      applicationIds: configuredIds,
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { value: 41 }
+        })
+      }
+    })] });
+
+    assert.equal(Object.prototype.hasOwnProperty.call(router, "bindings"), false);
+    configuredIds[0].fill(0xa5);
+    assert.equal((await router.resolve({}, REQUEST)).result.status, EffectStatus.ok);
+  });
 });
 
 function binding(overrides = {}) {
