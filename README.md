@@ -54,7 +54,7 @@ a safe host effect handler
 
 ## Included Packs
 
-- `research-lookup-fixture`: World `v1.0.0-rc.2` Research Digest fixture,
+- `research-lookup-fixture`: World `v1.0.0` Research Digest fixture,
   bound to exact application, interface, schema, and authority identities.
 - `fixture-model`: deterministic model-like fixture capability.
 - `generic-http-json`: dry-run HTTP JSON skeleton.
