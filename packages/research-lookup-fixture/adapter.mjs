@@ -3,15 +3,15 @@ const packManifest = {
   packageName: "@tkersey/world-capabilities/research-lookup-fixture",
   authorityLabels: ["research.fixture"],
   supportedActuationClasses: ["research"],
-  supportedActuatorRefs: ["actuator.research-lookup-fixture.v1"],
-  supportedDescriptorFingerprints: ["desc.research-lookup-fixture.v1"],
+  supportedActuatorRefs: ["actuator.research-lookup-fixture.v2"],
+  supportedDescriptorFingerprints: ["desc.research-lookup-fixture.v2"],
   supportedResponseStatuses: ["ok", "rejected", "failed"],
   secretRequirements: []
 };
 
 const QUERY = "portable algebraic effects";
-const MAXIMUM_QUERY_BYTES = 4096;
-const MAXIMUM_ITEMS = 2n;
+const MAXIMUM_QUERY_BYTES = 512;
+const MAXIMUM_ITEMS = 2;
 const FORBIDDEN_EVIDENCE_NORMAL_FORMS = new Set([
   "turnreceiptbytes",
   "archiveappendbatchbytes",
@@ -32,18 +32,16 @@ const FORBIDDEN_EVIDENCE_NORMAL_FORMS = new Set([
   "applicationmanifest"
 ]);
 const RESPONSE = Object.freeze({
-  first: Object.freeze({
-    title: "Effect rows as application boundaries",
-    summary: "Static closure leaves authority outside the guest."
-  }),
-  second: Object.freeze({
-    title: "Portable continuations",
-    summary: "Canonical Frames resume in fresh WASM instances."
-  }),
-  digestResult: Object.freeze({
-    digest: "Static closure keeps authority external; canonical Frames keep continuation portable.",
-    itemCount: 2n
-  })
+  items: Object.freeze([
+    Object.freeze({
+      title: "Effect rows as application boundaries",
+      summary: "Static closure leaves authority outside the guest."
+    }),
+    Object.freeze({
+      title: "Portable continuations",
+      summary: "Canonical Frames resume in fresh WASM instances."
+    })
+  ])
 });
 
 function status(hostRequest, wanted, fallback = "rejected") {
@@ -132,7 +130,7 @@ function requestReason(context, hostRequest) {
       new TextEncoder().encode(query).length > MAXIMUM_QUERY_BYTES) {
     return "malformed_research_query";
   }
-  if (typeof hostRequest.payload?.maximumItems !== "bigint" ||
+  if (!Number.isInteger(hostRequest.payload?.maximumItems) ||
       hostRequest.payload.maximumItems !== MAXIMUM_ITEMS) {
     return "invalid_maximum_items";
   }

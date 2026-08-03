@@ -38,13 +38,13 @@ A pack that supports v1 includes `world-effect-v1` in
 ```json
 {
   "applicationIds": [
-    "ae049a7b2a650ddd41a4d63602d5cdd3060ed644054c8d4532fbdd45e9a048c9"
+    "dfb1352d2050cc6e6a47070092a89fdad2ee4c83f7da5026aa3828939465986d"
   ],
   "authorityRequirements": "128",
-  "interfaceId": "56b70f28567ba9275cb5533652d83fa7bc05c8e37c5b61c94c85763dbbf2de58",
-  "interfaceLabel": "research.lookup.v1",
-  "payloadSchemaId": "24eb8230d48242130660a1229ad28857eaad2d85315dfcee6d41f21badf3a03a",
-  "resultSchemaId": "79828538ca9f2e3899120ce1ce96314bce094ab585c92b127d63f94ac8eb2172"
+  "interfaceId": "7207842d4663e1e93d3a1225faa74149bc0a7807b1dada81416cb7ce1e2c0807",
+  "interfaceLabel": "research.lookup.v2",
+  "payloadSchemaId": "0cce95380bfd932c58c185226d71a2957fc25f7fe3423598a29f5dede8a096f2",
+  "resultSchemaId": "1fd9bd60f34d340b4181b9dbd678c8dc680c9c776f200d13ca5717103bdc5d1c"
 }
 ```
 

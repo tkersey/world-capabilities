@@ -289,7 +289,7 @@ function payloadFor(name) {
   if (name === "human-approval") return { anchor: "world:host-request:1" };
   if (name === "local-memory-kv") return { operation: "put", key: "k", value: "v" };
   if (name === "research-lookup-fixture") {
-    return { query: "portable algebraic effects", maximumItems: 2n };
+    return { query: "portable algebraic effects", maximumItems: 2 };
   }
   if (name === "sandbox-files") return { operation: "read", path: "fixture.txt" };
   return { fixture: true };

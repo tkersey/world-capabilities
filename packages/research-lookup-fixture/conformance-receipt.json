@@ -1,8 +1,8 @@
 {
-  "corpusFingerprint": "485027cb5401bc12b84f3b9646c651214ee260881c8bc0f93ede5829efa24fc8",
+  "corpusFingerprint": "dcb404fef6eb4706c70ab3fad3354991aefba85f53b22fc98967386d83024e5d",
   "globalConformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
-  "packFingerprint": "c3106b770e2d14237c981b4671da3d42dfbaed33eed81ccc78c257a42419354e",
-  "receiptFingerprint": "46c629740d5917fa86e248ad2686e3780e0fed926aa1b5d2309884ce22ce0c76",
+  "packFingerprint": "c51b11775c073bc7e5e7d884a2a66a7c439e303b22687807435bcd05a2630481",
+  "receiptFingerprint": "ad81da7da8588a6d72c71a858b9425afb045a29dd2b5c604b744f527ce7d4b0d",
   "schema": "effect-v1-conformance-receipt/v1",
   "vectors": [
     "request-admission-before-effect",
@@ -11,6 +11,7 @@
     "wrong-application-rejected",
     "wrong-request-identity-rejected",
     "excessive-result-rejected",
+    "items-only-response-schema",
     "forbidden-world-evidence-rejected",
     "retry-result-reused",
     "static-inspection-does-not-execute-adapter",

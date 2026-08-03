@@ -25,7 +25,7 @@ const packageRoot = "packages/research-lookup-fixture";
 const corpus = JSON.parse(await readFile(`${packageRoot}/corpus.json`, "utf8"));
 const requestBytes = Buffer.from(corpus.effectRequestBase64, "base64");
 
-describe("research.lookup.v1 fixture pack", () => {
+describe("research.lookup.v2 fixture pack", () => {
   it("admits the exact World request before attempting the deterministic effect", async () => {
     const router = new CapabilityRouterV1({
       bindings: [researchLookupFixtureBinding()]
@@ -40,7 +40,7 @@ describe("research.lookup.v1 fixture pack", () => {
     assert.equal(resolved.result.status, EffectStatus.ok);
     assert.equal(admittedContext.effectAttempted, 1);
     assert.deepEqual(
-      normalizeResponse(decodeResearchResponse(resolved.result.resultBytes)),
+      decodeResearchResponse(resolved.result.resultBytes),
       corpus.response
     );
   });
@@ -61,7 +61,7 @@ describe("research.lookup.v1 fixture pack", () => {
       },
       payload: {
         query: corpus.request.query,
-        maximumItems: BigInt(corpus.request.maximumItems)
+        maximumItems: corpus.request.maximumItems
       }
     };
 
@@ -90,7 +90,7 @@ describe("research.lookup.v1 fixture pack", () => {
         },
         payload: {
           query: corpus.request.query,
-          maximumItems: 1n
+          maximumItems: 1
         }
       }
     );
@@ -135,18 +135,32 @@ describe("research.lookup.v1 fixture pack", () => {
     const wrongSchema = Buffer.from(requestBytes);
     wrongSchema[160] ^= 1;
     resealRequest(wrongSchema);
+    const wrongSchemaContext = context({ researchLookup: true });
     await assert.rejects(
-      () => router.resolve(context({ researchLookup: true }), wrongSchema),
+      () => router.resolve(wrongSchemaContext, wrongSchema),
       { code: "ERR_CAPABILITY_V1_SCHEMA_MISMATCH" }
     );
+    assert.equal(wrongSchemaContext.effectAttempted, 0);
+
+    const wrongResultSchema = Buffer.from(requestBytes);
+    wrongResultSchema[192] ^= 1;
+    resealRequest(wrongResultSchema);
+    const wrongResultSchemaContext = context({ researchLookup: true });
+    await assert.rejects(
+      () => router.resolve(wrongResultSchemaContext, wrongResultSchema),
+      { code: "ERR_CAPABILITY_V1_SCHEMA_MISMATCH" }
+    );
+    assert.equal(wrongResultSchemaContext.effectAttempted, 0);
 
     const wrongApplication = Buffer.from(requestBytes);
     wrongApplication[44] ^= 1;
     resealRequest(wrongApplication);
+    const wrongApplicationContext = context({ researchLookup: true });
     await assert.rejects(
-      () => router.resolve(context({ researchLookup: true }), wrongApplication),
+      () => router.resolve(wrongApplicationContext, wrongApplication),
       { code: "ERR_CAPABILITY_V1_APPLICATION_MISMATCH" }
     );
+    assert.equal(wrongApplicationContext.effectAttempted, 0);
 
     const wrongRequest = Buffer.from(requestBytes);
     wrongRequest[12] ^= 1;
@@ -168,18 +182,14 @@ describe("research.lookup.v1 fixture pack", () => {
         resolve: async (_context, request) => ({
           requestId: request.requestId,
           status: "ok",
-          payload: {
-            first: { title: huge, summary: huge },
-            second: { title: huge, summary: huge },
-            digestResult: { digest: huge, itemCount: 2n }
-          }
+          payload: { items: [{ title: huge, summary: huge }] }
         })
       }
     });
     await assert.rejects(
       () => new CapabilityRouterV1({ bindings: [excessive] })
         .resolve(context({ researchLookup: true }), requestBytes),
-      { code: "ERR_CAPABILITY_V1_RESULT" }
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
     );
 
     const evidence = researchLookupFixtureBinding({
@@ -215,6 +225,16 @@ describe("research.lookup.v1 fixture pack", () => {
 
     assert.equal(effectContext.effectAttempted, 1);
     assert.deepEqual(first.result.encodedBytes, retried.result.encodedBytes);
+  });
+
+  it("contains no capability-owned digest formatting surface", async () => {
+    const productionSources = await Promise.all([
+      readFile("src/v1/research_lookup_fixture.mjs", "utf8"),
+      readFile(`${packageRoot}/adapter.mjs`, "utf8")
+    ]);
+    for (const source of productionSources) {
+      assert.doesNotMatch(source, /digestResult|itemCount|preformatted/i);
+    }
   });
 
   it("statically inspects pack source without executing its adapter", async () => {
@@ -334,16 +354,6 @@ async function resolveRetained(router, effectContext, retained) {
   const resolved = await router.resolve(effectContext, requestBytes);
   retained.set(key, resolved);
   return resolved;
-}
-
-function normalizeResponse(value) {
-  return {
-    ...value,
-    digestResult: {
-      ...value.digestResult,
-      itemCount: value.digestResult.itemCount.toString()
-    }
-  };
 }
 
 function receiptFingerprint(receipt) {
