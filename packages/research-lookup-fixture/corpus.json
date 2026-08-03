@@ -1,6 +1,6 @@
 {
-  "applicationId": "2f7e37cdbc94671ef2249ba4dfc31da46fa4fe4c7da3bdb5882c693ac97aec85",
-  "effectRequestBase64": "V1JMREVSUTEBAAAAqrOXg3VApjxDmCMq0YemqssgFfY/Ilsoerb/ryIRz0AvfjfNvJRnHvIkm6Tfwx2kb6T+TH2jvbWILGk6yXrshQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqYbygwOcieRyB4QtRmPh6T06EiX6p0FJvAp4B7Ha2oFBbLfOHiwIBwzOlTgL/ZMsWMGFIm1xopV/wl9/40I1mKKfXe3ooJbyH9m9YPNNNAtBgbnb1njI3GgMnHdvIA0TylcXEDvcXRwXIgAAABoAAABwb3J0YWJsZSBhbGdlYnJhaWMgZWZmZWN0cwIAAADRbQX2lidnmOJElCGMoTkZodSsaLFkiCpXz4LV3GRkRIAAAAAAAAAAAAAEAAMAAAA=",
+  "applicationId": "fd8862ec67bf16ed0b81467c066c1b8f0403b8a9d87cadec278c06c98cf2d617",
+  "effectRequestBase64": "V1JMREVSUTEBAAAAHRzbEgBPp0EtcOIfYz6yX4FLiJfJK2xBNS43Kd+nuxv9iGLsZ78W7QuBRnwGbBuPBAO4qdh8rewnjAbJjPLWFwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACcYb7cgXIn9yB4QtRmPh6T06EiX6p0FJvAp4B7Ha2oFBbLfOHiwIBwzOlTgL/ZMsWMGFIm1xopV/wl9/40I1mKKfXe3ooJbyH9m9YPNNNAtBgbnb1njI3GgMnHdvIA0TylcXEDvcXRwXIgAAABoAAABwb3J0YWJsZSBhbGdlYnJhaWMgZWZmZWN0cwIAAABLpcTyTLZeTNNq89Xv5jGZNOPRZz1ktlkS/QXeuJ5sCIAAAAAAAAAAAAAEAAMAAAA=",
   "formatVersion": "research-lookup-fixture-corpus-v1",
   "interface": {
     "authorityRequirements": "128",
@@ -26,10 +26,10 @@
     ]
   },
   "worldRelease": {
-    "applicationManifestSha256": "1002e04ebdb89fc95e6c2bd184e0842b5c9f5754bb0bfce0771f73dd1728a09b",
-    "applicationWasmSha256": "a33f355a625e6706577b9a038ae45a108251cff68998dacb7274681fbea3fdbf",
-    "archiveSha256": "b04809061a0cce35ac8fb8f96dbc041fdf746c8879328cfca392c5bd00c488b8",
-    "packageHash": "world-2.0.0-rc.1-XXTUeDM3iQCARiiHFsx8dxemZ6rh6igToms2ps3o1yUU",
+    "applicationManifestSha256": "40c6d1b9fea02c534dbd60f6a2d4e944face6e9a0f9d4b6dd8f3845d25334491",
+    "applicationWasmSha256": "8a5881c770478fe64830b9f5777333acce3c6ef616590b917c2c076fe65d048c",
+    "archiveSha256": "ffcb1f1631b2fffaa838432169d5ab320c5136e208e1f56f61b9fb87d3bb49cd",
+    "packageHash": "world-2.0.0-rc.1-XXTUePxriQD_dJfLKsqTH46vEH3EuHHz36GZ48P_KP2D",
     "tag": "v2.0.0-rc.1"
   }
 }

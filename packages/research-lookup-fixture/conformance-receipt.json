@@ -1,8 +1,8 @@
 {
-  "corpusFingerprint": "d887167012c02cae83802427d15c9e458d8b987bca577ae46630730b28707b34",
+  "corpusFingerprint": "692e5d519c2bfff18636939bab7fe5e0167cf836a1e9d2f78c1ccf7cf5e08022",
   "globalConformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
-  "packFingerprint": "f51adc2b6449b7a4f3666e37622d750f942c5b545e6daee84b6a148dbf7bbb3a",
-  "receiptFingerprint": "ff19404514f19e5ce8e7dd7080ed716b680410c8a4a59d409a0352b9aa9ca7d8",
+  "packFingerprint": "2fda8a552101682cf118dd94d9c3a79b6fb4ca678746651893d55bf4983625ec",
+  "receiptFingerprint": "28e8b218351b0878814aa6ae853743803664a09418c741175d75e0f8f68d4c54",
   "schema": "effect-v1-conformance-receipt/v1",
   "vectors": [
     "request-admission-before-effect",
