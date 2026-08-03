@@ -28,8 +28,8 @@
   "worldRelease": {
     "applicationManifestSha256": "1002e04ebdb89fc95e6c2bd184e0842b5c9f5754bb0bfce0771f73dd1728a09b",
     "applicationWasmSha256": "a33f355a625e6706577b9a038ae45a108251cff68998dacb7274681fbea3fdbf",
-    "archiveSha256": "028947fe283f678eb1d91921b5db2552cb98784d156f57fa142a9ce617e178bb",
-    "packageHash": "world-2.0.0-rc.1-XXTUeGMziQC5SURAXzd9koo9DnE165Gd_kkqnQUu6xoN",
+    "archiveSha256": "b04809061a0cce35ac8fb8f96dbc041fdf746c8879328cfca392c5bd00c488b8",
+    "packageHash": "world-2.0.0-rc.1-XXTUeDM3iQCARiiHFsx8dxemZ6rh6igToms2ps3o1yUU",
     "tag": "v2.0.0-rc.1"
   }
 }
