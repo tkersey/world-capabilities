@@ -29,7 +29,7 @@ try {
     "embedded and released application manifests differ",
   );
   assert.equal(application.applicationName, "research-digest-agent");
-  assert.equal(application.worldPackageVersion, "2.0.0");
+  assert.equal(application.worldPackageVersion, "2.0.0-rc.1");
   assert.equal(application.residualEffects.length, 1);
 
   const corpus = JSON.parse(await readFile(corpusPath, "utf8"));

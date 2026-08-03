@@ -14,7 +14,7 @@
   ],
   "checksums": {
     "adapter.mjs": "30046ff4f37d923f22f7e5052de087db70393ee5c3ff13ea750b75638cd31917",
-    "corpus.json": "dcb404fef6eb4706c70ab3fad3354991aefba85f53b22fc98967386d83024e5d"
+    "corpus.json": "1b7ff553c4314b0f0528f9e053b858158d596da9571caafeefffaf070fc41a6c"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -24,7 +24,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "dfb1352d2050cc6e6a47070092a89fdad2ee4c83f7da5026aa3828939465986d"
+          "2f7e37cdbc94671ef2249ba4dfc31da46fa4fe4c7da3bdb5882c693ac97aec85"
         ],
         "authorityRequirements": "128",
         "interfaceId": "7207842d4663e1e93d3a1225faa74149bc0a7807b1dada81416cb7ce1e2c0807",
@@ -40,11 +40,11 @@
   "metadata": {
     "mode": "deterministic-research-fixture",
     "network": false,
-    "worldApplicationRelease": "source:1f76737a7967e0f9a2e9da51d7d5026aa0a502b3"
+    "worldApplicationRelease": "v2.0.0-rc.1"
   },
   "packageName": "@tkersey/world-capabilities/research-lookup-fixture",
   "packageVersion": "2.0.0",
-  "packFingerprint": "c51b11775c073bc7e5e7d884a2a66a7c439e303b22687807435bcd05a2630481",
+  "packFingerprint": "aa2a4f93af703430d71028a21624c564fc41a4301e20ef627c87bde1b80ab8b6",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

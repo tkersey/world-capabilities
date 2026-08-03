@@ -1,6 +1,6 @@
 {
-  "applicationId": "dfb1352d2050cc6e6a47070092a89fdad2ee4c83f7da5026aa3828939465986d",
-  "effectRequestBase64": "V1JMREVSUTEBAAAAzKL6HXdzxZsfcu/bOc7tiMTEdb0liHEwXE2PvOn67j7fsTUtIFDMbmpHBwCSqJ/a0u5Mg/faUCaqOCiTlGWYbQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ03Te7s/hyRyB4QtRmPh6T06EiX6p0FJvAp4B7Ha2oFBbLfOHiwIBwzOlTgL/ZMsWMGFIm1xopV/wl9/40I1mKKfXe3ooJbyH9m9YPNNNAtBgbnb1njI3GgMnHdvIA0TylcXEDvcXRwXIgAAABoAAABwb3J0YWJsZSBhbGdlYnJhaWMgZWZmZWN0cwIAAAAdgOpOIHV9p7gcHNiQGnZSW559aUebzpL7c1Wh+74BQYAAAAAAAAAAAAAEAAMAAAA=",
+  "applicationId": "2f7e37cdbc94671ef2249ba4dfc31da46fa4fe4c7da3bdb5882c693ac97aec85",
+  "effectRequestBase64": "V1JMREVSUTEBAAAAqrOXg3VApjxDmCMq0YemqssgFfY/Ilsoerb/ryIRz0AvfjfNvJRnHvIkm6Tfwx2kb6T+TH2jvbWILGk6yXrshQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqYbygwOcieRyB4QtRmPh6T06EiX6p0FJvAp4B7Ha2oFBbLfOHiwIBwzOlTgL/ZMsWMGFIm1xopV/wl9/40I1mKKfXe3ooJbyH9m9YPNNNAtBgbnb1njI3GgMnHdvIA0TylcXEDvcXRwXIgAAABoAAABwb3J0YWJsZSBhbGdlYnJhaWMgZWZmZWN0cwIAAADRbQX2lidnmOJElCGMoTkZodSsaLFkiCpXz4LV3GRkRIAAAAAAAAAAAAAEAAMAAAA=",
   "formatVersion": "research-lookup-fixture-corpus-v1",
   "interface": {
     "authorityRequirements": "128",
@@ -26,10 +26,10 @@
     ]
   },
   "worldRelease": {
-    "applicationManifestSha256": "bfb490d0dd5732b83fcf7a06af48cb78c0868dbd9882db160bb8b92786729c58",
-    "applicationWasmSha256": "023d95b7e8667c5e20b628750186ebe73adc8f150e83979ba9d28054d13bf01a",
-    "archiveSha256": "06fd04d7cba762accaa278b36076f421173e174a7cd4a277f061a427a310fbc6",
-    "packageHash": "world-source-1f76737a7967e0f9a2e9da51d7d5026aa0a502b3",
-    "tag": "source:1f76737a7967e0f9a2e9da51d7d5026aa0a502b3"
+    "applicationManifestSha256": "1002e04ebdb89fc95e6c2bd184e0842b5c9f5754bb0bfce0771f73dd1728a09b",
+    "applicationWasmSha256": "a33f355a625e6706577b9a038ae45a108251cff68998dacb7274681fbea3fdbf",
+    "archiveSha256": "028947fe283f678eb1d91921b5db2552cb98784d156f57fa142a9ce617e178bb",
+    "packageHash": "world-2.0.0-rc.1-XXTUeGMziQC5SURAXzd9koo9DnE165Gd_kkqnQUu6xoN",
+    "tag": "v2.0.0-rc.1"
   }
 }
