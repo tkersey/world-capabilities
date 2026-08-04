@@ -12,7 +12,7 @@ const corpusPath = "packages/research-lookup-fixture/corpus.json";
 const manifestPath = "packages/research-lookup-fixture/manifest.json";
 const bindingPath = "src/v1/research_lookup_fixture.mjs";
 const host = await import(
-  pathToFileURL(path.join(options.worldHostRoot, "host/src/v1/index.mjs")).href
+  pathToFileURL(path.join(options.worldHostRoot, "src/v1/index.mjs")).href
 );
 const [wasmBytes, manifestBytes] = await Promise.all([
   readFile(options.applicationWasm),
@@ -29,19 +29,19 @@ try {
     "embedded and released application manifests differ",
   );
   assert.equal(application.applicationName, "research-digest-agent");
-  assert.equal(application.worldPackageVersion, "1.0.0");
+  assert.equal(application.worldPackageVersion, "2.0.0-rc.1");
   assert.equal(application.residualEffects.length, 1);
 
   const corpus = JSON.parse(await readFile(corpusPath, "utf8"));
   const initialArgsBytes = encodeResearchRequest({
     query: corpus.request.query,
-    maximumItems: BigInt(corpus.request.maximumItems),
+    maximumItems: corpus.request.maximumItems,
   });
   const input = host.encodeStepInput(
     {
       applicationId: application.applicationId,
       initialArgsBytes,
-      fuel: 100n,
+      fuel: 10_000n,
     },
     application.limits,
   );
@@ -105,8 +105,8 @@ function encodeResearchRequest(value) {
   const query = Buffer.from(value.query, "utf8");
   const length = Buffer.alloc(4);
   length.writeUInt32LE(query.length);
-  const maximumItems = Buffer.alloc(8);
-  maximumItems.writeBigUInt64LE(value.maximumItems);
+  const maximumItems = Buffer.alloc(4);
+  maximumItems.writeUInt32LE(value.maximumItems);
   return Buffer.concat([length, query, maximumItems]);
 }
 

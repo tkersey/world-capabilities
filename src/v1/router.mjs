@@ -34,6 +34,10 @@ const FORBIDDEN_OUTPUT_KEYS = new Set([
 ]);
 const FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS = new Set([...FORBIDDEN_OUTPUT_KEYS]
   .map((key) => key.replace(/[^a-z0-9]/gi, "").toLowerCase()));
+const TYPED_ARRAY_LENGTH_GETTER = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype),
+  "length"
+).get;
 
 export class CapabilityRouterV1 {
   #bindings;
@@ -66,13 +70,12 @@ export class CapabilityRouterV1 {
     const request = decodeEffectRequest(requestBytes, this.limits);
     const binding = this.#bindingFor(request);
     const projected = projectRequest(binding, request);
-    const preflight = await binding.adapter.preflight(context, projected);
+    const preflight = admitOutcome(await binding.adapter.preflight(context, projected));
     assertOutcome(preflight, projected);
     const outcome = preflight.status === "ok"
-      ? await binding.adapter.resolve(context, projected)
+      ? admitOutcome(await binding.adapter.resolve(context, projected))
       : preflight;
     assertOutcome(outcome, projected);
-    assertNoForbiddenOutput(outcome);
     const status = statusCode(outcome.status);
     if ((request.allowedStatuses & (1 << status)) === 0) fail("ERR_CAPABILITY_V1_OUTCOME_STATUS");
     const resultBytes = status === EffectStatus.ok
@@ -185,15 +188,106 @@ function assertOutcome(value, request) {
   statusCode(value.status);
 }
 
-function assertNoForbiddenOutput(value, path = "$", depth = 0) {
+function admitOutcome(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
-  if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value)) {
-    const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-    if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
-      fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+  if (typeof value === "function") fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  if (!value || typeof value !== "object") return value;
+  let descriptors;
+  let prototype;
+  let isArray;
+  let byteCarrierKind = null;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    isArray = Array.isArray(value);
+    if (Buffer.isBuffer(value)) byteCarrierKind = "buffer";
+    else if (ArrayBuffer.isView(value) && prototype === Uint8Array.prototype) {
+      byteCarrierKind = "uint8array";
+    } else descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  if (byteCarrierKind !== null) {
+    return admitByteCarrier(value, byteCarrierKind, path);
+  }
+  if (!isArray && prototype !== Object.prototype && prototype !== null) {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  let arrayLength = null;
+  if (isArray) {
+    const lengthDescriptor = descriptors.length;
+    if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value") ||
+        !Number.isSafeInteger(lengthDescriptor.value) || lengthDescriptor.value < 0 ||
+        lengthDescriptor.value > 0xffff_ffff) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.length`);
     }
-    assertNoForbiddenOutput(child, `${path}.${key}`, depth + 1);
+    arrayLength = lengthDescriptor.value;
+  }
+  const admitted = isArray ? new Array(arrayLength) : Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const label = typeof key === "string" ? key : String(key);
+    if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
+    }
+    if (typeof key === "string") {
+      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+      }
+    }
+    if (isArray && key === "length") {
+      continue;
+    }
+    if (isArray && typeof key === "string") {
+      const index = Number(key);
+      if (Number.isSafeInteger(index) && index >= 0 && index < 0xffff_ffff &&
+          String(index) === key && index >= arrayLength) {
+        fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${key}`);
+      }
+    }
+    const admittedValue = admitOutcome(descriptor.value, `${path}.${label}`, depth + 1);
+    Object.defineProperty(admitted, key, {
+      value: admittedValue,
+      enumerable: descriptor.enumerable,
+      configurable: false,
+      writable: false
+    });
+  }
+  if (isArray) {
+    Object.defineProperty(admitted, "length", {
+      value: arrayLength,
+      enumerable: false,
+      configurable: false,
+      writable: false
+    });
+  }
+  return Object.freeze(admitted);
+}
+
+function admitByteCarrier(value, kind, path) {
+  let keys;
+  let length;
+  try {
+    length = TYPED_ARRAY_LENGTH_GETTER.call(value);
+    keys = Reflect.ownKeys(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  for (let index = length; index < keys.length; index += 1) {
+    const key = keys[index];
+    if (typeof key === "string") {
+      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+      }
+    }
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  try {
+    return kind === "buffer" ? Buffer.from(value) : new Uint8Array(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
   }
 }
 

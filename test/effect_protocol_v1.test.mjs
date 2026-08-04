@@ -8,8 +8,10 @@ import {
   createEffectResult,
   decodeEffectRequest,
   decodeEffectResult,
+  decodeJsonStringValue,
   decodeStringValue,
   effectInterfaceId,
+  encodeJsonStringValue,
   stringValueSchemaId
 } from "../src/v1/index.mjs";
 
@@ -72,6 +74,42 @@ describe("World Effect protocol v1", () => {
       status: EffectStatus.failed,
       resultSchemaId: Buffer.alloc(32)
     }), { code: "ERR_CAPABILITY_V1_RESULT" });
+  });
+
+  it("rejects null-prototype JSON accessors without executing them", () => {
+    let getterCalls = 0;
+    const value = Object.create(null);
+    Object.defineProperty(value, "answer", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return getterCalls === 1 ? 42 : Number.NaN;
+      }
+    });
+
+    assert.throws(() => encodeJsonStringValue(value), {
+      code: "ERR_CAPABILITY_V1_JSON_VALUE"
+    });
+    assert.equal(getterCalls, 0);
+
+    const admitted = Object.create(null);
+    Object.defineProperty(admitted, "answer", {
+      value: 42,
+      enumerable: true
+    });
+    assert.deepEqual(
+      decodeJsonStringValue(encodeJsonStringValue(admitted)),
+      { answer: 42 }
+    );
+  });
+
+  it("rejects revoked JSON proxies through the codec error surface", () => {
+    const revoked = Proxy.revocable([], {});
+    revoked.revoke();
+
+    assert.throws(() => encodeJsonStringValue(revoked.proxy), {
+      code: "ERR_CAPABILITY_V1_JSON_VALUE"
+    });
   });
 });
 
@@ -189,6 +227,399 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(Object.prototype.hasOwnProperty.call(router, "bindings"), false);
     configuredIds[0].fill(0xa5);
     assert.equal((await router.resolve({}, REQUEST)).result.status, EffectStatus.ok);
+  });
+
+  it("uses one inert admitted outcome snapshot for validation and encoding", async () => {
+    let semanticReadCalls = 0;
+    const target = {
+      requestId: decodeEffectRequest(REQUEST).requestId.toString("hex"),
+      status: "ok",
+      payload: { value: 41 }
+    };
+    const outcome = new Proxy(target, {
+      get(object, key, receiver) {
+        if (key === "requestId" || key === "status" || key === "payload") {
+          semanticReadCalls += 1;
+        }
+        if (key === "payload") return { frameBytes: Buffer.from("forbidden") };
+        return Reflect.get(object, key, receiver);
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => outcome
+      },
+      encodeOutcome: (admitted) => {
+        assert.deepEqual(admitted.payload, { value: 41 });
+        const bytes = Buffer.alloc(8);
+        bytes.writeBigInt64LE(BigInt(admitted.payload.value));
+        return bytes;
+      }
+    })] });
+
+    const resolved = await router.resolve({}, REQUEST);
+
+    assert.equal(resolved.result.status, EffectStatus.ok);
+    assert.equal(semanticReadCalls, 0);
+  });
+
+  it("keeps standard JSON bindings compatible with admitted outcome snapshots", async () => {
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { nested: { values: [1, 2, 3] } }
+        })
+      },
+      encodeOutcome: (outcome) => encodeJsonStringValue(outcome.payload)
+    })] });
+
+    const resolved = await router.resolve({}, REQUEST);
+
+    assert.deepEqual(
+      decodeJsonStringValue(resolved.result.resultBytes),
+      { nested: { values: [1, 2, 3] } }
+    );
+  });
+
+  it("preserves owned admitted carrier representations for binding encoders", async () => {
+    const values = [1, 2, 3];
+    const buffer = Buffer.from([4, 5, 6]);
+    const bytes = new Uint8Array([7, 8, 9]);
+    const getOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
+    let byteCarrierDescriptorCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { values, buffer, bytes }
+        })
+      },
+      encodeOutcome: (outcome) => {
+        assert.deepEqual(outcome.payload.values.map((value) => value * 2), [2, 4, 6]);
+        assert.deepEqual([...outcome.payload.values], values);
+        assert.equal(Buffer.isBuffer(outcome.payload.buffer), true);
+        assert.notStrictEqual(outcome.payload.buffer, buffer);
+        assert.deepEqual(outcome.payload.buffer, buffer);
+        assert.equal(outcome.payload.bytes instanceof Uint8Array, true);
+        assert.equal(Buffer.isBuffer(outcome.payload.bytes), false);
+        assert.notStrictEqual(outcome.payload.bytes, bytes);
+        assert.deepEqual(outcome.payload.bytes, bytes);
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    Object.getOwnPropertyDescriptors = (value) => {
+      if (value === buffer || value === bytes) byteCarrierDescriptorCalls += 1;
+      return getOwnPropertyDescriptors(value);
+    };
+    let resolved;
+    try {
+      resolved = await router.resolve({}, REQUEST);
+    } finally {
+      Object.getOwnPropertyDescriptors = getOwnPropertyDescriptors;
+    }
+
+    assert.deepEqual(resolved.result.resultBytes, Buffer.from([0x2a]));
+    assert.equal(byteCarrierDescriptorCalls, 0);
+  });
+
+  it("rejects revoked outcome proxies through the capability error surface", async () => {
+    const target = {
+      requestId: decodeEffectRequest(REQUEST).requestId.toString("hex"),
+      status: "ok",
+      payload: { value: 41 }
+    };
+    let revoke;
+    const revocable = Proxy.revocable(target, {
+      getPrototypeOf(object) {
+        revoke();
+        return Reflect.getPrototypeOf(object);
+      }
+    });
+    revoke = revocable.revoke;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => revocable.proxy
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+  });
+
+  it("rejects array proxy indices beyond the snapshotted length", async () => {
+    let encodeCalls = 0;
+    const values = new Proxy([], {
+      ownKeys() {
+        return ["0", "length"];
+      },
+      getOwnPropertyDescriptor(target, key) {
+        if (key === "0") {
+          return { value: 42, writable: true, enumerable: true, configurable: true };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { values }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("rejects proxy array lengths outside the JavaScript array domain", async () => {
+    let encodeCalls = 0;
+    const values = new Proxy([], {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === "length") {
+          return {
+            value: 0x1_0000_0000,
+            writable: true,
+            enumerable: false,
+            configurable: false
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { values }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("rejects evidence-bearing byte carrier extensions before copying", async () => {
+    let carrier;
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { carrier }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const [value, key] of [
+      [Buffer.from([1, 2, 3]), "frameBytes"],
+      [new Uint8Array([4, 5, 6]), "frame_bytes"]
+    ]) {
+      carrier = value;
+      Object.defineProperty(carrier, key, { value: Buffer.from("forbidden") });
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE"
+      });
+    }
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("derives byte-carrier extent without reading shadowed length", async () => {
+    let carrier;
+    let lengthReads = 0;
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { carrier }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const lengthDescriptor of [
+      { value: Number.MAX_SAFE_INTEGER },
+      { get() { lengthReads += 1; throw new Error("must not execute"); } }
+    ]) {
+      carrier = Buffer.from([1, 2, 3]);
+      Object.defineProperty(carrier, "frameBytes", { value: Buffer.from("forbidden") });
+      Object.defineProperty(carrier, "length", lengthDescriptor);
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE"
+      });
+    }
+
+    carrier = new Proxy(Buffer.from([4, 5, 6]), {});
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(lengthReads, 0);
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("rejects callable outcome values before an encoder can execute them", async () => {
+    let coercions = 0;
+    let encodeCalls = 0;
+    const callable = Object.assign(() => {}, {
+      frameBytes: Buffer.from("forbidden"),
+      toString() {
+        coercions += 1;
+        return "callable";
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { callable }
+        })
+      },
+      encodeOutcome: (outcome) => {
+        encodeCalls += 1;
+        return Buffer.from(String(outcome.payload.callable));
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(encodeCalls, 0);
+    assert.equal(coercions, 0);
+  });
+
+  it("rejects unsupported exotic admitted carrier representations", async () => {
+    let exotic = new Date("2026-08-03T00:00:00Z");
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { exotic }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const value of [exotic, new Map([["answer", 42]]), new Uint16Array([42])]) {
+      exotic = value;
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_OUTCOME"
+      });
+    }
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("rejects inherited outcome accessors without executing them", async () => {
+    let getterCalls = 0;
+    const inherited = Object.create({
+      get status() {
+        getterCalls += 1;
+        this.payload = { frameBytes: Buffer.from("forbidden") };
+        return "ok";
+      }
+    });
+    inherited.requestId = decodeEffectRequest(REQUEST).requestId.toString("hex");
+    inherited.payload = { value: 41 };
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => inherited
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(getterCalls, 0);
   });
 });
 

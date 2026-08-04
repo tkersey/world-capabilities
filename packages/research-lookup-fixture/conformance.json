@@ -27,6 +27,10 @@
       "passed": true
     },
     {
+      "id": "items-only-response-schema",
+      "passed": true
+    },
+    {
       "id": "forbidden-world-evidence-rejected",
       "passed": true
     },

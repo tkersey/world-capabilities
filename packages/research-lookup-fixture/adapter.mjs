@@ -3,15 +3,15 @@ const packManifest = {
   packageName: "@tkersey/world-capabilities/research-lookup-fixture",
   authorityLabels: ["research.fixture"],
   supportedActuationClasses: ["research"],
-  supportedActuatorRefs: ["actuator.research-lookup-fixture.v1"],
-  supportedDescriptorFingerprints: ["desc.research-lookup-fixture.v1"],
+  supportedActuatorRefs: ["actuator.research-lookup-fixture.v2"],
+  supportedDescriptorFingerprints: ["desc.research-lookup-fixture.v2"],
   supportedResponseStatuses: ["ok", "rejected", "failed"],
   secretRequirements: []
 };
 
 const QUERY = "portable algebraic effects";
-const MAXIMUM_QUERY_BYTES = 4096;
-const MAXIMUM_ITEMS = 2n;
+const MAXIMUM_QUERY_BYTES = 512;
+const MAXIMUM_U32 = 0xffff_ffff;
 const FORBIDDEN_EVIDENCE_NORMAL_FORMS = new Set([
   "turnreceiptbytes",
   "archiveappendbatchbytes",
@@ -32,18 +32,16 @@ const FORBIDDEN_EVIDENCE_NORMAL_FORMS = new Set([
   "applicationmanifest"
 ]);
 const RESPONSE = Object.freeze({
-  first: Object.freeze({
-    title: "Effect rows as application boundaries",
-    summary: "Static closure leaves authority outside the guest."
-  }),
-  second: Object.freeze({
-    title: "Portable continuations",
-    summary: "Canonical Frames resume in fresh WASM instances."
-  }),
-  digestResult: Object.freeze({
-    digest: "Static closure keeps authority external; canonical Frames keep continuation portable.",
-    itemCount: 2n
-  })
+  items: Object.freeze([
+    Object.freeze({
+      title: "Effect rows as application boundaries",
+      summary: "Static closure leaves authority outside the guest."
+    }),
+    Object.freeze({
+      title: "Portable continuations",
+      summary: "Canonical Frames resume in fresh WASM instances."
+    })
+  ])
 });
 
 function status(hostRequest, wanted, fallback = "rejected") {
@@ -98,7 +96,7 @@ function hostilePayloadReason(value, depth = 0) {
   return null;
 }
 
-function requestReason(context, hostRequest) {
+function requestAdmissionReason(context, hostRequest) {
   if (!hostRequest || typeof hostRequest !== "object") return "host_request_not_object";
   if (typeof hostRequest.requestId !== "string" || hostRequest.requestId.length === 0) {
     return "missing_request_id";
@@ -124,16 +122,21 @@ function requestReason(context, hostRequest) {
   }
   const policyReason = packagePolicyReason(context);
   if (policyReason) return policyReason;
-  const hostile = hostilePayloadReason(hostRequest.payload);
+  return null;
+}
+
+function requestPayloadReason(payload, maximumItems) {
+  const hostile = hostilePayloadReason(payload);
   if (hostile) return hostile;
-  const query = hostRequest.payload?.query;
+  const query = payload?.query;
   if (typeof query !== "string" ||
       new TextEncoder().encode(query).length === 0 ||
       new TextEncoder().encode(query).length > MAXIMUM_QUERY_BYTES) {
     return "malformed_research_query";
   }
-  if (typeof hostRequest.payload?.maximumItems !== "bigint" ||
-      hostRequest.payload.maximumItems !== MAXIMUM_ITEMS) {
+  if (!Number.isInteger(maximumItems) ||
+      maximumItems < 0 ||
+      maximumItems > MAXIMUM_U32) {
     return "invalid_maximum_items";
   }
   if (query !== QUERY) return "unsupported_fixture_query";
@@ -145,12 +148,19 @@ export function manifest() {
 }
 
 export async function preflight(context, hostRequest) {
-  const reason = requestReason(context, hostRequest);
-  if (reason) return rejection(hostRequest, reason);
+  const admissionReason = requestAdmissionReason(context, hostRequest);
+  if (admissionReason) return rejection(hostRequest, admissionReason);
+  const payload = Object.fromEntries(Object.entries(hostRequest?.payload ?? {}));
+  const maximumItems = payload.maximumItems;
+  const payloadReason = requestPayloadReason(payload, maximumItems);
+  if (payloadReason) return rejection(hostRequest, payloadReason);
   return {
     requestId: hostRequest.requestId,
     status: "ok",
-    payload: { admitted: true }
+    payload: {
+      admitted: true,
+      maximumItems
+    }
   };
 }
 
@@ -159,9 +169,13 @@ export async function resolve(context, hostRequest) {
   if (admitted.status !== "ok") return admitted;
   context.effectAttempted = (context.effectAttempted ?? 0) + 1;
   return {
-    requestId: hostRequest.requestId,
-    status: status(hostRequest, "ok"),
-    payload: structuredClone(RESPONSE)
+    requestId: admitted.requestId,
+    status: admitted.status,
+    payload: {
+      items: structuredClone(
+        RESPONSE.items.slice(0, admitted.payload.maximumItems)
+      )
+    }
   };
 }
 
@@ -169,8 +183,8 @@ export async function dryRun(context, hostRequest) {
   const admitted = await preflight(context, hostRequest);
   if (admitted.status !== "ok") return admitted;
   return {
-    requestId: hostRequest.requestId,
-    status: "ok",
+    requestId: admitted.requestId,
+    status: admitted.status,
     payload: { wouldResolve: true, effect: false }
   };
 }
