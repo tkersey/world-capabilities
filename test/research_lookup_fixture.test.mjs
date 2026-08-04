@@ -171,6 +171,19 @@ describe("research.lookup.v2 fixture pack", () => {
     );
   });
 
+  it("names the exact published World release in capability documentation", async () => {
+    const releaseLabel = `World \`${corpus.worldRelease.tag}\``;
+    const documentation = await Promise.all([
+      readFile("README.md", "utf8"),
+      readFile(`${packageRoot}/README.md`, "utf8"),
+      readFile(`${packageRoot}/non-claims.md`, "utf8")
+    ]);
+
+    for (const source of documentation) {
+      assert.ok(source.includes(releaseLabel));
+    }
+  });
+
   it("rejects excessive results and capability-authored World evidence", async () => {
     const huge = "x".repeat(64 * 1024);
     const excessive = researchLookupFixtureBinding({
