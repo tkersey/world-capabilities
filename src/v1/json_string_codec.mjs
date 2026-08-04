@@ -30,7 +30,9 @@ function assertJsonValue(value, path, depth) {
     for (let index = 0; index < value.length; index += 1) assertJsonValue(value[index], `${path}[${index}]`, depth + 1);
     return;
   }
-  if (typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) fail("ERR_CAPABILITY_V1_JSON_VALUE", path);
+  if (typeof value !== "object") fail("ERR_CAPABILITY_V1_JSON_VALUE", path);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) fail("ERR_CAPABILITY_V1_JSON_VALUE", path);
   const entries = Object.entries(value);
   if (entries.length > 1024) fail("ERR_CAPABILITY_V1_JSON_COUNT", path);
   for (const [key, child] of entries) assertJsonValue(child, `${path}.${key}`, depth + 1);

@@ -8,8 +8,10 @@ import {
   createEffectResult,
   decodeEffectRequest,
   decodeEffectResult,
+  decodeJsonStringValue,
   decodeStringValue,
   effectInterfaceId,
+  encodeJsonStringValue,
   stringValueSchemaId
 } from "../src/v1/index.mjs";
 
@@ -228,6 +230,31 @@ describe("CapabilityRouterV1 authority boundary", () => {
 
     assert.equal(resolved.result.status, EffectStatus.ok);
     assert.equal(semanticReadCalls, 0);
+  });
+
+  it("keeps standard JSON bindings compatible with admitted outcome snapshots", async () => {
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { nested: { values: [1, 2, 3] } }
+        })
+      },
+      encodeOutcome: (outcome) => encodeJsonStringValue(outcome.payload)
+    })] });
+
+    const resolved = await router.resolve({}, REQUEST);
+
+    assert.deepEqual(
+      decodeJsonStringValue(resolved.result.resultBytes),
+      { nested: { values: [1, 2, 3] } }
+    );
   });
 
   it("rejects inherited outcome accessors without executing them", async () => {
