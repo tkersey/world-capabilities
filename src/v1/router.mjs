@@ -216,7 +216,8 @@ function admitOutcome(value, path = "$", depth = 0) {
   if (isArray) {
     const lengthDescriptor = descriptors.length;
     if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value") ||
-        !Number.isSafeInteger(lengthDescriptor.value) || lengthDescriptor.value < 0) {
+        !Number.isSafeInteger(lengthDescriptor.value) || lengthDescriptor.value < 0 ||
+        lengthDescriptor.value > 0xffff_ffff) {
       fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.length`);
     }
     arrayLength = lengthDescriptor.value;

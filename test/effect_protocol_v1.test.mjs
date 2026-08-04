@@ -400,6 +400,46 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(encodeCalls, 0);
   });
 
+  it("rejects proxy array lengths outside the JavaScript array domain", async () => {
+    let encodeCalls = 0;
+    const values = new Proxy([], {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === "length") {
+          return {
+            value: 0x1_0000_0000,
+            writable: true,
+            enumerable: false,
+            configurable: false
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { values }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(encodeCalls, 0);
+  });
+
   it("rejects evidence-bearing byte carrier extensions before copying", async () => {
     let carrier;
     let encodeCalls = 0;
