@@ -189,17 +189,17 @@ function admitOutcome(value, path = "$", depth = 0) {
   if (!value || typeof value !== "object") return value;
   let descriptors;
   let prototype;
+  let isArray;
   try {
-    descriptors = Object.getOwnPropertyDescriptors(value);
     prototype = Object.getPrototypeOf(value);
+    isArray = Array.isArray(value);
+    if (Buffer.isBuffer(value)) return Buffer.from(value);
+    if (ArrayBuffer.isView(value) && prototype === Uint8Array.prototype) {
+      return new Uint8Array(value);
+    }
+    descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
-  }
-  const isArray = Array.isArray(value);
-  const isBuffer = Buffer.isBuffer(value);
-  const isUint8Array = !isBuffer && ArrayBuffer.isView(value) && prototype === Uint8Array.prototype;
-  if (isBuffer || isUint8Array) {
-    return admitByteCarrier(descriptors, isBuffer, path);
   }
   if (!isArray && prototype !== Object.prototype && prototype !== null) {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
@@ -241,24 +241,6 @@ function admitOutcome(value, path = "$", depth = 0) {
     });
   }
   return Object.freeze(admitted);
-}
-
-function admitByteCarrier(descriptors, isBuffer, path) {
-  const keys = Reflect.ownKeys(descriptors);
-  const admitted = isBuffer ? Buffer.alloc(keys.length) : new Uint8Array(keys.length);
-  for (let index = 0; index < keys.length; index += 1) {
-    const key = String(index);
-    if (keys[index] !== key || !Object.hasOwn(descriptors, key)) {
-      fail("ERR_CAPABILITY_V1_OUTCOME", path);
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor || !Object.hasOwn(descriptor, "value") ||
-        !Number.isInteger(descriptor.value) || descriptor.value < 0 || descriptor.value > 0xff) {
-      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${key}`);
-    }
-    admitted[index] = descriptor.value;
-  }
-  return admitted;
 }
 
 function semanticConfigurationIdentity(binding) {

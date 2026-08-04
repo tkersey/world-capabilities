@@ -288,6 +288,8 @@ describe("CapabilityRouterV1 authority boundary", () => {
     const values = [1, 2, 3];
     const buffer = Buffer.from([4, 5, 6]);
     const bytes = new Uint8Array([7, 8, 9]);
+    const getOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
+    let byteCarrierDescriptorCalls = 0;
     const router = new CapabilityRouterV1({ bindings: [binding({
       adapter: {
         preflight: async (_context, request) => ({
@@ -315,9 +317,49 @@ describe("CapabilityRouterV1 authority boundary", () => {
       }
     })] });
 
-    const resolved = await router.resolve({}, REQUEST);
+    Object.getOwnPropertyDescriptors = (value) => {
+      if (value === buffer || value === bytes) byteCarrierDescriptorCalls += 1;
+      return getOwnPropertyDescriptors(value);
+    };
+    let resolved;
+    try {
+      resolved = await router.resolve({}, REQUEST);
+    } finally {
+      Object.getOwnPropertyDescriptors = getOwnPropertyDescriptors;
+    }
 
     assert.deepEqual(resolved.result.resultBytes, Buffer.from([0x2a]));
+    assert.equal(byteCarrierDescriptorCalls, 0);
+  });
+
+  it("rejects revoked outcome proxies through the capability error surface", async () => {
+    const target = {
+      requestId: decodeEffectRequest(REQUEST).requestId.toString("hex"),
+      status: "ok",
+      payload: { value: 41 }
+    };
+    let revoke;
+    const revocable = Proxy.revocable(target, {
+      getPrototypeOf(object) {
+        revoke();
+        return Reflect.getPrototypeOf(object);
+      }
+    });
+    revoke = revocable.revoke;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => revocable.proxy
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
   });
 
   it("rejects unsupported exotic admitted carrier representations", async () => {
