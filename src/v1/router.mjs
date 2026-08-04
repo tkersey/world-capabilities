@@ -34,6 +34,10 @@ const FORBIDDEN_OUTPUT_KEYS = new Set([
 ]);
 const FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS = new Set([...FORBIDDEN_OUTPUT_KEYS]
   .map((key) => key.replace(/[^a-z0-9]/gi, "").toLowerCase()));
+const TYPED_ARRAY_LENGTH_GETTER = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype),
+  "length"
+).get;
 
 export class CapabilityRouterV1 {
   #bindings;
@@ -186,6 +190,7 @@ function assertOutcome(value, request) {
 
 function admitOutcome(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
+  if (typeof value === "function") fail("ERR_CAPABILITY_V1_OUTCOME", path);
   if (!value || typeof value !== "object") return value;
   let descriptors;
   let prototype;
@@ -261,12 +266,14 @@ function admitOutcome(value, path = "$", depth = 0) {
 
 function admitByteCarrier(value, kind, path) {
   let keys;
+  let length;
   try {
+    length = TYPED_ARRAY_LENGTH_GETTER.call(value);
     keys = Reflect.ownKeys(value);
   } catch {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
   }
-  for (let index = value.length; index < keys.length; index += 1) {
+  for (let index = length; index < keys.length; index += 1) {
     const key = keys[index];
     if (typeof key === "string") {
       const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();

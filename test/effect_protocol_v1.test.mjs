@@ -435,6 +435,85 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(encodeCalls, 0);
   });
 
+  it("derives byte-carrier extent without reading shadowed length", async () => {
+    let carrier;
+    let lengthReads = 0;
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { carrier }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const lengthDescriptor of [
+      { value: Number.MAX_SAFE_INTEGER },
+      { get() { lengthReads += 1; throw new Error("must not execute"); } }
+    ]) {
+      carrier = Buffer.from([1, 2, 3]);
+      Object.defineProperty(carrier, "frameBytes", { value: Buffer.from("forbidden") });
+      Object.defineProperty(carrier, "length", lengthDescriptor);
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE"
+      });
+    }
+
+    carrier = new Proxy(Buffer.from([4, 5, 6]), {});
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(lengthReads, 0);
+    assert.equal(encodeCalls, 0);
+  });
+
+  it("rejects callable outcome values before an encoder can execute them", async () => {
+    let coercions = 0;
+    let encodeCalls = 0;
+    const callable = Object.assign(() => {}, {
+      frameBytes: Buffer.from("forbidden"),
+      toString() {
+        coercions += 1;
+        return "callable";
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { callable }
+        })
+      },
+      encodeOutcome: (outcome) => {
+        encodeCalls += 1;
+        return Buffer.from(String(outcome.payload.callable));
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_OUTCOME"
+    });
+    assert.equal(encodeCalls, 0);
+    assert.equal(coercions, 0);
+  });
+
   it("rejects unsupported exotic admitted carrier representations", async () => {
     let exotic = new Date("2026-08-03T00:00:00Z");
     let encodeCalls = 0;
