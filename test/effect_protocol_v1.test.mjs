@@ -75,6 +75,33 @@ describe("World Effect protocol v1", () => {
       resultSchemaId: Buffer.alloc(32)
     }), { code: "ERR_CAPABILITY_V1_RESULT" });
   });
+
+  it("rejects null-prototype JSON accessors without executing them", () => {
+    let getterCalls = 0;
+    const value = Object.create(null);
+    Object.defineProperty(value, "answer", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return getterCalls === 1 ? 42 : Number.NaN;
+      }
+    });
+
+    assert.throws(() => encodeJsonStringValue(value), {
+      code: "ERR_CAPABILITY_V1_JSON_VALUE"
+    });
+    assert.equal(getterCalls, 0);
+
+    const admitted = Object.create(null);
+    Object.defineProperty(admitted, "answer", {
+      value: 42,
+      enumerable: true
+    });
+    assert.deepEqual(
+      decodeJsonStringValue(encodeJsonStringValue(admitted)),
+      { answer: 42 }
+    );
+  });
 });
 
 describe("CapabilityRouterV1 authority boundary", () => {
