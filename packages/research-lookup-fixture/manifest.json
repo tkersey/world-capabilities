@@ -24,7 +24,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "677efd4c6918662bdc21df5ae3b9f37266509000d91241272771e3f630604e08"
+          "57f6e52015041673d8d88714578ce54b9fce92c9056ddff8daa3a81aa798224c"
         ],
         "authorityRequirements": "128",
         "interfaceId": "7207842d4663e1e93d3a1225faa74149bc0a7807b1dada81416cb7ce1e2c0807",
@@ -40,10 +40,10 @@
   "metadata": {
     "mode": "deterministic-research-fixture",
     "network": false,
-    "worldApplicationRelease": "v2.0.0-rc.1"
+    "worldApplicationRelease": "v2.0.0"
   },
   "packageName": "@tkersey/world-capabilities/research-lookup-fixture",
-  "packageVersion": "2.0.0",
+  "packageVersion": "2.0.1",
   "packFingerprint": "01f940946793b81e767d9b8e7a85e4f2e36cca545ae3146b05a93d7f37627ab0",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
