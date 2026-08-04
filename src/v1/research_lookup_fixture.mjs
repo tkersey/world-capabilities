@@ -50,7 +50,7 @@ export function decodeResearchRequest(encoded) {
   return Object.freeze({ query, maximumItems });
 }
 
-export function encodeResearchResponse(value, maximumItems = MAXIMUM_ITEMS) {
+export function encodeResearchResponse(value, maximumItems) {
   if (!Number.isInteger(maximumItems) || maximumItems < 0 || maximumItems > MAXIMUM_U32) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }

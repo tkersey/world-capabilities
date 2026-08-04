@@ -170,6 +170,20 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.equal(effectContext.effectAttempted, 1);
   });
 
+  it("requires an explicit request limit at the public response encoder", () => {
+    assert.throws(
+      () => encodeResearchResponse(corpus.response),
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+    );
+    assert.deepEqual(
+      decodeResearchResponse(encodeResearchResponse(
+        corpus.response,
+        corpus.request.maximumItems
+      )),
+      corpus.response
+    );
+  });
+
   it("rejects malformed payload bytes before adapter preflight or effect", async () => {
     let preflightCalls = 0;
     let effectCalls = 0;
@@ -309,7 +323,7 @@ describe("research.lookup.v2 fixture pack", () => {
         const ownKeys = Object.keys(items);
 
         assert.throws(
-          () => encodeResearchResponse({ items }),
+          () => encodeResearchResponse({ items }, 8),
           { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
         );
         assert.equal(items.length, length);
@@ -355,7 +369,7 @@ describe("research.lookup.v2 fixture pack", () => {
     });
 
     assert.deepEqual(
-      decodeResearchResponse(encodeResearchResponse({ items })),
+      decodeResearchResponse(encodeResearchResponse({ items }, 8)),
       { items: [corpus.response.items[0]] }
     );
 
@@ -368,7 +382,7 @@ describe("research.lookup.v2 fixture pack", () => {
       }
     });
     assert.equal(
-      decodeResearchResponse(encodeResearchResponse({ items: misleading })).items.length,
+      decodeResearchResponse(encodeResearchResponse({ items: misleading }, 8)).items.length,
       1
     );
 
@@ -377,7 +391,7 @@ describe("research.lookup.v2 fixture pack", () => {
       get: () => { throw new Error("adapter getter failed"); }
     });
     assert.throws(
-      () => encodeResearchResponse({ items: throwing }),
+      () => encodeResearchResponse({ items: throwing }, 8),
       { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
     );
   });
@@ -387,7 +401,7 @@ describe("research.lookup.v2 fixture pack", () => {
     Object.setPrototypeOf(items, { 0: corpus.response.items[0] });
 
     assert.throws(
-      () => encodeResearchResponse({ items }),
+      () => encodeResearchResponse({ items }, 8),
       { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
     );
   });
@@ -398,7 +412,7 @@ describe("research.lookup.v2 fixture pack", () => {
     };
 
     assert.deepEqual(
-      decodeResearchResponse(encodeResearchResponse(response)),
+      decodeResearchResponse(encodeResearchResponse(response, 8)),
       response
     );
   });
@@ -476,7 +490,7 @@ describe("research.lookup.v2 fixture pack", () => {
 
     for (const response of [hiddenItems, { items: [hiddenFields] }, symbolField]) {
       assert.throws(
-        () => encodeResearchResponse(response),
+        () => encodeResearchResponse(response, 8),
         { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
       );
     }
@@ -521,7 +535,7 @@ describe("research.lookup.v2 fixture pack", () => {
       { items: accessorItems }
     ]) {
       assert.throws(
-        () => encodeResearchResponse(response),
+        () => encodeResearchResponse(response, 8),
         { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
       );
     }
