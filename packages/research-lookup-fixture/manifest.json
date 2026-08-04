@@ -13,7 +13,7 @@
     "research.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "177299de9cc95c26d62e1689667809a4022bb960bddc516f1d0b3e54168ad097",
+    "adapter.mjs": "b7f5922f724d898ecfa33b3c5e01dc03970cda24dc44bcd766b0a915a1080686",
     "corpus.json": "44aa6f571132058673589bf4957fcffff862a61f2fe1941cb90ee4c1f1ea97a5"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
@@ -44,7 +44,7 @@
   },
   "packageName": "@tkersey/world-capabilities/research-lookup-fixture",
   "packageVersion": "2.0.0",
-  "packFingerprint": "86a957732bda74919cc7854adb2e12f2f1a008706b63c6f6bb04e1c978aad457",
+  "packFingerprint": "01f940946793b81e767d9b8e7a85e4f2e36cca545ae3146b05a93d7f37627ab0",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

@@ -96,7 +96,7 @@ function hostilePayloadReason(value, depth = 0) {
   return null;
 }
 
-function requestReason(context, hostRequest, payload, maximumItems) {
+function requestAdmissionReason(context, hostRequest) {
   if (!hostRequest || typeof hostRequest !== "object") return "host_request_not_object";
   if (typeof hostRequest.requestId !== "string" || hostRequest.requestId.length === 0) {
     return "missing_request_id";
@@ -122,6 +122,10 @@ function requestReason(context, hostRequest, payload, maximumItems) {
   }
   const policyReason = packagePolicyReason(context);
   if (policyReason) return policyReason;
+  return null;
+}
+
+function requestPayloadReason(payload, maximumItems) {
   const hostile = hostilePayloadReason(payload);
   if (hostile) return hostile;
   const query = payload?.query;
@@ -144,10 +148,12 @@ export function manifest() {
 }
 
 export async function preflight(context, hostRequest) {
+  const admissionReason = requestAdmissionReason(context, hostRequest);
+  if (admissionReason) return rejection(hostRequest, admissionReason);
   const payload = Object.fromEntries(Object.entries(hostRequest?.payload ?? {}));
   const maximumItems = payload.maximumItems;
-  const reason = requestReason(context, hostRequest, payload, maximumItems);
-  if (reason) return rejection(hostRequest, reason);
+  const payloadReason = requestPayloadReason(payload, maximumItems);
+  if (payloadReason) return rejection(hostRequest, payloadReason);
   return {
     requestId: hostRequest.requestId,
     status: "ok",

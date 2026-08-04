@@ -204,6 +204,43 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.equal(effectContext.effectAttempted, 1);
   });
 
+  it("checks policy before taking the payload snapshot", async () => {
+    const pack = await loadPack("research-lookup-fixture");
+    const adapter = await importAdapter(pack.dir);
+    let getterCalls = 0;
+    const request = {
+      requestId: "research-policy-before-payload-snapshot",
+      idempotencyKey: "world:idem:research-policy-before-payload-snapshot",
+      target: {
+        descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
+        actuatorRef: pack.manifest.supportedActuatorRefs[0],
+        actuationClass: pack.manifest.supportedActuationClasses[0]
+      },
+      responseSchema: {
+        statuses: pack.manifest.supportedResponseStatuses
+      },
+      payload: {
+        query: corpus.request.query
+      }
+    };
+    Object.defineProperty(request.payload, "maximumItems", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        throw new Error("payload getter must not run before policy admission");
+      }
+    });
+
+    const rejected = await adapter.preflight(
+      context({ researchLookup: false }),
+      request
+    );
+
+    assert.equal(rejected.status, "rejected");
+    assert.equal(rejected.payload.reason, "research_lookup_policy_required");
+    assert.equal(getterCalls, 0);
+  });
+
   it("rejects adapter results above the request-specific item ceiling", async () => {
     const excessive = researchLookupFixtureBinding({
       adapter: {
