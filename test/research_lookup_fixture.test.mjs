@@ -168,6 +168,42 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.deepEqual(resolved.payload.items, []);
   });
 
+  it("binds an accessor-backed request limit to one admitted value", async () => {
+    const pack = await loadPack("research-lookup-fixture");
+    const adapter = await importAdapter(pack.dir);
+    let getterCalls = 0;
+    const request = {
+      requestId: "research-accessor-backed-request-limit",
+      idempotencyKey: "world:idem:research-accessor-backed-request-limit",
+      target: {
+        descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
+        actuatorRef: pack.manifest.supportedActuatorRefs[0],
+        actuationClass: pack.manifest.supportedActuationClasses[0]
+      },
+      responseSchema: {
+        statuses: pack.manifest.supportedResponseStatuses
+      },
+      payload: {
+        query: corpus.request.query
+      }
+    };
+    Object.defineProperty(request.payload, "maximumItems", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        return getterCalls === 1 ? 0 : 2;
+      }
+    });
+    const effectContext = context({ researchLookup: true });
+
+    const resolved = await adapter.resolve(effectContext, request);
+
+    assert.equal(resolved.status, "ok");
+    assert.deepEqual(resolved.payload.items, []);
+    assert.equal(getterCalls, 1);
+    assert.equal(effectContext.effectAttempted, 1);
+  });
+
   it("rejects adapter results above the request-specific item ceiling", async () => {
     const excessive = researchLookupFixtureBinding({
       adapter: {

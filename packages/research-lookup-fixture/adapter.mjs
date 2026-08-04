@@ -96,7 +96,7 @@ function hostilePayloadReason(value, depth = 0) {
   return null;
 }
 
-function requestReason(context, hostRequest) {
+function requestReason(context, hostRequest, payload, maximumItems) {
   if (!hostRequest || typeof hostRequest !== "object") return "host_request_not_object";
   if (typeof hostRequest.requestId !== "string" || hostRequest.requestId.length === 0) {
     return "missing_request_id";
@@ -122,17 +122,17 @@ function requestReason(context, hostRequest) {
   }
   const policyReason = packagePolicyReason(context);
   if (policyReason) return policyReason;
-  const hostile = hostilePayloadReason(hostRequest.payload);
+  const hostile = hostilePayloadReason(payload);
   if (hostile) return hostile;
-  const query = hostRequest.payload?.query;
+  const query = payload?.query;
   if (typeof query !== "string" ||
       new TextEncoder().encode(query).length === 0 ||
       new TextEncoder().encode(query).length > MAXIMUM_QUERY_BYTES) {
     return "malformed_research_query";
   }
-  if (!Number.isInteger(hostRequest.payload?.maximumItems) ||
-      hostRequest.payload.maximumItems < 0 ||
-      hostRequest.payload.maximumItems > MAXIMUM_U32) {
+  if (!Number.isInteger(maximumItems) ||
+      maximumItems < 0 ||
+      maximumItems > MAXIMUM_U32) {
     return "invalid_maximum_items";
   }
   if (query !== QUERY) return "unsupported_fixture_query";
@@ -144,14 +144,16 @@ export function manifest() {
 }
 
 export async function preflight(context, hostRequest) {
-  const reason = requestReason(context, hostRequest);
+  const payload = Object.fromEntries(Object.entries(hostRequest?.payload ?? {}));
+  const maximumItems = payload.maximumItems;
+  const reason = requestReason(context, hostRequest, payload, maximumItems);
   if (reason) return rejection(hostRequest, reason);
   return {
     requestId: hostRequest.requestId,
     status: "ok",
     payload: {
       admitted: true,
-      maximumItems: hostRequest.payload.maximumItems
+      maximumItems
     }
   };
 }
