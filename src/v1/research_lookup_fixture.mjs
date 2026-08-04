@@ -54,14 +54,12 @@ export function encodeResearchResponse(value, maximumItems = MAXIMUM_ITEMS) {
   if (!Number.isInteger(maximumItems) || maximumItems < 0 || maximumItems > MAXIMUM_U32) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
-  if (!hasExactOwnKeys(value, ["items"])) {
-    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
-  }
-  const items = readResponseProperty(value, "items", "items");
+  const [items] = readExactDataProduct(value, ["items"]);
   if (!isResponseArray(items)) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
-  const itemCount = readResponseProperty(items, "length", "items");
+  const itemDescriptors = snapshotOwnPropertyDescriptors(items, "items");
+  const itemCount = readOwnDataValue(itemDescriptors, "length", "items");
   if (!Number.isInteger(itemCount) ||
       itemCount < 0 ||
       itemCount > MAXIMUM_ITEMS ||
@@ -73,10 +71,7 @@ export function encodeResearchResponse(value, maximumItems = MAXIMUM_ITEMS) {
   const encodedItems = [];
   for (let index = 0; index < itemCount; index += 1) {
     const label = `items[${index}]`;
-    if (!hasOwnResponseProperty(items, index, label)) {
-      fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
-    }
-    const item = readResponseProperty(items, index, label);
+    const item = readOwnDataValue(itemDescriptors, index, label);
     encodedItems.push(encodeResearchItem(item, label));
   }
   return Buffer.concat([length, ...encodedItems]);
@@ -97,32 +92,33 @@ export function decodeResearchResponse(encoded) {
 }
 
 function encodeResearchItem(value, label) {
-  if (!hasExactOwnKeys(value, ["summary", "title"])) {
-    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
-  }
+  const [summary, title] = readExactDataProduct(
+    value,
+    ["summary", "title"],
+    label
+  );
   return Buffer.concat([
     encodeString(
-      readResponseProperty(value, "title", `${label}.title`),
+      title,
       MAXIMUM_TITLE_BYTES,
       `${label}.title`
     ),
     encodeString(
-      readResponseProperty(value, "summary", `${label}.summary`),
+      summary,
       MAXIMUM_SUMMARY_BYTES,
       `${label}.summary`
     )
   ]);
 }
 
-function hasExactOwnKeys(value, expectedKeys) {
-  if (!value || typeof value !== "object") return false;
-  try {
-    const keys = Reflect.ownKeys(value);
-    return keys.length === expectedKeys.length &&
-      expectedKeys.every((key) => keys.includes(key));
-  } catch {
-    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
+function readExactDataProduct(value, expectedKeys, label) {
+  const descriptors = snapshotOwnPropertyDescriptors(value, label);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length !== expectedKeys.length ||
+      !expectedKeys.every((key) => keys.includes(key))) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
+  return expectedKeys.map((key) => readOwnDataValue(descriptors, key, label));
 }
 
 function isResponseArray(value) {
@@ -133,20 +129,23 @@ function isResponseArray(value) {
   }
 }
 
-function hasOwnResponseProperty(value, key, label) {
+function snapshotOwnPropertyDescriptors(value, label) {
+  if (!value || typeof value !== "object") {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  }
   try {
-    return Object.hasOwn(value, key);
+    return Object.getOwnPropertyDescriptors(value);
   } catch {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
 }
 
-function readResponseProperty(value, key, label) {
-  try {
-    return value[key];
-  } catch {
+function readOwnDataValue(descriptors, key, label) {
+  const descriptor = descriptors[key];
+  if (!descriptor || !Object.hasOwn(descriptor, "value")) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
+  return descriptor.value;
 }
 
 function decodeResearchItem(reader, label) {

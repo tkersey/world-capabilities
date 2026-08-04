@@ -482,6 +482,52 @@ describe("research.lookup.v2 fixture pack", () => {
     }
   });
 
+  it("rejects accessor-backed response state without executing getters", () => {
+    let getterCalls = 0;
+    const accessorResponse = {};
+    Object.defineProperty(accessorResponse, "items", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        accessorResponse.rendered = "forbidden";
+        return corpus.response.items;
+      }
+    });
+
+    const accessorItem = { summary: corpus.response.items[0].summary };
+    Object.defineProperty(accessorItem, "title", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        accessorItem.rank = 1;
+        return corpus.response.items[0].title;
+      }
+    });
+
+    const accessorItems = [];
+    Object.defineProperty(accessorItems, 0, {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        accessorItems.rendered = "forbidden";
+        return corpus.response.items[0];
+      }
+    });
+    accessorItems.length = 1;
+
+    for (const response of [
+      accessorResponse,
+      { items: [accessorItem] },
+      { items: accessorItems }
+    ]) {
+      assert.throws(
+        () => encodeResearchResponse(response),
+        { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+      );
+    }
+    assert.equal(getterCalls, 0);
+  });
+
   it("statically inspects pack source without executing its adapter", async () => {
     const root = await mkdtemp(join(tmpdir(), "research-lookup-static-pack-"));
     try {
