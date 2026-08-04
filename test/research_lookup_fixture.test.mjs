@@ -276,13 +276,43 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.deepEqual(first.result.encodedBytes, retried.result.encodedBytes);
   });
 
-  it("contains no capability-owned digest formatting surface", async () => {
-    const productionSources = await Promise.all([
-      readFile("src/v1/research_lookup_fixture.mjs", "utf8"),
-      readFile(`${packageRoot}/adapter.mjs`, "utf8")
-    ]);
-    for (const source of productionSources) {
-      assert.doesNotMatch(source, /digestResult|itemCount|preformatted/i);
+  it("rejects every non-items-only response product", async () => {
+    const invalidPayloads = [
+      { items: corpus.response.items, rendered: "forbidden" },
+      {
+        items: [
+          { ...corpus.response.items[0], rank: 1 },
+          corpus.response.items[1]
+        ]
+      }
+    ];
+
+    for (const payload of invalidPayloads) {
+      const binding = researchLookupFixtureBinding({
+        adapter: {
+          preflight: async (_context, request) => ({
+            requestId: request.requestId,
+            status: "ok",
+            payload: {}
+          }),
+          resolve: async (effectContext, request) => {
+            effectContext.effectAttempted += 1;
+            return {
+              requestId: request.requestId,
+              status: "ok",
+              payload
+            };
+          }
+        }
+      });
+      const effectContext = context({ researchLookup: true });
+
+      await assert.rejects(
+        () => new CapabilityRouterV1({ bindings: [binding] })
+          .resolve(effectContext, requestBytes),
+        { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+      );
+      assert.equal(effectContext.effectAttempted, 1);
     }
   });
 
