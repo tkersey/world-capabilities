@@ -362,6 +362,41 @@ describe("CapabilityRouterV1 authority boundary", () => {
     });
   });
 
+  it("rejects evidence-bearing byte carrier extensions before copying", async () => {
+    let carrier;
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { carrier }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const [value, key] of [
+      [Buffer.from([1, 2, 3]), "frameBytes"],
+      [new Uint8Array([4, 5, 6]), "frame_bytes"]
+    ]) {
+      carrier = value;
+      Object.defineProperty(carrier, key, { value: Buffer.from("forbidden") });
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE"
+      });
+    }
+    assert.equal(encodeCalls, 0);
+  });
+
   it("rejects unsupported exotic admitted carrier representations", async () => {
     let exotic = new Date("2026-08-03T00:00:00Z");
     let encodeCalls = 0;

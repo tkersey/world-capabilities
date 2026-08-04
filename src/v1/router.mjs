@@ -190,16 +190,19 @@ function admitOutcome(value, path = "$", depth = 0) {
   let descriptors;
   let prototype;
   let isArray;
+  let byteCarrierKind = null;
   try {
     prototype = Object.getPrototypeOf(value);
     isArray = Array.isArray(value);
-    if (Buffer.isBuffer(value)) return Buffer.from(value);
-    if (ArrayBuffer.isView(value) && prototype === Uint8Array.prototype) {
-      return new Uint8Array(value);
-    }
-    descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Buffer.isBuffer(value)) byteCarrierKind = "buffer";
+    else if (ArrayBuffer.isView(value) && prototype === Uint8Array.prototype) {
+      byteCarrierKind = "uint8array";
+    } else descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  if (byteCarrierKind !== null) {
+    return admitByteCarrier(value, byteCarrierKind, path);
   }
   if (!isArray && prototype !== Object.prototype && prototype !== null) {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
@@ -241,6 +244,30 @@ function admitOutcome(value, path = "$", depth = 0) {
     });
   }
   return Object.freeze(admitted);
+}
+
+function admitByteCarrier(value, kind, path) {
+  let keys;
+  try {
+    keys = Reflect.ownKeys(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  for (let index = value.length; index < keys.length; index += 1) {
+    const key = keys[index];
+    if (typeof key === "string") {
+      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+      }
+    }
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  try {
+    return kind === "buffer" ? Buffer.from(value) : new Uint8Array(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
 }
 
 function semanticConfigurationIdentity(binding) {
