@@ -107,9 +107,9 @@ function encodeResearchItem(value, label) {
 function hasExactOwnKeys(value, expectedKeys) {
   if (!value || typeof value !== "object") return false;
   try {
-    const keys = Object.keys(value);
+    const keys = Reflect.ownKeys(value);
     return keys.length === expectedKeys.length &&
-      expectedKeys.every((key) => Object.hasOwn(value, key));
+      expectedKeys.every((key) => keys.includes(key));
   } catch {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
   }

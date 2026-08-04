@@ -386,6 +386,32 @@ describe("research.lookup.v2 fixture pack", () => {
     }
   });
 
+  it("compares the complete own-key set for exact response products", () => {
+    const hiddenItems = { rendered: "forbidden" };
+    Object.defineProperty(hiddenItems, "items", {
+      value: corpus.response.items,
+      enumerable: false
+    });
+
+    const hiddenFields = { rank: 1, rendered: "forbidden" };
+    Object.defineProperties(hiddenFields, {
+      title: { value: corpus.response.items[0].title, enumerable: false },
+      summary: { value: corpus.response.items[0].summary, enumerable: false }
+    });
+
+    const symbolField = {
+      items: corpus.response.items,
+      [Symbol("forbidden")]: true
+    };
+
+    for (const response of [hiddenItems, { items: [hiddenFields] }, symbolField]) {
+      assert.throws(
+        () => encodeResearchResponse(response),
+        { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+      );
+    }
+  });
+
   it("statically inspects pack source without executing its adapter", async () => {
     const root = await mkdtemp(join(tmpdir(), "research-lookup-static-pack-"));
     try {
