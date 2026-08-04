@@ -188,15 +188,24 @@ function admitOutcome(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
   if (!value || typeof value !== "object") return value;
   let descriptors;
+  let prototype;
   try {
     descriptors = Object.getOwnPropertyDescriptors(value);
+    prototype = Object.getPrototypeOf(value);
   } catch {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
   }
   const isArray = Array.isArray(value);
+  const isBuffer = Buffer.isBuffer(value);
+  const isUint8Array = !isBuffer && ArrayBuffer.isView(value) && prototype === Uint8Array.prototype;
+  if (isBuffer || isUint8Array) {
+    return admitByteCarrier(descriptors, isBuffer, path);
+  }
+  if (!isArray && prototype !== Object.prototype && prototype !== null) {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
   const admitted = isArray ? [] : Object.create(null);
   let arrayLength = null;
-  if (isArray) Object.setPrototypeOf(admitted, null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const label = typeof key === "string" ? key : String(key);
     if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
@@ -232,6 +241,24 @@ function admitOutcome(value, path = "$", depth = 0) {
     });
   }
   return Object.freeze(admitted);
+}
+
+function admitByteCarrier(descriptors, isBuffer, path) {
+  const keys = Reflect.ownKeys(descriptors);
+  const admitted = isBuffer ? Buffer.alloc(keys.length) : new Uint8Array(keys.length);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = String(index);
+    if (keys[index] !== key || !Object.hasOwn(descriptors, key)) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", path);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+        !Number.isInteger(descriptor.value) || descriptor.value < 0 || descriptor.value > 0xff) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${key}`);
+    }
+    admitted[index] = descriptor.value;
+  }
+  return admitted;
 }
 
 function semanticConfigurationIdentity(binding) {

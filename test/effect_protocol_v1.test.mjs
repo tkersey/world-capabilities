@@ -257,6 +257,73 @@ describe("CapabilityRouterV1 authority boundary", () => {
     );
   });
 
+  it("preserves owned admitted carrier representations for binding encoders", async () => {
+    const values = [1, 2, 3];
+    const buffer = Buffer.from([4, 5, 6]);
+    const bytes = new Uint8Array([7, 8, 9]);
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { values, buffer, bytes }
+        })
+      },
+      encodeOutcome: (outcome) => {
+        assert.deepEqual(outcome.payload.values.map((value) => value * 2), [2, 4, 6]);
+        assert.deepEqual([...outcome.payload.values], values);
+        assert.equal(Buffer.isBuffer(outcome.payload.buffer), true);
+        assert.notStrictEqual(outcome.payload.buffer, buffer);
+        assert.deepEqual(outcome.payload.buffer, buffer);
+        assert.equal(outcome.payload.bytes instanceof Uint8Array, true);
+        assert.equal(Buffer.isBuffer(outcome.payload.bytes), false);
+        assert.notStrictEqual(outcome.payload.bytes, bytes);
+        assert.deepEqual(outcome.payload.bytes, bytes);
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    const resolved = await router.resolve({}, REQUEST);
+
+    assert.deepEqual(resolved.result.resultBytes, Buffer.from([0x2a]));
+  });
+
+  it("rejects unsupported exotic admitted carrier representations", async () => {
+    let exotic = new Date("2026-08-03T00:00:00Z");
+    let encodeCalls = 0;
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: { exotic }
+        })
+      },
+      encodeOutcome: () => {
+        encodeCalls += 1;
+        return Buffer.from([0x2a]);
+      }
+    })] });
+
+    for (const value of [exotic, new Map([["answer", 42]]), new Uint16Array([42])]) {
+      exotic = value;
+      await assert.rejects(() => router.resolve({}, REQUEST), {
+        code: "ERR_CAPABILITY_V1_OUTCOME"
+      });
+    }
+    assert.equal(encodeCalls, 0);
+  });
+
   it("rejects inherited outcome accessors without executing them", async () => {
     let getterCalls = 0;
     const inherited = Object.create({
@@ -280,7 +347,7 @@ describe("CapabilityRouterV1 authority boundary", () => {
     })] });
 
     await assert.rejects(() => router.resolve({}, REQUEST), {
-      code: "ERR_CAPABILITY_V1_STATUS"
+      code: "ERR_CAPABILITY_V1_OUTCOME"
     });
     assert.equal(getterCalls, 0);
   });
