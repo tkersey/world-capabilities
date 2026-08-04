@@ -141,6 +141,9 @@ function snapshotOwnPropertyDescriptors(value, label) {
 }
 
 function readOwnDataValue(descriptors, key, label) {
+  if (!Object.hasOwn(descriptors, key)) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  }
   const descriptor = descriptors[key];
   if (!descriptor || !Object.hasOwn(descriptor, "value")) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);

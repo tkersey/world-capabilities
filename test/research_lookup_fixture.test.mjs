@@ -447,6 +447,23 @@ describe("research.lookup.v2 fixture pack", () => {
     );
   });
 
+  it("rejects polluted descriptor map entries for sparse response positions", () => {
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "0");
+    Object.defineProperty(Object.prototype, "0", {
+      configurable: true,
+      value: { value: corpus.response.items[0] }
+    });
+    try {
+      assert.throws(
+        () => encodeResearchResponse({ items: Array(1) }, 8),
+        { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+      );
+    } finally {
+      if (previous) Object.defineProperty(Object.prototype, "0", previous);
+      else delete Object.prototype[0];
+    }
+  });
+
   it("preserves a leading BOM scalar in every ResearchItem Text field", () => {
     const response = {
       items: [{ title: "\uFEFFtitle", summary: "\uFEFFsummary" }]
