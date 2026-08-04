@@ -11,7 +11,7 @@ const packManifest = {
 
 const QUERY = "portable algebraic effects";
 const MAXIMUM_QUERY_BYTES = 512;
-const MAXIMUM_ITEMS = 2;
+const MAXIMUM_U32 = 0xffff_ffff;
 const FORBIDDEN_EVIDENCE_NORMAL_FORMS = new Set([
   "turnreceiptbytes",
   "archiveappendbatchbytes",
@@ -131,7 +131,8 @@ function requestReason(context, hostRequest) {
     return "malformed_research_query";
   }
   if (!Number.isInteger(hostRequest.payload?.maximumItems) ||
-      hostRequest.payload.maximumItems !== MAXIMUM_ITEMS) {
+      hostRequest.payload.maximumItems < 0 ||
+      hostRequest.payload.maximumItems > MAXIMUM_U32) {
     return "invalid_maximum_items";
   }
   if (query !== QUERY) return "unsupported_fixture_query";
@@ -159,7 +160,11 @@ export async function resolve(context, hostRequest) {
   return {
     requestId: hostRequest.requestId,
     status: status(hostRequest, "ok"),
-    payload: structuredClone(RESPONSE)
+    payload: {
+      items: structuredClone(
+        RESPONSE.items.slice(0, hostRequest.payload.maximumItems)
+      )
+    }
   };
 }
 

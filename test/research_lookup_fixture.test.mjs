@@ -73,14 +73,13 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.equal(admitted.status, "ok");
   });
 
-  it("rejects a request below the fixture's exact two-item response cardinality", async () => {
+  it("treats maximumItems as an upper bound on the fixture response", async () => {
     const pack = await loadPack("research-lookup-fixture");
     const adapter = await importAdapter(pack.dir);
-    const rejected = await adapter.preflight(
-      context({ researchLookup: true }),
-      {
-        requestId: "research-one-item",
-        idempotencyKey: "world:idem:research-one-item",
+    for (const maximumItems of [0, 1, 2, 3, 0xffff_ffff]) {
+      const request = {
+        requestId: `research-${maximumItems}-items`,
+        idempotencyKey: `world:idem:research-${maximumItems}-items`,
         target: {
           descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
           actuatorRef: pack.manifest.supportedActuatorRefs[0],
@@ -91,13 +90,51 @@ describe("research.lookup.v2 fixture pack", () => {
         },
         payload: {
           query: corpus.request.query,
-          maximumItems: 1
+          maximumItems
         }
-      }
-    );
+      };
+      const admitted = await adapter.preflight(
+        context({ researchLookup: true }),
+        request
+      );
+      assert.equal(admitted.status, "ok");
 
-    assert.equal(rejected.status, "rejected");
-    assert.equal(rejected.payload.reason, "invalid_maximum_items");
+      const resolved = await adapter.resolve(
+        context({ researchLookup: true }),
+        request
+      );
+      assert.equal(resolved.status, "ok");
+      assert.deepEqual(
+        resolved.payload.items,
+        corpus.response.items.slice(0, maximumItems)
+      );
+      assert.ok(resolved.payload.items.length <= maximumItems);
+    }
+
+    for (const maximumItems of [-1, 1.5, 0x1_0000_0000]) {
+      const rejected = await adapter.preflight(
+        context({ researchLookup: true }),
+        {
+          requestId: `research-invalid-${maximumItems}`,
+          idempotencyKey: `world:idem:research-invalid-${maximumItems}`,
+          target: {
+            descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
+            actuatorRef: pack.manifest.supportedActuatorRefs[0],
+            actuationClass: pack.manifest.supportedActuationClasses[0]
+          },
+          responseSchema: {
+            statuses: pack.manifest.supportedResponseStatuses
+          },
+          payload: {
+            query: corpus.request.query,
+            maximumItems
+          }
+        }
+      );
+
+      assert.equal(rejected.status, "rejected");
+      assert.equal(rejected.payload.reason, "invalid_maximum_items");
+    }
   });
 
   it("rejects malformed payload bytes before adapter preflight or effect", async () => {
