@@ -14,7 +14,7 @@
   ],
   "checksums": {
     "adapter.mjs": "b7f5922f724d898ecfa33b3c5e01dc03970cda24dc44bcd766b0a915a1080686",
-    "corpus.json": "44aa6f571132058673589bf4957fcffff862a61f2fe1941cb90ee4c1f1ea97a5"
+    "corpus.json": "0563d3a13980decf7e60806bbd9e4dfe9140fac180ee7ff3b75c8204d7ad2b16"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -24,7 +24,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "677efd4c6918662bdc21df5ae3b9f37266509000d91241272771e3f630604e08"
+          "57f6e52015041673d8d88714578ce54b9fce92c9056ddff8daa3a81aa798224c"
         ],
         "authorityRequirements": "128",
         "interfaceId": "7207842d4663e1e93d3a1225faa74149bc0a7807b1dada81416cb7ce1e2c0807",
@@ -40,11 +40,11 @@
   "metadata": {
     "mode": "deterministic-research-fixture",
     "network": false,
-    "worldApplicationRelease": "v2.0.0-rc.1"
+    "worldApplicationRelease": "v2.0.0"
   },
   "packageName": "@tkersey/world-capabilities/research-lookup-fixture",
-  "packageVersion": "2.0.0",
-  "packFingerprint": "01f940946793b81e767d9b8e7a85e4f2e36cca545ae3146b05a93d7f37627ab0",
+  "packageVersion": "2.0.1",
+  "packFingerprint": "7ffb2f7da1bd0d60a3dadce25aff6388f1a01ea8517f3ac20f0ee8cf8ef9fd79",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

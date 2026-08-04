@@ -38,7 +38,7 @@ A pack that supports v1 includes `world-effect-v1` in
 ```json
 {
   "applicationIds": [
-    "677efd4c6918662bdc21df5ae3b9f37266509000d91241272771e3f630604e08"
+    "57f6e52015041673d8d88714578ce54b9fce92c9056ddff8daa3a81aa798224c"
   ],
   "authorityRequirements": "128",
   "interfaceId": "7207842d4663e1e93d3a1225faa74149bc0a7807b1dada81416cb7ce1e2c0807",

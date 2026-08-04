@@ -29,7 +29,7 @@ try {
     "embedded and released application manifests differ",
   );
   assert.equal(application.applicationName, "research-digest-agent");
-  assert.equal(application.worldPackageVersion, "2.0.0-rc.1");
+  assert.equal(application.worldPackageVersion, "2.0.0");
   assert.equal(application.residualEffects.length, 1);
 
   const corpus = JSON.parse(await readFile(corpusPath, "utf8"));
@@ -61,8 +61,6 @@ try {
 
   corpus.worldRelease = {
     tag: options.worldTag,
-    packageHash: options.worldPackageHash,
-    archiveSha256: options.worldArchiveSha256,
     applicationWasmSha256: sha256(wasmBytes),
     applicationManifestSha256: sha256(manifestBytes),
   };
@@ -122,9 +120,7 @@ function parseArgs(args) {
   const result = {
     applicationManifest: null,
     applicationWasm: null,
-    worldArchiveSha256: null,
     worldHostRoot: null,
-    worldPackageHash: null,
     worldTag: null,
   };
   for (let index = 0; index < args.length; index += 1) {
@@ -138,14 +134,8 @@ function parseArgs(args) {
       case "--application-wasm":
         result.applicationWasm = path.resolve(value);
         break;
-      case "--world-archive-sha256":
-        result.worldArchiveSha256 = digest(value, key);
-        break;
       case "--world-host-root":
         result.worldHostRoot = path.resolve(value);
-        break;
-      case "--world-package-hash":
-        result.worldPackageHash = value;
         break;
       case "--world-tag":
         result.worldTag = value;
@@ -158,11 +148,4 @@ function parseArgs(args) {
     if (value === null) throw new Error(`${key} is required`);
   }
   return result;
-}
-
-function digest(value, label) {
-  if (!/^[0-9a-f]{64}$/.test(value)) {
-    throw new Error(`${label} requires a lowercase SHA-256`);
-  }
-  return value;
 }
