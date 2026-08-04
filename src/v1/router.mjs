@@ -207,8 +207,16 @@ function admitOutcome(value, path = "$", depth = 0) {
   if (!isArray && prototype !== Object.prototype && prototype !== null) {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
   }
-  const admitted = isArray ? [] : Object.create(null);
   let arrayLength = null;
+  if (isArray) {
+    const lengthDescriptor = descriptors.length;
+    if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value") ||
+        !Number.isSafeInteger(lengthDescriptor.value) || lengthDescriptor.value < 0) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.length`);
+    }
+    arrayLength = lengthDescriptor.value;
+  }
+  const admitted = isArray ? new Array(arrayLength) : Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const label = typeof key === "string" ? key : String(key);
     if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
@@ -222,11 +230,17 @@ function admitOutcome(value, path = "$", depth = 0) {
         fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
       }
     }
-    const admittedValue = admitOutcome(descriptor.value, `${path}.${label}`, depth + 1);
     if (isArray && key === "length") {
-      arrayLength = admittedValue;
       continue;
     }
+    if (isArray && typeof key === "string") {
+      const index = Number(key);
+      if (Number.isSafeInteger(index) && index >= 0 && index < 0xffff_ffff &&
+          String(index) === key && index >= arrayLength) {
+        fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${key}`);
+      }
+    }
+    const admittedValue = admitOutcome(descriptor.value, `${path}.${label}`, depth + 1);
     Object.defineProperty(admitted, key, {
       value: admittedValue,
       enumerable: descriptor.enumerable,
@@ -235,7 +249,6 @@ function admitOutcome(value, path = "$", depth = 0) {
     });
   }
   if (isArray) {
-    if (!Number.isSafeInteger(arrayLength) || arrayLength < 0) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.length`);
     Object.defineProperty(admitted, "length", {
       value: arrayLength,
       enumerable: false,
