@@ -401,31 +401,33 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.equal(effectContext.effectAttempted, 1);
   });
 
-  it("encodes only checked array positions and ignores iterator authority", () => {
-    const items = [corpus.response.items[0]];
-    Object.defineProperty(items, Symbol.iterator, {
-      value: function* () {
-        throw new Error("the response codec must not invoke this iterator");
-      }
-    });
-
+  it("requires exact items vector keys without invoking extension authority", () => {
     assert.deepEqual(
-      decodeResearchResponse(encodeResearchResponse({ items }, 8)),
+      decodeResearchResponse(encodeResearchResponse({
+        items: [corpus.response.items[0]]
+      }, 8)),
       { items: [corpus.response.items[0]] }
     );
 
-    const misleading = [corpus.response.items[0]];
-    Object.defineProperty(misleading, Symbol.iterator, {
+    let iteratorCalls = 0;
+    const withIterator = [corpus.response.items[0]];
+    Object.defineProperty(withIterator, Symbol.iterator, {
       value: function* () {
-        for (let index = 0; index < 9; index += 1) {
-          yield corpus.response.items[0];
-        }
+        iteratorCalls += 1;
+        yield corpus.response.items[0];
       }
     });
-    assert.equal(
-      decodeResearchResponse(encodeResearchResponse({ items: misleading }, 8)).items.length,
-      1
-    );
+    const withString = [corpus.response.items[0]];
+    Object.defineProperty(withString, "rendered", { value: "forbidden" });
+    const withSymbol = [corpus.response.items[0]];
+    Object.defineProperty(withSymbol, Symbol("forbidden"), { value: true });
+    for (const items of [withIterator, withString, withSymbol]) {
+      assert.throws(
+        () => encodeResearchResponse({ items }, 8),
+        { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+      );
+    }
+    assert.equal(iteratorCalls, 0);
 
     const throwing = [corpus.response.items[0]];
     Object.defineProperty(throwing, 0, {

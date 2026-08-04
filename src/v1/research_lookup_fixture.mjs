@@ -66,6 +66,7 @@ export function encodeResearchResponse(value, maximumItems) {
       itemCount > maximumItems) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
+  assertExactArrayKeys(itemDescriptors, itemCount, "items");
   const length = Buffer.alloc(4);
   length.writeUInt32LE(itemCount);
   const encodedItems = [];
@@ -119,6 +120,18 @@ function readExactDataProduct(value, expectedKeys, label) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
   return expectedKeys.map((key) => readOwnDataValue(descriptors, key, label));
+}
+
+function assertExactArrayKeys(descriptors, length, label) {
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length !== length + 1 || !Object.hasOwn(descriptors, "length")) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  }
+  for (let index = 0; index < length; index += 1) {
+    if (!Object.hasOwn(descriptors, String(index))) {
+      fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+    }
+  }
 }
 
 function isResponseArray(value) {
