@@ -102,6 +102,15 @@ describe("World Effect protocol v1", () => {
       { answer: 42 }
     );
   });
+
+  it("rejects revoked JSON proxies through the codec error surface", () => {
+    const revoked = Proxy.revocable([], {});
+    revoked.revoke();
+
+    assert.throws(() => encodeJsonStringValue(revoked.proxy), {
+      code: "ERR_CAPABILITY_V1_JSON_VALUE"
+    });
+  });
 });
 
 describe("CapabilityRouterV1 authority boundary", () => {

@@ -44,7 +44,13 @@ function snapshotJsonValue(value, path, depth) {
     if (!Number.isFinite(value)) fail("ERR_CAPABILITY_V1_JSON_NUMBER", path);
     return value;
   }
-  if (Array.isArray(value)) return snapshotJsonArray(value, path, depth);
+  let isArray;
+  try {
+    isArray = Array.isArray(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_JSON_VALUE", path);
+  }
+  if (isArray) return snapshotJsonArray(value, path, depth);
   if (typeof value !== "object") fail("ERR_CAPABILITY_V1_JSON_VALUE", path);
 
   let descriptors;
