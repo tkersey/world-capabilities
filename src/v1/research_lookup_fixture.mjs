@@ -12,6 +12,7 @@ export const RESEARCH_RESPONSE_SCHEMA_ID =
 
 const MAXIMUM_QUERY_BYTES = 512;
 const MAXIMUM_ITEMS = 8;
+const MAXIMUM_U32 = 0xffff_ffff;
 const MAXIMUM_TITLE_BYTES = 256;
 const MAXIMUM_SUMMARY_BYTES = 1024;
 
@@ -33,7 +34,10 @@ export function researchLookupFixtureBinding(options = {}) {
     },
     adapter,
     decodePayload: decodeResearchRequest,
-    encodeOutcome: (outcome) => encodeResearchResponse(outcome.payload),
+    encodeOutcome: (outcome, projected) => encodeResearchResponse(
+      outcome.payload,
+      projected.payload.maximumItems
+    ),
     recoveryClass: "pure"
   };
 }
@@ -46,7 +50,10 @@ export function decodeResearchRequest(encoded) {
   return Object.freeze({ query, maximumItems });
 }
 
-export function encodeResearchResponse(value) {
+export function encodeResearchResponse(value, maximumItems = MAXIMUM_ITEMS) {
+  if (!Number.isInteger(maximumItems) || maximumItems < 0 || maximumItems > MAXIMUM_U32) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
+  }
   if (!hasExactOwnKeys(value, ["items"])) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
   }
@@ -55,7 +62,10 @@ export function encodeResearchResponse(value) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
   const itemCount = readResponseProperty(items, "length", "items");
-  if (!Number.isInteger(itemCount) || itemCount < 0 || itemCount > MAXIMUM_ITEMS) {
+  if (!Number.isInteger(itemCount) ||
+      itemCount < 0 ||
+      itemCount > MAXIMUM_ITEMS ||
+      itemCount > maximumItems) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
   const length = Buffer.alloc(4);

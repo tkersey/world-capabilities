@@ -137,6 +137,39 @@ describe("research.lookup.v2 fixture pack", () => {
     }
   });
 
+  it("rejects adapter results above the request-specific item ceiling", async () => {
+    const excessive = researchLookupFixtureBinding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (effectContext, request) => {
+          effectContext.effectAttempted += 1;
+          return {
+            requestId: request.requestId,
+            status: "ok",
+            payload: {
+              items: [
+                ...corpus.response.items,
+                corpus.response.items[0]
+              ]
+            }
+          };
+        }
+      }
+    });
+    const effectContext = context({ researchLookup: true });
+
+    await assert.rejects(
+      () => new CapabilityRouterV1({ bindings: [excessive] })
+        .resolve(effectContext, requestBytes),
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+    );
+    assert.equal(effectContext.effectAttempted, 1);
+  });
+
   it("rejects malformed payload bytes before adapter preflight or effect", async () => {
     let preflightCalls = 0;
     let effectCalls = 0;
