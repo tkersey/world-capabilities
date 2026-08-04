@@ -47,7 +47,9 @@ export function decodeResearchRequest(encoded) {
 }
 
 export function encodeResearchResponse(value) {
-  if (!value || typeof value !== "object") fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
+  if (!hasExactOwnKeys(value, ["items"])) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
+  }
   if (!Array.isArray(value.items) || value.items.length > MAXIMUM_ITEMS) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
@@ -55,7 +57,10 @@ export function encodeResearchResponse(value) {
   length.writeUInt32LE(value.items.length);
   return Buffer.concat([
     length,
-    ...value.items.map((item, index) => encodeResearchItem(item, `items[${index}]`))
+    ...Array.from(
+      value.items,
+      (item, index) => encodeResearchItem(item, `items[${index}]`)
+    )
   ]);
 }
 
@@ -74,11 +79,20 @@ export function decodeResearchResponse(encoded) {
 }
 
 function encodeResearchItem(value, label) {
-  if (!value || typeof value !== "object") fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  if (!hasExactOwnKeys(value, ["summary", "title"])) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  }
   return Buffer.concat([
     encodeString(value.title, MAXIMUM_TITLE_BYTES, `${label}.title`),
     encodeString(value.summary, MAXIMUM_SUMMARY_BYTES, `${label}.summary`)
   ]);
+}
+
+function hasExactOwnKeys(value, expectedKeys) {
+  if (!value || typeof value !== "object") return false;
+  const keys = Object.keys(value);
+  return keys.length === expectedKeys.length &&
+    expectedKeys.every((key) => Object.hasOwn(value, key));
 }
 
 function decodeResearchItem(reader, label) {

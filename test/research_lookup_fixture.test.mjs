@@ -9,6 +9,7 @@ import {
   CapabilityRouterV1,
   EffectStatus,
   decodeResearchResponse,
+  encodeResearchResponse,
   researchLookupFixtureBinding
 } from "../src/v1/index.mjs";
 import {
@@ -212,6 +213,54 @@ describe("research.lookup.v2 fixture pack", () => {
         .resolve(context({ researchLookup: true }), requestBytes),
       { code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE" }
     );
+  });
+
+  it("rejects every sparse response position with the owned codec error", () => {
+    for (let length = 1; length <= 8; length += 1) {
+      for (let hole = 0; hole < length; hole += 1) {
+        const items = Array.from(
+          { length },
+          (_, index) => index === hole ? undefined : corpus.response.items[0]
+        );
+        delete items[hole];
+        const ownKeys = Object.keys(items);
+
+        assert.throws(
+          () => encodeResearchResponse({ items }),
+          { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+        );
+        assert.equal(items.length, length);
+        assert.deepEqual(Object.keys(items), ownKeys);
+      }
+    }
+  });
+
+  it("rejects a sparse adapter response before EffectResult publication", async () => {
+    const sparse = researchLookupFixtureBinding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (effectContext, request) => {
+          effectContext.effectAttempted += 1;
+          return {
+            requestId: request.requestId,
+            status: "ok",
+            payload: { items: Array(1) }
+          };
+        }
+      }
+    });
+    const effectContext = context({ researchLookup: true });
+
+    await assert.rejects(
+      () => new CapabilityRouterV1({ bindings: [sparse] })
+        .resolve(effectContext, requestBytes),
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+    );
+    assert.equal(effectContext.effectAttempted, 1);
   });
 
   it("reuses the retained EffectResult on deterministic retry", async () => {
