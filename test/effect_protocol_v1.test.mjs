@@ -190,6 +190,73 @@ describe("CapabilityRouterV1 authority boundary", () => {
     configuredIds[0].fill(0xa5);
     assert.equal((await router.resolve({}, REQUEST)).result.status, EffectStatus.ok);
   });
+
+  it("uses one inert admitted outcome snapshot for validation and encoding", async () => {
+    let semanticReadCalls = 0;
+    const target = {
+      requestId: decodeEffectRequest(REQUEST).requestId.toString("hex"),
+      status: "ok",
+      payload: { value: 41 }
+    };
+    const outcome = new Proxy(target, {
+      get(object, key, receiver) {
+        if (key === "requestId" || key === "status" || key === "payload") {
+          semanticReadCalls += 1;
+        }
+        if (key === "payload") return { frameBytes: Buffer.from("forbidden") };
+        return Reflect.get(object, key, receiver);
+      }
+    });
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => outcome
+      },
+      encodeOutcome: (admitted) => {
+        assert.deepEqual(admitted.payload, { value: 41 });
+        const bytes = Buffer.alloc(8);
+        bytes.writeBigInt64LE(BigInt(admitted.payload.value));
+        return bytes;
+      }
+    })] });
+
+    const resolved = await router.resolve({}, REQUEST);
+
+    assert.equal(resolved.result.status, EffectStatus.ok);
+    assert.equal(semanticReadCalls, 0);
+  });
+
+  it("rejects inherited outcome accessors without executing them", async () => {
+    let getterCalls = 0;
+    const inherited = Object.create({
+      get status() {
+        getterCalls += 1;
+        this.payload = { frameBytes: Buffer.from("forbidden") };
+        return "ok";
+      }
+    });
+    inherited.requestId = decodeEffectRequest(REQUEST).requestId.toString("hex");
+    inherited.payload = { value: 41 };
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async () => inherited
+      }
+    })] });
+
+    await assert.rejects(() => router.resolve({}, REQUEST), {
+      code: "ERR_CAPABILITY_V1_STATUS"
+    });
+    assert.equal(getterCalls, 0);
+  });
 });
 
 function binding(overrides = {}) {

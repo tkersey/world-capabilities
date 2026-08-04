@@ -66,13 +66,11 @@ export class CapabilityRouterV1 {
     const request = decodeEffectRequest(requestBytes, this.limits);
     const binding = this.#bindingFor(request);
     const projected = projectRequest(binding, request);
-    const preflight = await binding.adapter.preflight(context, projected);
-    assertNoForbiddenOutput(preflight);
+    const preflight = admitOutcome(await binding.adapter.preflight(context, projected));
     assertOutcome(preflight, projected);
     const outcome = preflight.status === "ok"
-      ? await binding.adapter.resolve(context, projected)
+      ? admitOutcome(await binding.adapter.resolve(context, projected))
       : preflight;
-    assertNoForbiddenOutput(outcome);
     assertOutcome(outcome, projected);
     const status = statusCode(outcome.status);
     if ((request.allowedStatuses & (1 << status)) === 0) fail("ERR_CAPABILITY_V1_OUTCOME_STATUS");
@@ -186,19 +184,24 @@ function assertOutcome(value, request) {
   statusCode(value.status);
 }
 
-function assertNoForbiddenOutput(value, path = "$", depth = 0) {
+function admitOutcome(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
-  if (!value || typeof value !== "object") return;
+  if (!value || typeof value !== "object") return value;
   let descriptors;
   try {
     descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
     fail("ERR_CAPABILITY_V1_OUTCOME", path);
   }
+  const isArray = Array.isArray(value);
+  const admitted = isArray ? [] : Object.create(null);
+  let arrayLength = null;
+  if (isArray) Object.setPrototypeOf(admitted, null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const label = typeof key === "string" ? key : String(key);
+    if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     const descriptor = descriptors[key];
-    if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
       fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     }
     if (typeof key === "string") {
@@ -207,8 +210,28 @@ function assertNoForbiddenOutput(value, path = "$", depth = 0) {
         fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
       }
     }
-    assertNoForbiddenOutput(descriptor.value, `${path}.${label}`, depth + 1);
+    const admittedValue = admitOutcome(descriptor.value, `${path}.${label}`, depth + 1);
+    if (isArray && key === "length") {
+      arrayLength = admittedValue;
+      continue;
+    }
+    Object.defineProperty(admitted, key, {
+      value: admittedValue,
+      enumerable: descriptor.enumerable,
+      configurable: false,
+      writable: false
+    });
   }
+  if (isArray) {
+    if (!Number.isSafeInteger(arrayLength) || arrayLength < 0) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.length`);
+    Object.defineProperty(admitted, "length", {
+      value: arrayLength,
+      enumerable: false,
+      configurable: false,
+      writable: false
+    });
+  }
+  return Object.freeze(admitted);
 }
 
 function semanticConfigurationIdentity(binding) {
