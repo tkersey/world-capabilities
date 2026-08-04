@@ -67,12 +67,13 @@ export class CapabilityRouterV1 {
     const binding = this.#bindingFor(request);
     const projected = projectRequest(binding, request);
     const preflight = await binding.adapter.preflight(context, projected);
+    assertNoForbiddenOutput(preflight);
     assertOutcome(preflight, projected);
     const outcome = preflight.status === "ok"
       ? await binding.adapter.resolve(context, projected)
       : preflight;
-    assertOutcome(outcome, projected);
     assertNoForbiddenOutput(outcome);
+    assertOutcome(outcome, projected);
     const status = statusCode(outcome.status);
     if ((request.allowedStatuses & (1 << status)) === 0) fail("ERR_CAPABILITY_V1_OUTCOME_STATUS");
     const resultBytes = status === EffectStatus.ok
@@ -188,12 +189,25 @@ function assertOutcome(value, request) {
 function assertNoForbiddenOutput(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
   if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value)) {
-    const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-    if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
-      fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+  let descriptors;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_OUTCOME", path);
+  }
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const label = typeof key === "string" ? key : String(key);
+    const descriptor = descriptors[key];
+    if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+      fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     }
-    assertNoForbiddenOutput(child, `${path}.${key}`, depth + 1);
+    if (typeof key === "string") {
+      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
+      }
+    }
+    assertNoForbiddenOutput(descriptor.value, `${path}.${label}`, depth + 1);
   }
 }
 

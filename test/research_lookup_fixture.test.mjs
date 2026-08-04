@@ -312,6 +312,47 @@ describe("research.lookup.v2 fixture pack", () => {
     );
   });
 
+  it("rejects router accessors without executing self-sanitizing getters", async () => {
+    let getterCalls = 0;
+    const payload = {};
+    Object.defineProperty(payload, "items", {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        delete payload.frameBytes;
+        Object.defineProperty(payload, "items", {
+          configurable: true,
+          enumerable: true,
+          value: corpus.response.items
+        });
+        return corpus.response.items;
+      }
+    });
+    payload.frameBytes = Buffer.from("forbidden");
+    const binding = researchLookupFixtureBinding({
+      adapter: {
+        preflight: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload: {}
+        }),
+        resolve: async (_context, request) => ({
+          requestId: request.requestId,
+          status: "ok",
+          payload
+        })
+      }
+    });
+
+    await assert.rejects(
+      () => new CapabilityRouterV1({ bindings: [binding] })
+        .resolve(context({ researchLookup: true }), requestBytes),
+      { code: "ERR_CAPABILITY_V1_OUTCOME" }
+    );
+    assert.equal(getterCalls, 0);
+  });
+
   it("rejects every sparse response position with the owned codec error", () => {
     for (let length = 1; length <= 8; length += 1) {
       for (let hole = 0; hole < length; hole += 1) {
