@@ -14,7 +14,7 @@
   ],
   "checksums": {
     "adapter.mjs": "30046ff4f37d923f22f7e5052de087db70393ee5c3ff13ea750b75638cd31917",
-    "corpus.json": "8ba77929089eb16ccfed6d0b5c4238d2a93c064b9483509f6f3d11f6332a8f2a"
+    "corpus.json": "44aa6f571132058673589bf4957fcffff862a61f2fe1941cb90ee4c1f1ea97a5"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -44,7 +44,7 @@
   },
   "packageName": "@tkersey/world-capabilities/research-lookup-fixture",
   "packageVersion": "2.0.0",
-  "packFingerprint": "a1efdbca9709828e589fdc6562301a22896298a833837acf4687e47674a1c063",
+  "packFingerprint": "745da334947a3d1e2e3c33b4f910a2d3881104e913c93f8126d95cdd6f701321",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",
