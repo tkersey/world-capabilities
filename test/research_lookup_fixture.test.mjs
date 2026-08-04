@@ -312,6 +312,16 @@ describe("research.lookup.v2 fixture pack", () => {
     );
   });
 
+  it("rejects inherited ResearchItems at sparse array positions", () => {
+    const items = Array(1);
+    Object.setPrototypeOf(items, { 0: corpus.response.items[0] });
+
+    assert.throws(
+      () => encodeResearchResponse({ items }),
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+    );
+  });
+
   it("preserves a leading BOM scalar in every ResearchItem Text field", () => {
     const response = {
       items: [{ title: "\uFEFFtitle", summary: "\uFEFFsummary" }]

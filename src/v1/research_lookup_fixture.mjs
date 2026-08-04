@@ -63,6 +63,9 @@ export function encodeResearchResponse(value) {
   const encodedItems = [];
   for (let index = 0; index < itemCount; index += 1) {
     const label = `items[${index}]`;
+    if (!hasOwnResponseProperty(items, index, label)) {
+      fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+    }
     const item = readResponseProperty(items, index, label);
     encodedItems.push(encodeResearchItem(item, label));
   }
@@ -117,6 +120,14 @@ function isResponseArray(value) {
     return Array.isArray(value);
   } catch {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
+  }
+}
+
+function hasOwnResponseProperty(value, key, label) {
+  try {
+    return Object.hasOwn(value, key);
+  } catch {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
 }
 
