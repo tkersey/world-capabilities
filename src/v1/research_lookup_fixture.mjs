@@ -50,18 +50,23 @@ export function encodeResearchResponse(value) {
   if (!hasExactOwnKeys(value, ["items"])) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
   }
-  if (!Array.isArray(value.items) || value.items.length > MAXIMUM_ITEMS) {
+  const items = readResponseProperty(value, "items", "items");
+  if (!isResponseArray(items)) {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
+  }
+  const itemCount = readResponseProperty(items, "length", "items");
+  if (!Number.isInteger(itemCount) || itemCount < 0 || itemCount > MAXIMUM_ITEMS) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
   }
   const length = Buffer.alloc(4);
-  length.writeUInt32LE(value.items.length);
-  return Buffer.concat([
-    length,
-    ...Array.from(
-      value.items,
-      (item, index) => encodeResearchItem(item, `items[${index}]`)
-    )
-  ]);
+  length.writeUInt32LE(itemCount);
+  const encodedItems = [];
+  for (let index = 0; index < itemCount; index += 1) {
+    const label = `items[${index}]`;
+    const item = readResponseProperty(items, index, label);
+    encodedItems.push(encodeResearchItem(item, label));
+  }
+  return Buffer.concat([length, ...encodedItems]);
 }
 
 export function decodeResearchResponse(encoded) {
@@ -83,16 +88,44 @@ function encodeResearchItem(value, label) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
   return Buffer.concat([
-    encodeString(value.title, MAXIMUM_TITLE_BYTES, `${label}.title`),
-    encodeString(value.summary, MAXIMUM_SUMMARY_BYTES, `${label}.summary`)
+    encodeString(
+      readResponseProperty(value, "title", `${label}.title`),
+      MAXIMUM_TITLE_BYTES,
+      `${label}.title`
+    ),
+    encodeString(
+      readResponseProperty(value, "summary", `${label}.summary`),
+      MAXIMUM_SUMMARY_BYTES,
+      `${label}.summary`
+    )
   ]);
 }
 
 function hasExactOwnKeys(value, expectedKeys) {
   if (!value || typeof value !== "object") return false;
-  const keys = Object.keys(value);
-  return keys.length === expectedKeys.length &&
-    expectedKeys.every((key) => Object.hasOwn(value, key));
+  try {
+    const keys = Object.keys(value);
+    return keys.length === expectedKeys.length &&
+      expectedKeys.every((key) => Object.hasOwn(value, key));
+  } catch {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE");
+  }
+}
+
+function isResponseArray(value) {
+  try {
+    return Array.isArray(value);
+  } catch {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", "items");
+  }
+}
+
+function readResponseProperty(value, key, label) {
+  try {
+    return value[key];
+  } catch {
+    fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
+  }
 }
 
 function decodeResearchItem(reader, label) {
@@ -105,7 +138,10 @@ function decodeResearchItem(reader, label) {
 function encodeString(value, maximum, label) {
   if (typeof value !== "string") fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   const bytes = Buffer.from(value, "utf8");
-  if (bytes.length > maximum || new TextDecoder("utf-8", { fatal: true }).decode(bytes) !== value) {
+  if (
+    bytes.length > maximum ||
+    new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) !== value
+  ) {
     fail("ERR_CAPABILITY_V1_RESEARCH_RESPONSE", label);
   }
   const length = Buffer.alloc(4);
@@ -142,7 +178,7 @@ class Reader {
     const bytes = this.bytes(this.u32());
     if (bytes.length > maximum) fail(this.errorCode, label);
     try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     } catch {
       fail(this.errorCode, label);
     }

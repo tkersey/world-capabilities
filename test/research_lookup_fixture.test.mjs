@@ -276,6 +276,53 @@ describe("research.lookup.v2 fixture pack", () => {
     assert.equal(effectContext.effectAttempted, 1);
   });
 
+  it("encodes only checked array positions and ignores iterator authority", () => {
+    const items = [corpus.response.items[0]];
+    Object.defineProperty(items, Symbol.iterator, {
+      value: function* () {
+        throw new Error("the response codec must not invoke this iterator");
+      }
+    });
+
+    assert.deepEqual(
+      decodeResearchResponse(encodeResearchResponse({ items })),
+      { items: [corpus.response.items[0]] }
+    );
+
+    const misleading = [corpus.response.items[0]];
+    Object.defineProperty(misleading, Symbol.iterator, {
+      value: function* () {
+        for (let index = 0; index < 9; index += 1) {
+          yield corpus.response.items[0];
+        }
+      }
+    });
+    assert.equal(
+      decodeResearchResponse(encodeResearchResponse({ items: misleading })).items.length,
+      1
+    );
+
+    const throwing = [corpus.response.items[0]];
+    Object.defineProperty(throwing, 0, {
+      get: () => { throw new Error("adapter getter failed"); }
+    });
+    assert.throws(
+      () => encodeResearchResponse({ items: throwing }),
+      { code: "ERR_CAPABILITY_V1_RESEARCH_RESPONSE" }
+    );
+  });
+
+  it("preserves a leading BOM scalar in every ResearchItem Text field", () => {
+    const response = {
+      items: [{ title: "\uFEFFtitle", summary: "\uFEFFsummary" }]
+    };
+
+    assert.deepEqual(
+      decodeResearchResponse(encodeResearchResponse(response)),
+      response
+    );
+  });
+
   it("reuses the retained EffectResult on deterministic retry", async () => {
     const router = new CapabilityRouterV1({
       bindings: [researchLookupFixtureBinding()]
