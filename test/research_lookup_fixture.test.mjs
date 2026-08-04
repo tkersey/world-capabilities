@@ -137,6 +137,37 @@ describe("research.lookup.v2 fixture pack", () => {
     }
   });
 
+  it("binds the response to the admitted request limit snapshot", async () => {
+    const pack = await loadPack("research-lookup-fixture");
+    const adapter = await importAdapter(pack.dir);
+    const request = {
+      requestId: "research-request-limit-snapshot",
+      idempotencyKey: "world:idem:research-request-limit-snapshot",
+      target: {
+        descriptorFingerprint: pack.manifest.supportedDescriptorFingerprints[0],
+        actuatorRef: pack.manifest.supportedActuatorRefs[0],
+        actuationClass: pack.manifest.supportedActuationClasses[0]
+      },
+      responseSchema: {
+        statuses: pack.manifest.supportedResponseStatuses
+      },
+      payload: {
+        query: corpus.request.query,
+        maximumItems: 0
+      }
+    };
+
+    const pending = adapter.resolve(
+      context({ researchLookup: true }),
+      request
+    );
+    request.payload.maximumItems = 2;
+
+    const resolved = await pending;
+    assert.equal(resolved.status, "ok");
+    assert.deepEqual(resolved.payload.items, []);
+  });
+
   it("rejects adapter results above the request-specific item ceiling", async () => {
     const excessive = researchLookupFixtureBinding({
       adapter: {

@@ -149,7 +149,10 @@ export async function preflight(context, hostRequest) {
   return {
     requestId: hostRequest.requestId,
     status: "ok",
-    payload: { admitted: true }
+    payload: {
+      admitted: true,
+      maximumItems: hostRequest.payload.maximumItems
+    }
   };
 }
 
@@ -158,11 +161,11 @@ export async function resolve(context, hostRequest) {
   if (admitted.status !== "ok") return admitted;
   context.effectAttempted = (context.effectAttempted ?? 0) + 1;
   return {
-    requestId: hostRequest.requestId,
-    status: status(hostRequest, "ok"),
+    requestId: admitted.requestId,
+    status: admitted.status,
     payload: {
       items: structuredClone(
-        RESPONSE.items.slice(0, hostRequest.payload.maximumItems)
+        RESPONSE.items.slice(0, admitted.payload.maximumItems)
       )
     }
   };
@@ -172,8 +175,8 @@ export async function dryRun(context, hostRequest) {
   const admitted = await preflight(context, hostRequest);
   if (admitted.status !== "ok") return admitted;
   return {
-    requestId: hostRequest.requestId,
-    status: "ok",
+    requestId: admitted.requestId,
+    status: admitted.status,
     payload: { wouldResolve: true, effect: false }
   };
 }
