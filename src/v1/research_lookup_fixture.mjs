@@ -4,7 +4,7 @@ import { effectInterfaceId } from "./protocol.mjs";
 
 export const RESEARCH_LOOKUP_INTERFACE_LABEL = "research.lookup.v2";
 export const RESEARCH_DIGEST_APPLICATION_ID =
-  "57f6e52015041673d8d88714578ce54b9fce92c9056ddff8daa3a81aa798224c";
+  "1880383510d2cb82892827245c206d7a98afd6779a3ce3a72d1776ce813ab1e3";
 export const RESEARCH_REQUEST_SCHEMA_ID =
   "0cce95380bfd932c58c185226d71a2957fc25f7fe3423598a29f5dede8a096f2";
 export const RESEARCH_RESPONSE_SCHEMA_ID =
