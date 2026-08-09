@@ -54,7 +54,7 @@ a safe host effect handler
 
 ## Included Packs
 
-- `research-lookup-fixture`: World `v2.0.0` Research Digest fixture,
+- `research-lookup-fixture`: World `v3.0.0` Research Digest fixture,
   bound to exact application, interface, schema, and authority identities and
   returning only bounded research items for Machine-owned formatting.
 - `fixture-model`: deterministic model-like fixture capability.

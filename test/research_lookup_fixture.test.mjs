@@ -372,6 +372,18 @@ describe("research.lookup.v2 fixture pack", () => {
     }
   });
 
+  it("retains the complete immutable World release tuple", () => {
+    assert.equal(corpus.worldRelease.tag, "v3.0.0");
+    assert.match(corpus.worldRelease.packageHash, /^world-3\.0\.0-[A-Za-z0-9_-]+$/);
+    for (const field of [
+      "archiveSha256",
+      "applicationWasmSha256",
+      "applicationManifestSha256"
+    ]) {
+      assert.match(corpus.worldRelease[field], /^[0-9a-f]{64}$/);
+    }
+  });
+
   it("rejects excessive results and capability-authored World evidence", async () => {
     const huge = "x".repeat(64 * 1024);
     const excessive = researchLookupFixtureBinding({
