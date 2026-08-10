@@ -1,0 +1,71 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    }
+  ],
+  "authorityLabels": [
+    "model.fixture"
+  ],
+  "checksums": {
+    "adapter.mjs": "23b43a184b1305be50efdcc8a3e2dc0a799cf918f3652f29cfd938df7f009572"
+  },
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "driverAbiVersion": "capability-driver-v1",
+  "driverId": "repository-repair-decision-fixture",
+  "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "applicationIds": [
+          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+        ],
+        "authorityRequirements": "9",
+        "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
+        "interfaceLabel": "model.decide.v1",
+        "payloadSchemaId": "9c77e9f50112cf7b620dd4d4f235365aff354615bf4b9e7f394434dc7cc367cb",
+        "resultSchemaId": "f881b59b5cd53a3cd073b8704794fdd52a99120ca9aeb7e6eb05f8054ce5cfb1"
+      }
+    ]
+  },
+  "idempotencySupport": "full-world-key-bound",
+  "maximumRequestBytes": 524288,
+  "maximumResponseBytes": 65536,
+  "metadata": {
+    "mode": "deterministic-actuality-fixture",
+    "network": false
+  },
+  "packageName": "@tkersey/world-capabilities/repository-repair-decision-fixture",
+  "packageVersion": "2.1.0",
+  "packFingerprint": "a3aafd3137312df56c4779dd58b65ed4f20b1cb9b2bce91d1208e95fe2ab0305",
+  "packFormatVersion": "foundry-effect-pack-v1",
+  "recoverSupport": true,
+  "recoveryClass": "pure",
+  "replaySupport": true,
+  "secretRequirements": [],
+  "shadowSupport": true,
+  "supportedActuationClasses": [
+    "model"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.repository-repair-decision-fixture.v1"
+  ],
+  "supportedApplianceAbiVersions": [
+    "world-application-abi-v1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.repository-repair-decision-fixture.v1"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "world-frame-v1"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-effect-v1"
+  ]
+}

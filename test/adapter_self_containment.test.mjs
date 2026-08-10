@@ -18,6 +18,45 @@ test("sidecar fixture imports are checksum covered", async () => {
   await verifySelfContained(await loadPack("sidecar-fixture"));
 });
 
+test("fixed repository test process requires the exact closed declaration", async () => {
+  const root = await mkdtemp(join(tmpdir(), "world-fixed-process-pack-"));
+  try {
+    const dir = join(root, "pack");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "adapter.mjs"),
+      "import { spawn } from \"node:child_process\";\n" +
+        "import { kill as killProcess } from \"node:process\";\n" +
+        "export const run = spawn;\nexport const stop = killProcess;\n"
+    );
+    const pack = {
+      name: "fixed-process-pack",
+      dir,
+      manifest: {
+        artifacts: [{ path: "adapter.mjs" }],
+        supportedActuatorRefs: ["actuator.repository-test.v1"],
+        metadata: {
+          allowedBuiltins: ["node:child_process", "node:process"],
+          fixedProcess: { argv: ["test"], executable: "receiver-context", shell: false }
+        }
+      }
+    };
+    await verifySelfContained(pack);
+    await expect(verifySelfContained({
+      ...pack,
+      manifest: {
+        ...pack.manifest,
+        metadata: {
+          ...pack.manifest.metadata,
+          fixedProcess: { argv: ["test", "--watch"], executable: "receiver-context", shell: false }
+        }
+      }
+    })).rejects.toThrow(/fixed process declaration rejected/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("self-containment scanner supports shebang JavaScript", async () => {
   const root = await mkdtemp(join(tmpdir(), "world-shebang-pack-"));
   try {

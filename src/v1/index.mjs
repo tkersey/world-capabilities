@@ -36,3 +36,27 @@ export {
   encodeResearchResponse,
   researchLookupFixtureBinding
 } from "./research_lookup_fixture.mjs";
+export {
+  ACTION_TAG,
+  LIMITS as REPOSITORY_REPAIR_LIMITS,
+  decodeAction as decodeRepositoryRepairAction,
+  decodeDecisionRequest as decodeRepositoryRepairDecisionRequest,
+  decodeFinalResult as decodeRepositoryRepairFinalResult,
+  decodeListRequest as decodeRepositoryListRequest,
+  decodeReadRequest as decodeRepositoryReadRequest,
+  decodeReplaceRequest as decodeRepositoryReplaceRequest,
+  decodeSearchRequest as decodeRepositorySearchRequest,
+  decodeTestRequest as decodeRepositoryTestRequest,
+  encodeAction as encodeRepositoryRepairAction,
+  encodeListResult as encodeRepositoryListResult,
+  encodeReadResult as encodeRepositoryReadResult,
+  encodeReplaceOutcome as encodeRepositoryReplaceOutcome,
+  encodeSearchResult as encodeRepositorySearchResult,
+  encodeTestResult as encodeRepositoryTestResult
+} from "./actuality/repository_repair_codecs.mjs";
+export { repositoryRepairDecisionFixtureBinding } from "./actuality/repository_repair_fixture_binding.mjs";
+export { repositoryRepairOpenAIBinding } from "./actuality/repository_repair_openai_binding.mjs";
+export {
+  ACTUALITY_APPLICATION_ID,
+  repositoryWorkspaceBindings
+} from "./actuality/repository_workspace_binding.mjs";

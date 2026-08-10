@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { importAdapter, loadPack, packageNames } from "../harness/pack-utils.mjs";
@@ -291,6 +291,10 @@ function payloadFor(name) {
   if (name === "research-lookup-fixture") {
     return { query: "portable algebraic effects", maximumItems: 2 };
   }
+  if (name === "repository-repair-decision-fixture" || name === "repository-repair-openai") {
+    return { phase: "decide", history: [] };
+  }
+  if (name === "repository-workspace-actuality") return { operation: "list" };
   if (name === "sandbox-files") return { operation: "read", path: "fixture.txt" };
   return { fixture: true };
 }
@@ -326,6 +330,26 @@ test("all adapters reject unsupported targets and status sets before effects", a
         fixtureRoot: root,
         effectAttempted: 0
       };
+      if (name === "repository-repair-decision-fixture") {
+        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.policy.repositoryRepairDecisionFixture = true;
+      }
+      if (name === "repository-repair-openai") {
+        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.policy.openaiRepositoryRepair = true;
+        context.secrets = { OPENAI_API_KEY: "fixture-secret" };
+        context.openaiModel = "fixture-model";
+        context.decisionContractDigest = "3e2e4a1bd58b047dc9343964cfdc413174bb50a39d573e340cb963bf29127800";
+        context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
+      }
+      if (name === "repository-workspace-actuality") {
+        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.policy.repositoryActuality = true;
+        context.workspaceRoot = root;
+        context.workspaceRootReal = await realpath(root);
+        context.temporaryHome = root;
+        context.bunExecutable = process.execPath;
+      }
       const wrongTarget = await adapter.resolve(context, {
         ...request,
         target: { ...request.target, descriptorFingerprint: "desc.unsupported.v0" }
