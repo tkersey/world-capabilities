@@ -92,8 +92,8 @@
     "mode": "temporary-repository-actuality"
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-actuality",
-  "packageVersion": "2.1.0",
-  "packFingerprint": "200af04dd73db1e3952e27fb2937ea08c7bcd541b9fb22f4f0fa951838874af0",
+  "packageVersion": "2.1.1",
+  "packFingerprint": "80dc7651823f21e757f7dd4955dbd470cd73b6ebff373f2ed9736247f1434aed",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",
