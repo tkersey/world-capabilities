@@ -2693,6 +2693,7 @@ export async function verifySelfContained(pack) {
   const covered = new Set(pack.manifest.artifacts.map((artifact) => artifact.path));
   const allowedBuiltins = new Set(pack.manifest.metadata?.allowedBuiltins ?? []);
   const allowNetworkAuthority = Array.isArray(pack.manifest.authorityLabels) && pack.manifest.authorityLabels.includes("network.http");
+  const allowFixedProcess = admitsFixedProcess(pack);
   const sidecarEntry = sidecarEntrypoint(pack);
   const sidecarRuntimeName = sidecarRuntime(pack);
   const root = resolve(pack.dir);
@@ -2780,11 +2781,19 @@ export async function verifySelfContained(pack) {
     }
     for (const specifier of specifiers) {
       if (specifier.startsWith("node:")) {
-        assert(!FORBIDDEN_LOADER_BUILTINS.has(specifier), `${pack.name}: loader builtin ${specifier} rejected`);
+        assert(
+          !FORBIDDEN_LOADER_BUILTINS.has(specifier) ||
+            (specifier === "node:process" && allowFixedProcess),
+          `${pack.name}: loader builtin ${specifier} rejected`
+        );
         assert(allowedBuiltins.has(specifier), `${pack.name}: unchecked builtin ${specifier}`);
         assert(!builtinMatches(specifier, RAW_NETWORK_BUILTINS), `${pack.name}: raw network builtin ${specifier} rejected`);
         assert(!builtinMatches(specifier, HTTP_NETWORK_BUILTINS) || allowNetworkAuthority, `${pack.name}: network builtin ${specifier} requires network.http authority`);
-        assert(!FORBIDDEN_EXECUTION_BUILTINS.has(specifier), `${pack.name}: code execution builtin ${specifier} rejected`);
+        assert(
+          !FORBIDDEN_EXECUTION_BUILTINS.has(specifier) ||
+            (specifier === "node:child_process" && allowFixedProcess),
+          `${pack.name}: code execution builtin ${specifier} rejected`
+        );
         continue;
       }
       assert(specifier.startsWith("./") || specifier.startsWith("../"), `${pack.name}: package import ${specifier} rejected`);
@@ -2877,6 +2886,25 @@ export async function verifySelfContained(pack) {
     }
   }
   validateSidecarCommand(pack);
+}
+
+function admitsFixedProcess(pack) {
+  const declaration = pack.manifest.metadata?.fixedProcess;
+  if (declaration === undefined) return false;
+  assert(
+    stableStringify(declaration) === stableStringify({
+      argv: ["test"],
+      executable: "receiver-context",
+      shell: false
+    }),
+    `${pack.name}: fixed process declaration rejected`
+  );
+  assert(
+    Array.isArray(pack.manifest.supportedActuatorRefs) &&
+      pack.manifest.supportedActuatorRefs.includes("actuator.repository-test.v1"),
+    `${pack.name}: fixed process actuator binding required`
+  );
+  return true;
 }
 
 async function sameFilePathIdentity(left, right) {

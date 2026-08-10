@@ -63,6 +63,12 @@ a safe host effect handler
 - `sandbox-files`: local fixture-root file read/write skeleton.
 - `local-memory-kv`: deterministic key/value fixture.
 - `sidecar-fixture`: sidecar packaging/security fixture.
+- `repository-repair-decision-fixture`: deterministic typed Action sequence for
+  the exact Agent Actuality application.
+- `repository-repair-openai`: fixed-endpoint OpenAI Responses capability with
+  strict structured output and receiver-owned secret/model configuration.
+- `repository-workspace-actuality`: bounded repository reads, literal search,
+  fixed `bun test`, request-bound approval, and one atomic source replacement.
 
 Every Effect v1 pack declares exact interface, schema, and authority identities
 in `manifest.json`; application-specific packs also declare admitted
@@ -99,4 +105,7 @@ run as part of default proof.
 
 See [Effect protocol v1](docs/effect_protocol_v1.md),
 [agent invocation](docs/agent_invoke_v1.md), and the
-[v0/v1 adapter boundary](docs/v0_v1_adapter.md).
+[v0/v1 adapter boundary](docs/v0_v1_adapter.md). The application-specific
+Actuality packs are described in
+[repository actuality](docs/repository_actuality.md) and
+[OpenAI decisions](docs/openai_decision.md).

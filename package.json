@@ -1,6 +1,6 @@
 {
   "name": "@tkersey/world-capabilities",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "description": "Capability packs and conformance for the World agent runtime",
@@ -16,6 +16,9 @@
     "proof:research-v2": "bun test test/research_lookup_fixture.test.mjs && bun harness/check-pack.mjs research-lookup-fixture",
     "proof:v1-checkout-integration": "bun scripts/run-v1-conformance.mjs --world-repo ../world --world-host-repo ../world-host",
     "proof:agent-invoke": "bun test test/agent_invoke_v1.test.mjs",
+    "proof:actuality": "bun test test/repository_repair_codecs.test.mjs test/repository_repair_openai.test.mjs test/repository_workspace_actuality.test.mjs && bun harness/check-pack.mjs repository-repair-decision-fixture repository-repair-openai repository-workspace-actuality",
+    "proof:actuality-openai-mock": "bun test test/repository_repair_openai.test.mjs",
+    "proof:actuality-workspace": "bun test test/repository_workspace_actuality.test.mjs",
     "corpus:check": "bun scripts/check-corpus.mjs",
     "corpus:update": "bun scripts/update-corpus.mjs",
     "packs:build": "bun scripts/build-packs.mjs",
