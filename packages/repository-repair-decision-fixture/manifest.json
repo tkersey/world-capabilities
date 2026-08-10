@@ -37,8 +37,8 @@
     "network": false
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-decision-fixture",
-  "packageVersion": "2.1.0",
-  "packFingerprint": "a3aafd3137312df56c4779dd58b65ed4f20b1cb9b2bce91d1208e95fe2ab0305",
+  "packageVersion": "2.1.1",
+  "packFingerprint": "5ceb77889208d2d6e0d34c56ca6a8b2eb0537437d8a9307d6ca107960a22f6c0",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

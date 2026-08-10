@@ -47,8 +47,8 @@
     ]
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-openai",
-  "packageVersion": "2.1.0",
-  "packFingerprint": "f5b152a9cbaf9ea1f5e232d29f2802aababc683d310676eadcb12d1e53abaa44",
+  "packageVersion": "2.1.1",
+  "packFingerprint": "65bcc985a8a0a8f8af84d8aee5fea5b46d247a42682c745e34aabf6005a37e88",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",
