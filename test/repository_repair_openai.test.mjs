@@ -19,7 +19,10 @@ describe("repository repair OpenAI capability", () => {
       expect(body.tools).toEqual([]);
       expect(body.text.format.type).toBe("json_schema");
       expect(body.text.format.strict).toBe(true);
-      expect(body.text.format.schema.oneOf).toHaveLength(7);
+      expect(body.text.format.schema.type).toBe("object");
+      expect(body.text.format.schema.oneOf).toBeUndefined();
+      expect(body.text.format.schema.properties.action.enum).toHaveLength(7);
+      expect(body.text.format.schema.properties.arguments.anyOf).toHaveLength(7);
       expect(body.previous_response_id).toBeUndefined();
       expect(body.conversation).toBeUndefined();
       return response({ action: "read_file", arguments: { path: "src/range.mjs" } });
@@ -86,6 +89,7 @@ describe("repository repair OpenAI capability", () => {
 
   test("admits only exact closed Action objects and UTF-8 byte bounds", () => {
     expect(() => openai.admitAction({ action: "read_file", arguments: { path: "x", extra: true } })).toThrow();
+    expect(() => openai.admitAction({ action: "read_file", arguments: { suite: "default" } })).toThrow();
     expect(() => openai.admitAction({ action: "replace_file", arguments: {
       path: "src/range.mjs",
       expected_sha256: "not-a-digest",
