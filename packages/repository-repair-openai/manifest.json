@@ -14,7 +14,7 @@
     "network.http"
   ],
   "checksums": {
-    "adapter.mjs": "035ac34a8e77c8e47ab8e9f613ad94e6368827c510c47420202caec32b00a0bf",
+    "adapter.mjs": "8fffc179aab49459e8dfef0f8ac2376230897149fc47dd23dd2d265154e8abf8",
     "decision-contract.json": "47a66ee17f4d518d9eee2d4092917e6d3ce242c288e23837f6412a9f399ab2be"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
@@ -48,7 +48,7 @@
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-openai",
   "packageVersion": "2.1.0",
-  "packFingerprint": "16207d82c46edf56a2ab66ce8f690b92429991de5b06e86e065430ed603043ab",
+  "packFingerprint": "f5b152a9cbaf9ea1f5e232d29f2802aababc683d310676eadcb12d1e53abaa44",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",

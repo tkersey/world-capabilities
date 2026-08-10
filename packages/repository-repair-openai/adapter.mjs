@@ -15,6 +15,7 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_MAXIMUM_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAXIMUM_MODEL_CALLS = 16;
 const defaultFetch = fetch;
+const openAiDecisionSchema = openAiStrictSchema(decisionContract);
 
 const packManifest = Object.freeze({
   driverId: "repository-repair-openai",
@@ -141,7 +142,7 @@ export function buildResponsesRequest(context, request) {
         type: "json_schema",
         name: "repository_repair_action",
         strict: true,
-        schema: decisionContract
+        schema: openAiDecisionSchema
       }
     },
     max_output_tokens: maximumOutputTokens(context),
@@ -152,6 +153,27 @@ export function buildResponsesRequest(context, request) {
       decision_contract: DECISION_CONTRACT_DIGEST
     }
   };
+}
+
+function openAiStrictSchema(contract) {
+  const variants = contract.oneOf;
+  if (!Array.isArray(variants) || variants.length === 0) {
+    throw new Error("decision_contract_variants_required");
+  }
+  return Object.freeze({
+    type: "object",
+    properties: Object.freeze({
+      action: Object.freeze({
+        type: "string",
+        enum: Object.freeze(variants.map((variant) => variant.properties.action.const))
+      }),
+      arguments: Object.freeze({
+        anyOf: Object.freeze(variants.map((variant) => variant.properties.arguments))
+      })
+    }),
+    required: Object.freeze(["action", "arguments"]),
+    additionalProperties: false
+  });
 }
 
 export function admitAction(value) {
