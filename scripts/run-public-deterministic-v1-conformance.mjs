@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import {
   extractDistributionArchive,
   parseChecksumSidecar,
+  readDistributionArchive,
   sha256,
   verifyDistributionTree,
 } from "./public-deterministic-v1.mjs";
@@ -20,12 +21,12 @@ try {
   const root = archive === null ? path.resolve(rootArgument) : temporary;
   if (archive !== null) {
     const archivePath = path.resolve(archive);
-    const bytes = await readFile(archivePath);
     const checksum = valueAfter("--checksum");
     assert(checksum !== null, "--checksum is required with --archive");
+    const bytes = await readDistributionArchive(archivePath);
     const expected = parseChecksumSidecar(await readFile(path.resolve(checksum), "utf8"), path.basename(archivePath));
     assert.equal(sha256(bytes), expected, "release asset checksum mismatch");
-    await extractDistributionArchive(archivePath, root);
+    await extractDistributionArchive(archivePath, root, bytes);
   }
   await verifyDistributionTree(root);
   for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "OPENAI_API_KEY"]) {
@@ -38,8 +39,8 @@ try {
     await withCwd(root, async () => packUtils.inspectPack(await packUtils.loadPack(name)));
   }
 
-  const proof = await run(root, ["bun", "run", "proof"]);
-  const tests = await run(root, ["bun", "test"]);
+  const proof = await run(root, [process.execPath, "run", "proof"]);
+  const tests = await run(root, [process.execPath, "test"]);
   const receipt = {
     schema: "world-capabilities-public-deterministic-conformance/v1",
     version: "2.1.2",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const PUBLIC_DETERMINISTIC_VERSION = "2.1.2";
@@ -102,15 +102,36 @@ export async function writeDeterministicArchive(treeRoot, outputPath) {
     if (padding > 0) chunks.push(Buffer.alloc(padding));
   }
   chunks.push(Buffer.alloc(1024));
-  const archive = gzipSync(Buffer.concat(chunks), { level: 9, mtime: 0 });
+  const tar = Buffer.concat(chunks);
+  admitExpandedArchiveBytes(tar.length);
+  const archive = gzipSync(tar, { level: 9, mtime: 0 });
+  archive[9] = 0xff;
   assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, archive);
   return { sha256: sha256(archive), bytes: archive.length, entries: entries.length };
 }
 
-export async function extractDistributionArchive(archivePath, destination) {
-  const archive = await readFile(archivePath);
+export function admitExpandedArchiveBytes(bytes) {
+  assert(bytes <= MAXIMUM_EXPANDED_BYTES, "deterministic archive expansion exceeds maximum");
+}
+
+export async function readDistributionArchive(archivePath) {
+  const handle = await open(archivePath, "r");
+  try {
+    const info = await handle.stat();
+    assert(info.isFile(), "deterministic archive must be a regular file");
+    assert(info.size <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
+    const archive = await handle.readFile();
+    assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
+    return archive;
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function extractDistributionArchive(archivePath, destination, authenticatedArchive = null) {
+  const archive = authenticatedArchive ?? await readDistributionArchive(archivePath);
   assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
   const tar = gunzipSync(archive, { maxOutputLength: MAXIMUM_EXPANDED_BYTES });
   assert.equal(tar.length % 512, 0, "tar payload is not block aligned");
@@ -119,6 +140,8 @@ export async function extractDistributionArchive(archivePath, destination) {
   let count = 0;
   let terminated = false;
   const seen = new Set();
+  const portableSeen = new Set();
+  const entries = [];
   while (offset + 512 <= tar.length) {
     const header = tar.subarray(offset, offset + 512);
     offset += 512;
@@ -144,17 +167,23 @@ export async function extractDistributionArchive(archivePath, destination) {
     assert(safeRelative(inside), `unsafe archive path: ${relative}`);
     assert(!seen.has(inside), `duplicate archive path: ${inside}`);
     seen.add(inside);
+    const portable = inside.normalize("NFC").toLowerCase();
+    assert(!portableSeen.has(portable), `non-portable archive path collision: ${inside}`);
+    portableSeen.add(portable);
     const type = header[156];
     assert(type === 0 || type === 0x30, `links and non-files are forbidden: ${inside}`);
     const size = octal(header.subarray(124, 136));
     expanded += size;
     assert(expanded <= MAXIMUM_EXPANDED_BYTES, "deterministic archive expansion exceeds maximum");
     assert(offset + size <= tar.length, "truncated tar entry");
-    await writeTreeFile(destination, inside, tar.subarray(offset, offset + size), executable(inside));
+    entries.push({ inside, bytes: tar.subarray(offset, offset + size), isExecutable: executable(inside) });
     offset += size + ((512 - (size % 512)) % 512);
   }
   assert(count > 0, "deterministic archive is empty");
   assert(terminated, "deterministic archive has no complete terminator");
+  for (const entry of entries) {
+    await writeTreeFile(destination, entry.inside, entry.bytes, entry.isExecutable);
+  }
   return { sha256: sha256(archive), bytes: archive.length, entries: count, expandedBytes: expanded };
 }
 
@@ -209,6 +238,7 @@ async function walk(root, relative, output) {
     assert(!info.isSymbolicLink(), `distribution source symlink forbidden: ${child}`);
     if (info.isDirectory()) await walk(root, child, output);
     else if (info.isFile()) output.push(child);
+    else assert.fail(`unsupported distribution entry: ${child}`);
   }
 }
 

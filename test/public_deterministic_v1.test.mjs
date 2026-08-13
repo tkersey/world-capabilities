@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, truncate } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
@@ -7,10 +7,14 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import {
   PUBLIC_DETERMINISTIC_ARCHIVE,
   PUBLIC_DETERMINISTIC_ROOT,
+  MAXIMUM_ARCHIVE_BYTES,
+  MAXIMUM_EXPANDED_BYTES,
+  admitExpandedArchiveBytes,
   admitDistributionSourcePaths,
   buildDistributionTree,
   distributionSourcePaths,
   extractDistributionArchive,
+  readDistributionArchive,
   runtimeTreeDigest,
   sha256,
   verifyDistributionTree,
@@ -41,7 +45,12 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     const left = await writeDeterministicArchive(tree, first);
     const right = await writeDeterministicArchive(tree, second);
     expect(left.sha256).toBe(right.sha256);
-    expect(sha256(await readFile(first))).toBe(left.sha256);
+    const firstBytes = await readFile(first);
+    expect(sha256(firstBytes)).toBe(left.sha256);
+    expect(firstBytes[9]).toBe(0xff);
+    expect(() => admitExpandedArchiveBytes(MAXIMUM_EXPANDED_BYTES + 1)).toThrow(
+      "deterministic archive expansion exceeds maximum",
+    );
     const extracted = path.join(root, "extracted");
     await extractDistributionArchive(first, extracted);
     const receipt = await verifyDistributionTree(extracted);
@@ -58,6 +67,26 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     await expect(extractDistributionArchive(trailing, path.join(root, "trailing-output"))).rejects.toThrow(
       "non-zero data follows tar terminator",
     );
+    await expect(readdir(path.join(root, "trailing-output"))).rejects.toThrow();
+
+    const collision = path.join(root, "collision.tar.gz");
+    await Bun.write(collision, minimalArchive([
+      [`${PUBLIC_DETERMINISTIC_ROOT}/LICENSE`, Buffer.from("same")],
+      [`${PUBLIC_DETERMINISTIC_ROOT}/license`, Buffer.from("same")],
+    ]));
+    await expect(extractDistributionArchive(collision, path.join(root, "collision-output"))).rejects.toThrow(
+      "non-portable archive path collision",
+    );
+
+    const oversized = path.join(root, "oversized.tar.gz");
+    await Bun.write(oversized, Buffer.alloc(0));
+    await truncate(oversized, MAXIMUM_ARCHIVE_BYTES + 1);
+    await expect(readDistributionArchive(oversized)).rejects.toThrow("deterministic archive exceeds maximum size");
+
+    const fifo = path.join(extracted, "uncovered-fifo");
+    const mkfifo = Bun.spawnSync(["mkfifo", fifo]);
+    expect(mkfifo.exitCode).toBe(0);
+    await expect(verifyDistributionTree(extracted)).rejects.toThrow("unsupported distribution entry");
 
     for (const script of [
       "scripts/check-public-deterministic-v1.mjs",
@@ -72,26 +101,36 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
       expect(missingChecksumExit).not.toBe(0);
       expect(missingChecksumError).toContain("--checksum is required with --archive");
     }
+
+    const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
+    const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
+    expect(checkSource).toContain("Bun.spawn([process.execPath");
+    expect(conformanceSource).toContain('[process.execPath, "run", "proof"]');
+    expect(conformanceSource).toContain('[process.execPath, "test"]');
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-function minimalArchive(name, contents) {
-  const header = Buffer.alloc(512);
-  Buffer.from(name).copy(header, 0);
-  writeOctal(header, 100, 8, 0o644);
-  writeOctal(header, 108, 8, 0);
-  writeOctal(header, 116, 8, 0);
-  writeOctal(header, 124, 12, contents.length);
-  writeOctal(header, 136, 12, 0);
-  header.fill(0x20, 148, 156);
-  header[156] = 0x30;
-  Buffer.from("ustar\0").copy(header, 257);
-  Buffer.from("00").copy(header, 263);
-  writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
-  const padding = Buffer.alloc((512 - (contents.length % 512)) % 512);
-  return gzipSync(Buffer.concat([header, contents, padding, Buffer.alloc(1024)]), { level: 9, mtime: 0 });
+function minimalArchive(nameOrEntries, contents = null) {
+  const entries = Array.isArray(nameOrEntries) ? nameOrEntries : [[nameOrEntries, contents]];
+  const chunks = [];
+  for (const [name, entryContents] of entries) {
+    const header = Buffer.alloc(512);
+    Buffer.from(name).copy(header, 0);
+    writeOctal(header, 100, 8, 0o644);
+    writeOctal(header, 108, 8, 0);
+    writeOctal(header, 116, 8, 0);
+    writeOctal(header, 124, 12, entryContents.length);
+    writeOctal(header, 136, 12, 0);
+    header.fill(0x20, 148, 156);
+    header[156] = 0x30;
+    Buffer.from("ustar\0").copy(header, 257);
+    Buffer.from("00").copy(header, 263);
+    writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
+    chunks.push(header, entryContents, Buffer.alloc((512 - (entryContents.length % 512)) % 512));
+  }
+  return gzipSync(Buffer.concat([...chunks, Buffer.alloc(1024)]), { level: 9, mtime: 0 });
 }
 
 function writeOctal(buffer, offset, width, value) {

@@ -7,6 +7,7 @@ import path from "node:path";
 import {
   extractDistributionArchive,
   parseChecksumSidecar,
+  readDistributionArchive,
   sha256,
   verifyDistributionTree,
 } from "./public-deterministic-v1.mjs";
@@ -20,17 +21,17 @@ try {
   let extraction = null;
   if (archive !== null) {
     const archivePath = path.resolve(archive);
-    const bytes = await readFile(archivePath);
     const checksum = valueAfter("--checksum");
     assert(checksum !== null, "--checksum is required with --archive");
+    const bytes = await readDistributionArchive(archivePath);
     const expected = parseChecksumSidecar(await readFile(path.resolve(checksum), "utf8"), path.basename(archivePath));
     assert.equal(sha256(bytes), expected, "release asset checksum mismatch");
-    extraction = await extractDistributionArchive(archivePath, root);
+    extraction = await extractDistributionArchive(archivePath, root, bytes);
   }
   const receipt = await verifyDistributionTree(root);
   let packagedVerifier = null;
   if (archive !== null) {
-    const child = Bun.spawn(["bun", path.join(root, "conformance/check-distribution.mjs"), "--root", root], {
+    const child = Bun.spawn([process.execPath, path.join(root, "conformance/check-distribution.mjs"), "--root", root], {
       cwd: root,
       env: sanitizedEnvironment(),
       stdout: "pipe",
