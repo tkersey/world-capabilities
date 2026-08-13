@@ -1,111 +1,93 @@
 # world-capabilities
 
-`world-capabilities` is the Effect protocol v1 Foundry for host-side capability
-packs that resolve World external effects under receiver-local policy.
+`world-capabilities` is the public reference Effect protocol v1 Foundry: a
+router, portable codecs, capability packs, application-specific bindings, and
+conformance for World applications.
 
-Boundary defines and defunctionalizes the program.
-World closes known handlers at comptime and emits the application runtime.
-world-host persists Frames and operates the capability membrane.
-world-capabilities resolves only genuinely external effects.
+Boundary owns portable computation. World owns Application ABI v1 and Frame
+v1. world-host retains lifecycle evidence and dispatches effects.
+world-capabilities applies receiver policy before external authority and returns
+only untrusted EffectResults. It cannot author Frames, Machine state, or World
+evidence.
 
-The repository may remain private. Its versioned packs are checksum-bound,
-statically inspectable source distributions. World-host supplies the capability
-membrane; this repository supplies independently authored effect
-implementations and conformance.
+## Capability classes
 
-## Charter
+- Deterministic packs use synthetic fixtures and require no receiver secret.
+- Live packs, including `repository-repair-openai`, receive provider secrets,
+  model selection, allowlists, and policy from the receiver.
+- Application-specific packs bind exact application, interface, schema, result
+  bound, and authority identities.
 
-Capabilities are host-side effect handlers. A capability package may return
-untrusted ResolutionInput-like records only.
+The source repository and deterministic conformance release contain no receiver
+secret, live provider transcript, runtime store, or private policy.
 
-This repository does not define Boundary semantics, does not define World
-semantics, does not mint World evidence, and does not replace world-host. World
-validates and finalizes outcomes and authors receipts/evidence. Capability
-packages remain replaceable host-owned adapters.
+## Public deterministic distribution
 
-Effect v1 Foundry default conformance:
-
-- uses no live network
-- requires no secrets
-- requires no Boundary checkout
-- requires no World source checkout
-- requires no world-host checkout
-- uses no real vendor SDKs
-- uses no npm runtime dependencies
-- executes no adapter during static pack inspection
-
-Effect protocol v1 is the primary surface. The v1 router accepts a
-World-authored `EffectRequest`, runs
-receiver-local preflight before any effect, and authors only an untrusted
-`EffectResult`. It cannot author a `Frame` or other World evidence.
-
-The v0 HostRequest adapter surface remains compatibility-only.
-
-## Completion Equation
+Release `v2.1.2` publishes:
 
 ```text
-Agent Runtime v0.1 pack
-  + capability pack
-  + capability policy
-  + capability conformance
-  =
-a safe host effect handler
+world-capabilities-v2.1.2-deterministic.tar.gz
+world-capabilities-v2.1.2-deterministic.tar.gz.sha256
 ```
 
-## Included Packs
+The stable release URL is:
 
-- `research-lookup-fixture`: World `v3.0.0` Research Digest fixture,
-  bound to exact application, interface, schema, and authority identities and
-  returning only bounded research items for Machine-owned formatting.
-- `fixture-model`: deterministic model-like fixture capability.
-- `generic-http-json`: dry-run HTTP JSON skeleton.
-- `human-approval`: noninteractive approval fixture.
-- `sandbox-files`: local fixture-root file read/write skeleton.
-- `local-memory-kv`: deterministic key/value fixture.
-- `sidecar-fixture`: sidecar packaging/security fixture.
-- `repository-repair-decision-fixture`: deterministic typed Action sequence for
-  the exact Agent Actuality application.
-- `repository-repair-openai`: fixed-endpoint OpenAI Responses capability with
-  strict structured output and receiver-owned secret/model configuration.
-- `repository-workspace-actuality`: bounded repository reads, literal search,
-  fixed `bun test`, request-bound approval, and one atomic source replacement.
+```text
+https://github.com/tkersey/world-capabilities/releases/download/v2.1.2/world-capabilities-v2.1.2-deterministic.tar.gz
+```
 
-Every Effect v1 pack declares exact interface, schema, and authority identities
-in `manifest.json`; application-specific packs also declare admitted
-application identities. `agent.invoke.v1` is a receiver-constructed built-in
-binding because its child runner is host authority rather than pack data.
+The archive contains the Effect v1 router/codecs, checksum-bound packs,
+synthetic corpora, static pack inspection, and deterministic conformance. The
+packaged verifier runs without a source checkout, GitHub authentication,
+GitHub CLI, or receiver secret:
 
-Start a new pack from [`templates/capability-v1`](templates/capability-v1/README.md).
-Static inspection uses `inspectPack`; executable verification uses
-`verifyPack`.
+```sh
+bun conformance/check-distribution.mjs --root .
+bun conformance/run-conformance.mjs --root .
+```
 
-## Proof
+From a source checkout:
 
-```bash
+```sh
 bun --version
 bun test
 bun run check
-bun run proof
-bun run proof:packs
-bun run proof:negative
-bun run proof:sidecars
-bun run proof:redaction
-bun run proof:policy
-bun run proof:v1
-bun run proof:agent-invoke
-bun run corpus:check
+bun run check:public-deterministic-v1
+bun run conformance:public-deterministic-v1
 ```
 
-The default gate is source-independent. The older checkout-coupled fixture
-integration remains available as `bun run proof:v1-checkout-integration`; it is
-not part of the release gate.
+Static inspection does not import adapters. Executable conformance separately
+proves deterministic adapter execution, policy-before-effect, exact
+application/schema/authority admission, result bounds, forbidden World
+evidence rejection, and absence of Frame authority.
 
-`corpus:update` and `packs:build` are explicit maintainer commands. They never
-run as part of default proof.
+## Included packs
 
+- `research-lookup-fixture`, bound to the exact Research Digest artifact from
+  World `v3.0.0`
+- `fixture-model`
+- `generic-http-json`
+- `human-approval`
+- `sandbox-files`
+- `local-memory-kv`
+- `sidecar-fixture`
+- `repository-repair-decision-fixture`
+- `repository-repair-openai`
+- `repository-workspace-actuality`
+
+Every Effect v1 pack declares exact identities in `manifest.json`.
+`agent.invoke.v1` remains a receiver-constructed built-in binding because its
+child runner is host authority rather than pack data.
+
+Start a pack from [`templates/capability-v1`](templates/capability-v1/README.md).
 See [Effect protocol v1](docs/effect_protocol_v1.md),
-[agent invocation](docs/agent_invoke_v1.md), and the
-[v0/v1 adapter boundary](docs/v0_v1_adapter.md). The application-specific
-Actuality packs are described in
-[repository actuality](docs/repository_actuality.md) and
+[agent invocation](docs/agent_invoke_v1.md),
+[repository actuality](docs/repository_actuality.md), and
 [OpenAI decisions](docs/openai_decision.md).
+
+## Non-claims
+
+This is a reference implementation; Effect v1 permits alternate capability
+implementations. Live model execution requires credentials. Receiver policy is
+local. The repository makes no exactly-once, hostile-host, or prompt-injection
+immunity claim.
