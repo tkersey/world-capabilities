@@ -22,10 +22,9 @@ try {
     const archivePath = path.resolve(archive);
     const bytes = await readFile(archivePath);
     const checksum = valueAfter("--checksum");
-    if (checksum !== null) {
-      const expected = parseChecksumSidecar(await readFile(path.resolve(checksum), "utf8"), path.basename(archivePath));
-      assert.equal(sha256(bytes), expected, "release asset checksum mismatch");
-    }
+    assert(checksum !== null, "--checksum is required with --archive");
+    const expected = parseChecksumSidecar(await readFile(path.resolve(checksum), "utf8"), path.basename(archivePath));
+    assert.equal(sha256(bytes), expected, "release asset checksum mismatch");
     await extractDistributionArchive(archivePath, root);
   }
   await verifyDistributionTree(root);

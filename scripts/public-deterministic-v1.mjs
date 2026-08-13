@@ -13,12 +13,33 @@ export const MAXIMUM_ENTRY_COUNT = 2048;
 
 const SOURCE_TREES = Object.freeze(["corpus", "harness", "packages", "src/v1", "test"]);
 const SOURCE_FILES = Object.freeze(["LICENSE", "scripts/build-packs.mjs", "scripts/check-corpus.mjs"]);
+const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
 
 export async function distributionSourcePaths(repository) {
   const files = [...SOURCE_FILES];
   for (const tree of SOURCE_TREES) await walk(repository, tree, files);
   await walk(repository, "examples/negative-pack", files);
-  return files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort();
+  return admitDistributionSourcePaths(files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort());
+}
+
+export function admitDistributionSourcePaths(files) {
+  assert.equal(sha256(Buffer.from(`${files.join("\n")}\n`)), DISTRIBUTION_SOURCE_PATHS_SHA256,
+    "distribution source path set differs from the reviewed release inputs");
+  return files;
+}
+
+export async function runtimeTreeDigest(repository) {
+  const files = [];
+  for (const tree of ["packages", "src/v1"]) await walk(repository, tree, files);
+  files.sort();
+  const digest = createHash("sha256");
+  for (const relative of files) {
+    digest.update(relative);
+    digest.update("\0");
+    digest.update(await readFile(path.join(repository, relative)));
+    digest.update("\0");
+  }
+  return { fileCount: files.length, sha256: digest.digest("hex") };
 }
 
 export async function buildDistributionTree(repository, outputRoot) {
@@ -92,14 +113,23 @@ export async function extractDistributionArchive(archivePath, destination) {
   const archive = await readFile(archivePath);
   assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
   const tar = gunzipSync(archive, { maxOutputLength: MAXIMUM_EXPANDED_BYTES });
+  assert.equal(tar.length % 512, 0, "tar payload is not block aligned");
   let offset = 0;
   let expanded = 0;
   let count = 0;
+  let terminated = false;
   const seen = new Set();
   while (offset + 512 <= tar.length) {
     const header = tar.subarray(offset, offset + 512);
     offset += 512;
-    if (header.every((byte) => byte === 0)) break;
+    if (header.every((byte) => byte === 0)) {
+      assert(offset + 512 <= tar.length, "tar terminator is incomplete");
+      assert(tar.subarray(offset, offset + 512).every((byte) => byte === 0), "tar terminator is incomplete");
+      offset += 512;
+      assert(tar.subarray(offset).every((byte) => byte === 0), "non-zero data follows tar terminator");
+      terminated = true;
+      break;
+    }
     count += 1;
     assert(count <= MAXIMUM_ENTRY_COUNT, "deterministic archive has too many entries");
     const storedChecksum = octal(header.subarray(148, 156));
@@ -124,6 +154,7 @@ export async function extractDistributionArchive(archivePath, destination) {
     offset += size + ((512 - (size % 512)) % 512);
   }
   assert(count > 0, "deterministic archive is empty");
+  assert(terminated, "deterministic archive has no complete terminator");
   return { sha256: sha256(archive), bytes: archive.length, entries: count, expandedBytes: expanded };
 }
 
@@ -240,7 +271,7 @@ function textField(bytes) {
 }
 function sum(bytes) { let result = 0; for (const byte of bytes) result += byte; return result; }
 function executable(relative) { return relative.startsWith("conformance/") || relative.startsWith("harness/") || relative.startsWith("scripts/"); }
-function safeRelative(value) { return value.length > 0 && !path.posix.isAbsolute(value) && !value.split("/").some((part) => part === "" || part === "." || part === ".."); }
+function safeRelative(value) { return value.length > 0 && !value.includes("\\") && !path.posix.isAbsolute(value) && !value.split("/").some((part) => part === "" || part === "." || part === ".."); }
 export function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function stableJson(value) { return JSON.stringify(value, Object.keys(value).sort(), 2); }
 function parseChecksums(text) {
