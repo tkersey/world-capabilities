@@ -20,6 +20,9 @@ assert(archive !== null, "--archive is required for executable conformance");
 assert(rootArgument === null, "--root is forbidden for executable conformance");
 const checksum = valueAfter("--checksum");
 assert(checksum !== null, "--checksum is required with --archive");
+for (const name of ["BUN_OPTIONS", "NODE_OPTIONS"]) {
+  assert(!process.env[name], `${name} must be unset for deterministic conformance`);
+}
 const temporary = await mkdtemp(path.join(tmpdir(), "world-capabilities-public-conformance-"));
 try {
   const root = temporary;
@@ -53,6 +56,7 @@ try {
   const receipt = {
     schema: "world-capabilities-public-deterministic-conformance/v1",
     version: "2.1.2",
+    archiveSha256: expected,
     inspectedPackCount: names.length,
     staticInspectionImportedAdapters: false,
     deterministicAdaptersExecuted: true,
@@ -87,7 +91,7 @@ async function withCwd(cwd, operation) {
 }
 function sanitizedEnvironment() {
   const env = { ...process.env };
-  for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "OPENAI_API_KEY"]) delete env[name];
+  for (const name of ["BUN_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN", "NODE_OPTIONS", "OPENAI_API_KEY"]) delete env[name];
   return env;
 }
 function valueAfter(flag) {

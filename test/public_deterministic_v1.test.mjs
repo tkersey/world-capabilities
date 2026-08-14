@@ -185,6 +185,32 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(rootConformanceExit).not.toBe(0);
     expect(rootConformanceError).toContain("--archive is required for executable conformance");
 
+    const preload = path.join(root, "preload.mjs");
+    await Bun.write(preload, "export {};\n");
+    const sidecar = `${first}.sha256`;
+    await Bun.write(sidecar, `${left.sha256}  ${PUBLIC_DETERMINISTIC_ARCHIVE}\n`);
+    const preloadConformance = Bun.spawn([
+      process.execPath,
+      "scripts/run-public-deterministic-v1-conformance.mjs",
+      "--archive",
+      first,
+      "--checksum",
+      sidecar,
+    ], {
+      cwd: process.cwd(),
+      env: { ...process.env, BUN_OPTIONS: `--preload=${preload}` },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [preloadOutput, preloadError, preloadExit] = await Promise.all([
+      new Response(preloadConformance.stdout).text(),
+      new Response(preloadConformance.stderr).text(),
+      preloadConformance.exited,
+    ]);
+    expect(preloadExit).not.toBe(0);
+    expect(preloadOutput).toBe("");
+    expect(preloadError).toContain("BUN_OPTIONS must be unset for deterministic conformance");
+
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
     expect(checkSource).toContain("Bun.spawn([process.execPath");
@@ -192,9 +218,11 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(conformanceSource).toContain('[process.execPath, "harness/check-pack.mjs", "--all"]');
     expect(conformanceSource).toContain('[process.execPath, "scripts/check-corpus.mjs"]');
     expect(conformanceSource).toContain('[process.execPath, "test"]');
+    expect(conformanceSource).toContain("archiveSha256: expected");
     const repositoryReadme = await readFile("README.md", "utf8");
     expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)");
     expect(repositoryReadme).toContain("run-conformance.mjs \\\n  --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256");
+    expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/check-distribution.mjs"));
     expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/run-conformance.mjs"));
     const workflow = await readFile(".github/workflows/public-reference-stack.yml", "utf8");
     expect(workflow).toContain("persist-credentials: false");

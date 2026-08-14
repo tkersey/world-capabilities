@@ -21,7 +21,7 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "f65e8a181a1fba6b46d9be32dba869a11afbaa79d9c75a689ea1366281f68a12";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "29f43c2a426999899fbfb2d184f3b2fb37c1ae51e39770954dfab448b597544c";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
@@ -121,7 +121,7 @@ export async function buildDistributionTree(repository, outputRoot) {
     dependencies: {},
     devDependencies: {},
   }, null, 2)}\n`));
-  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nInspect an extracted tree without executing its code:\n\n\`\`\`sh\nbun conformance/check-distribution.mjs --root .\n\`\`\`\n\nAuthenticate the complete release archive before executing any bundled code, then run executable conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
+  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nAuthenticate the complete release archive before executing any bundled code, then inspect and run conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/check-distribution.mjs --root .\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
   for (const [source, target] of CONFORMANCE_SOURCE_FILES) {
     await writeTreeFile(outputRoot, `conformance/${target}`, snapshot.get(source), true);
   }
