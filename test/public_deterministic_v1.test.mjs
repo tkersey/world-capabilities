@@ -23,6 +23,7 @@ import {
   readChecksumSidecar,
   runtimeTreeDigest,
   sha256,
+  snapshotFileBytes,
   verifyDistributionTree,
   writeDeterministicArchive,
 } from "../scripts/public-deterministic-v1.mjs";
@@ -52,6 +53,18 @@ test("release inputs are closed over the reviewed source path set", async () => 
     expect(() => admitDistributionSourceContent(after)).toThrow(
       "distribution source bytes differ from the reviewed release inputs",
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("distribution source snapshots retain the exact admitted bytes", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "world-capabilities-source-snapshot-"));
+  try {
+    await Bun.write(path.join(root, "source.mjs"), "export const value = 1;\n");
+    const snapshot = await snapshotFileBytes(root, ["source.mjs"]);
+    await Bun.write(path.join(root, "source.mjs"), "export const value = 2;\n");
+    expect(snapshot.get("source.mjs").toString("utf8")).toBe("export const value = 1;\n");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -179,6 +192,12 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(conformanceSource).toContain('[process.execPath, "harness/check-pack.mjs", "--all"]');
     expect(conformanceSource).toContain('[process.execPath, "scripts/check-corpus.mjs"]');
     expect(conformanceSource).toContain('[process.execPath, "test"]');
+    const repositoryReadme = await readFile("README.md", "utf8");
+    expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)");
+    expect(repositoryReadme).toContain("run-conformance.mjs \\\n  --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256");
+    expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/run-conformance.mjs"));
+    const workflow = await readFile(".github/workflows/public-reference-stack.yml", "utf8");
+    expect(workflow).toContain("persist-credentials: false");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -21,15 +21,20 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "56f91b889a2f18a6019b20a2314133fe554b94b4cb13da11a589a93b7f2b97dc";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "f65e8a181a1fba6b46d9be32dba869a11afbaa79d9c75a689ea1366281f68a12";
 
 export async function distributionSourcePaths(repository) {
+  const admitted = await reviewedDistributionSourcePaths(repository);
+  const snapshot = await snapshotFileBytes(repository, identitySourcePaths(admitted));
+  admitDistributionSourceContent(distributionSourceContentDigestFromSnapshot(snapshot, identitySourcePaths(admitted)));
+  return admitted;
+}
+
+async function reviewedDistributionSourcePaths(repository) {
   const files = [...SOURCE_FILES];
   for (const tree of SOURCE_TREES) await walk(repository, tree, files);
   await walk(repository, "examples/negative-pack", files);
-  const admitted = admitDistributionSourcePaths(files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort());
-  admitDistributionSourceContent(await distributionSourceIdentityDigest(repository, admitted));
-  return admitted;
+  return admitDistributionSourcePaths(files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort());
 }
 
 export function admitDistributionSourcePaths(files) {
@@ -39,9 +44,20 @@ export function admitDistributionSourcePaths(files) {
 }
 
 export async function distributionSourceContentDigest(repository, files) {
+  return distributionSourceContentDigestFromSnapshot(await snapshotFileBytes(repository, files), files);
+}
+
+export async function snapshotFileBytes(repository, files) {
+  const snapshot = new Map();
+  for (const relative of files) snapshot.set(relative, await readFile(path.join(repository, relative)));
+  return snapshot;
+}
+
+function distributionSourceContentDigestFromSnapshot(snapshot, files) {
   const digest = createHash("sha256");
   for (const relative of files) {
-    let bytes = await readFile(path.join(repository, relative));
+    let bytes = snapshot.get(relative);
+    assert(bytes !== undefined, `distribution source snapshot is missing: ${relative}`);
     if (relative === "scripts/public-deterministic-v1.mjs") {
       bytes = Buffer.from(bytes.toString("utf8").replace(
         /const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "[^"]+";/,
@@ -57,10 +73,12 @@ export async function distributionSourceContentDigest(repository, files) {
 }
 
 export async function distributionSourceIdentityDigest(repository, distributionPaths) {
-  return distributionSourceContentDigest(
-    repository,
-    [...distributionPaths, ...CONFORMANCE_SOURCE_FILES.map(([source]) => source)].sort(),
-  );
+  const files = identitySourcePaths(distributionPaths);
+  return distributionSourceContentDigestFromSnapshot(await snapshotFileBytes(repository, files), files);
+}
+
+function identitySourcePaths(distributionPaths) {
+  return [...distributionPaths, ...CONFORMANCE_SOURCE_FILES.map(([source]) => source)].sort();
 }
 
 export function admitDistributionSourceContent(actual) {
@@ -83,8 +101,11 @@ export async function runtimeTreeDigest(repository) {
 }
 
 export async function buildDistributionTree(repository, outputRoot) {
-  for (const relative of await distributionSourcePaths(repository)) {
-    await writeTreeFile(outputRoot, relative, await readFile(path.join(repository, relative)), executable(relative));
+  const distributionPaths = await reviewedDistributionSourcePaths(repository);
+  const snapshot = await snapshotFileBytes(repository, identitySourcePaths(distributionPaths));
+  admitDistributionSourceContent(distributionSourceContentDigestFromSnapshot(snapshot, identitySourcePaths(distributionPaths)));
+  for (const relative of distributionPaths) {
+    await writeTreeFile(outputRoot, relative, snapshot.get(relative), executable(relative));
   }
   await writeTreeFile(outputRoot, "package.json", Buffer.from(`${JSON.stringify({
     name: "@tkersey/world-capabilities-deterministic",
@@ -100,9 +121,9 @@ export async function buildDistributionTree(repository, outputRoot) {
     dependencies: {},
     devDependencies: {},
   }, null, 2)}\n`));
-  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nInspect an extracted tree without executing its code:\n\n\`\`\`sh\nbun conformance/check-distribution.mjs --root .\n\`\`\`\n\nExecute conformance only from the externally checksum-authenticated release archive:\n\n\`\`\`sh\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
+  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nInspect an extracted tree without executing its code:\n\n\`\`\`sh\nbun conformance/check-distribution.mjs --root .\n\`\`\`\n\nAuthenticate the complete release archive before executing any bundled code, then run executable conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
   for (const [source, target] of CONFORMANCE_SOURCE_FILES) {
-    await writeTreeFile(outputRoot, `conformance/${target}`, await readFile(path.join(repository, source)), true);
+    await writeTreeFile(outputRoot, `conformance/${target}`, snapshot.get(source), true);
   }
   const covered = await treeFiles(outputRoot);
   const checksums = [];
