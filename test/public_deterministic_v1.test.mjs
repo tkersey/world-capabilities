@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, readdir, rm, truncate } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, truncate } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
@@ -8,13 +8,19 @@ import {
   PUBLIC_DETERMINISTIC_ARCHIVE,
   PUBLIC_DETERMINISTIC_ROOT,
   MAXIMUM_ARCHIVE_BYTES,
+  MAXIMUM_ENTRY_COUNT,
   MAXIMUM_EXPANDED_BYTES,
+  admitArchiveEntryCount,
   admitExpandedArchiveBytes,
+  admitDistributionSourceContent,
   admitDistributionSourcePaths,
   buildDistributionTree,
+  distributionSourceContentDigest,
+  distributionSourceIdentityDigest,
   distributionSourcePaths,
   extractDistributionArchive,
   readDistributionArchive,
+  readChecksumSidecar,
   runtimeTreeDigest,
   sha256,
   verifyDistributionTree,
@@ -33,6 +39,22 @@ test("release inputs are closed over the reviewed source path set", async () => 
   expect(() => admitDistributionSourcePaths([...paths, "packages/fixture-model/local-debug.txt"])).toThrow(
     "distribution source path set differs from the reviewed release inputs",
   );
+  const digest = await distributionSourceIdentityDigest(process.cwd(), paths);
+  expect(() => admitDistributionSourceContent(digest)).not.toThrow();
+
+  const root = await mkdtemp(path.join(tmpdir(), "world-capabilities-source-identity-"));
+  try {
+    await Bun.write(path.join(root, "source.mjs"), "export const value = 1;\n");
+    const before = await distributionSourceContentDigest(root, ["source.mjs"]);
+    await Bun.write(path.join(root, "source.mjs"), "export const value = 2;\n");
+    const after = await distributionSourceContentDigest(root, ["source.mjs"]);
+    expect(after).not.toBe(before);
+    expect(() => admitDistributionSourceContent(after)).toThrow(
+      "distribution source bytes differ from the reviewed release inputs",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("deterministic distribution is reproducible and safely self-verifying", async () => {
@@ -50,6 +72,9 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(firstBytes[9]).toBe(0xff);
     expect(() => admitExpandedArchiveBytes(MAXIMUM_EXPANDED_BYTES + 1)).toThrow(
       "deterministic archive expansion exceeds maximum",
+    );
+    expect(() => admitArchiveEntryCount(MAXIMUM_ENTRY_COUNT + 1)).toThrow(
+      "deterministic archive has too many entries",
     );
     const extracted = path.join(root, "extracted");
     await extractDistributionArchive(first, extracted);
@@ -78,10 +103,46 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
       "non-portable archive path collision",
     );
 
+    const nonCanonical = path.join(root, "non-canonical.tar.gz");
+    await Bun.write(nonCanonical, mutateArchiveHeader(
+      minimalArchive(`${PUBLIC_DETERMINISTIC_ROOT}/LICENSE`, Buffer.from("same")),
+      (header) => writeOctal(header, 108, 8, 1),
+    ));
+    await expect(extractDistributionArchive(nonCanonical, path.join(root, "non-canonical-output"))).rejects.toThrow(
+      "non-canonical tar header",
+    );
+
+    const nonZeroPadding = path.join(root, "non-zero-padding.tar.gz");
+    const paddedTar = gunzipSync(minimalArchive(`${PUBLIC_DETERMINISTIC_ROOT}/LICENSE`, Buffer.from("x")));
+    paddedTar[513] = 1;
+    await Bun.write(nonZeroPadding, gzipSync(paddedTar, { level: 9, mtime: 0 }));
+    await expect(extractDistributionArchive(nonZeroPadding, path.join(root, "non-zero-padding-output"))).rejects.toThrow(
+      "non-zero tar padding",
+    );
+
     const oversized = path.join(root, "oversized.tar.gz");
     await Bun.write(oversized, Buffer.alloc(0));
     await truncate(oversized, MAXIMUM_ARCHIVE_BYTES + 1);
     await expect(readDistributionArchive(oversized)).rejects.toThrow("deterministic archive exceeds maximum size");
+
+    const oversizedTree = path.join(root, "oversized-tree");
+    await mkdir(oversizedTree);
+    const oversizedEntry = path.join(oversizedTree, "payload.bin");
+    await Bun.write(oversizedEntry, "");
+    await truncate(oversizedEntry, MAXIMUM_EXPANDED_BYTES + 1);
+    await expect(writeDeterministicArchive(oversizedTree, path.join(root, "oversized-output.tar.gz"))).rejects.toThrow(
+      "deterministic archive expansion exceeds maximum",
+    );
+
+    const hugeSidecar = path.join(root, "huge.sha256");
+    await Bun.write(hugeSidecar, "");
+    await truncate(hugeSidecar, 257);
+    await expect(readChecksumSidecar(hugeSidecar)).rejects.toThrow("checksum sidecar exceeds maximum size");
+
+    const fifoSidecar = path.join(root, "checksum.fifo");
+    const mkfifoSidecar = Bun.spawnSync(["mkfifo", fifoSidecar]);
+    expect(mkfifoSidecar.exitCode).toBe(0);
+    await expect(readChecksumSidecar(fifoSidecar)).rejects.toThrow("checksum sidecar must be a regular file");
 
     const fifo = path.join(extracted, "uncovered-fifo");
     const mkfifo = Bun.spawnSync(["mkfifo", fifo]);
@@ -102,10 +163,21 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
       expect(missingChecksumError).toContain("--checksum is required with --archive");
     }
 
+    const rootConformance = Bun.spawn([process.execPath, "scripts/run-public-deterministic-v1-conformance.mjs", "--root", extracted], {
+      cwd: process.cwd(), stdout: "pipe", stderr: "pipe",
+    });
+    const [rootConformanceError, rootConformanceExit] = await Promise.all([
+      new Response(rootConformance.stderr).text(), rootConformance.exited,
+    ]);
+    expect(rootConformanceExit).not.toBe(0);
+    expect(rootConformanceError).toContain("--archive is required for executable conformance");
+
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
     expect(checkSource).toContain("Bun.spawn([process.execPath");
-    expect(conformanceSource).toContain('[process.execPath, "run", "proof"]');
+    expect(conformanceSource).not.toContain('[process.execPath, "run", "proof"]');
+    expect(conformanceSource).toContain('[process.execPath, "harness/check-pack.mjs", "--all"]');
+    expect(conformanceSource).toContain('[process.execPath, "scripts/check-corpus.mjs"]');
     expect(conformanceSource).toContain('[process.execPath, "test"]');
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -131,6 +203,15 @@ function minimalArchive(nameOrEntries, contents = null) {
     chunks.push(header, entryContents, Buffer.alloc((512 - (entryContents.length % 512)) % 512));
   }
   return gzipSync(Buffer.concat([...chunks, Buffer.alloc(1024)]), { level: 9, mtime: 0 });
+}
+
+function mutateArchiveHeader(archive, mutate) {
+  const tar = gunzipSync(archive);
+  const header = tar.subarray(0, 512);
+  mutate(header);
+  header.fill(0x20, 148, 156);
+  writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
+  return gzipSync(tar, { level: 9, mtime: 0 });
 }
 
 function writeOctal(buffer, offset, width, value) {

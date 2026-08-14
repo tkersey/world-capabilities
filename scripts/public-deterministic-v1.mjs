@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,22 +11,61 @@ export const PUBLIC_DETERMINISTIC_ARCHIVE = `${PUBLIC_DETERMINISTIC_ROOT}.tar.gz
 export const MAXIMUM_ARCHIVE_BYTES = 32 << 20;
 export const MAXIMUM_EXPANDED_BYTES = 128 << 20;
 export const MAXIMUM_ENTRY_COUNT = 2048;
+export const MAXIMUM_CHECKSUM_SIDECAR_BYTES = 256;
 
 const SOURCE_TREES = Object.freeze(["corpus", "harness", "packages", "src/v1", "test"]);
 const SOURCE_FILES = Object.freeze(["LICENSE", "scripts/build-packs.mjs", "scripts/check-corpus.mjs"]);
+const CONFORMANCE_SOURCE_FILES = Object.freeze([
+  ["scripts/public-deterministic-v1.mjs", "public-deterministic-v1.mjs"],
+  ["scripts/check-public-deterministic-v1.mjs", "check-distribution.mjs"],
+  ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
+]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "56f91b889a2f18a6019b20a2314133fe554b94b4cb13da11a589a93b7f2b97dc";
 
 export async function distributionSourcePaths(repository) {
   const files = [...SOURCE_FILES];
   for (const tree of SOURCE_TREES) await walk(repository, tree, files);
   await walk(repository, "examples/negative-pack", files);
-  return admitDistributionSourcePaths(files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort());
+  const admitted = admitDistributionSourcePaths(files.filter((relative) => relative !== "test/public_deterministic_v1.test.mjs").sort());
+  admitDistributionSourceContent(await distributionSourceIdentityDigest(repository, admitted));
+  return admitted;
 }
 
 export function admitDistributionSourcePaths(files) {
   assert.equal(sha256(Buffer.from(`${files.join("\n")}\n`)), DISTRIBUTION_SOURCE_PATHS_SHA256,
     "distribution source path set differs from the reviewed release inputs");
   return files;
+}
+
+export async function distributionSourceContentDigest(repository, files) {
+  const digest = createHash("sha256");
+  for (const relative of files) {
+    let bytes = await readFile(path.join(repository, relative));
+    if (relative === "scripts/public-deterministic-v1.mjs") {
+      bytes = Buffer.from(bytes.toString("utf8").replace(
+        /const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "[^"]+";/,
+        'const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "<self>";',
+      ));
+    }
+    digest.update(relative);
+    digest.update("\0");
+    digest.update(bytes);
+    digest.update("\0");
+  }
+  return digest.digest("hex");
+}
+
+export async function distributionSourceIdentityDigest(repository, distributionPaths) {
+  return distributionSourceContentDigest(
+    repository,
+    [...distributionPaths, ...CONFORMANCE_SOURCE_FILES.map(([source]) => source)].sort(),
+  );
+}
+
+export function admitDistributionSourceContent(actual) {
+  assert.equal(actual, DISTRIBUTION_SOURCE_CONTENT_SHA256,
+    "distribution source bytes differ from the reviewed release inputs");
 }
 
 export async function runtimeTreeDigest(repository) {
@@ -56,18 +96,13 @@ export async function buildDistributionTree(repository, outputRoot) {
     scripts: {
       test: "bun test",
       proof: "bun harness/check-pack.mjs --all && bun harness/run-negative.mjs && bun harness/run-sidecar-conformance.mjs && bun harness/redaction-tests.mjs && bun harness/policy-tests.mjs && bun test test/effect_protocol_v1.test.mjs test/effect_protocol_v1_manifest.test.mjs test/research_lookup_fixture.test.mjs test/agent_invoke_v1.test.mjs && bun scripts/check-corpus.mjs",
-      conformance: "bun conformance/run-conformance.mjs --root .",
     },
     dependencies: {},
     devDependencies: {},
   }, null, 2)}\n`));
-  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\n\`\`\`sh\nbun conformance/check-distribution.mjs --root .\nbun conformance/run-conformance.mjs --root .\n\`\`\`\n`));
-  for (const [source, target] of [
-    ["public-deterministic-v1.mjs", "public-deterministic-v1.mjs"],
-    ["check-public-deterministic-v1.mjs", "check-distribution.mjs"],
-    ["run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
-  ]) {
-    await writeTreeFile(outputRoot, `conformance/${target}`, await readFile(path.join(repository, "scripts", source)), true);
+  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nInspect an extracted tree without executing its code:\n\n\`\`\`sh\nbun conformance/check-distribution.mjs --root .\n\`\`\`\n\nExecute conformance only from the externally checksum-authenticated release archive:\n\n\`\`\`sh\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
+  for (const [source, target] of CONFORMANCE_SOURCE_FILES) {
+    await writeTreeFile(outputRoot, `conformance/${target}`, await readFile(path.join(repository, source)), true);
   }
   const covered = await treeFiles(outputRoot);
   const checksums = [];
@@ -93,31 +128,58 @@ export async function buildDistributionTree(repository, outputRoot) {
 
 export async function writeDeterministicArchive(treeRoot, outputPath) {
   const entries = await treeFiles(treeRoot);
-  const chunks = [];
-  for (const relative of entries) {
-    const bytes = await readFile(path.join(treeRoot, relative));
-    chunks.push(tarHeader(`${PUBLIC_DETERMINISTIC_ROOT}/${relative}`, bytes.length, executable(relative) ? 0o755 : 0o644));
-    chunks.push(bytes);
-    const padding = (512 - (bytes.length % 512)) % 512;
-    if (padding > 0) chunks.push(Buffer.alloc(padding));
+  admitArchiveEntryCount(entries.length);
+  const opened = [];
+  try {
+    let projectedBytes = 1024;
+    for (const relative of entries) {
+      const handle = await open(path.join(treeRoot, relative), fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+      try {
+        const info = await handle.stat();
+        assert(info.isFile(), `deterministic archive entry must be a regular file: ${relative}`);
+        projectedBytes += 512 + info.size + ((512 - (info.size % 512)) % 512);
+        admitExpandedArchiveBytes(projectedBytes);
+        opened.push({ handle, info, relative });
+      } catch (error) {
+        await handle.close();
+        throw error;
+      }
+    }
+
+    const chunks = [];
+    for (const entry of opened) {
+      const current = await entry.handle.stat();
+      assert.equal(current.size, entry.info.size, `deterministic archive entry changed during admission: ${entry.relative}`);
+      const bytes = await entry.handle.readFile();
+      assert.equal(bytes.length, entry.info.size, `deterministic archive entry changed during admission: ${entry.relative}`);
+      chunks.push(tarHeader(`${PUBLIC_DETERMINISTIC_ROOT}/${entry.relative}`, bytes.length, executable(entry.relative) ? 0o755 : 0o644));
+      chunks.push(bytes);
+      const padding = (512 - (bytes.length % 512)) % 512;
+      if (padding > 0) chunks.push(Buffer.alloc(padding));
+    }
+    chunks.push(Buffer.alloc(1024));
+    const tar = Buffer.concat(chunks, projectedBytes);
+    const archive = gzipSync(tar, { level: 9, mtime: 0 });
+    archive[9] = 0xff;
+    assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, archive);
+    return { sha256: sha256(archive), bytes: archive.length, entries: entries.length };
+  } finally {
+    await Promise.all(opened.map(({ handle }) => handle.close()));
   }
-  chunks.push(Buffer.alloc(1024));
-  const tar = Buffer.concat(chunks);
-  admitExpandedArchiveBytes(tar.length);
-  const archive = gzipSync(tar, { level: 9, mtime: 0 });
-  archive[9] = 0xff;
-  assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, archive);
-  return { sha256: sha256(archive), bytes: archive.length, entries: entries.length };
 }
 
 export function admitExpandedArchiveBytes(bytes) {
   assert(bytes <= MAXIMUM_EXPANDED_BYTES, "deterministic archive expansion exceeds maximum");
 }
 
+export function admitArchiveEntryCount(count) {
+  assert(count <= MAXIMUM_ENTRY_COUNT, "deterministic archive has too many entries");
+}
+
 export async function readDistributionArchive(archivePath) {
-  const handle = await open(archivePath, "r");
+  const handle = await open(archivePath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
   try {
     const info = await handle.stat();
     assert(info.isFile(), "deterministic archive must be a regular file");
@@ -173,11 +235,16 @@ export async function extractDistributionArchive(archivePath, destination, authe
     const type = header[156];
     assert(type === 0 || type === 0x30, `links and non-files are forbidden: ${inside}`);
     const size = octal(header.subarray(124, 136));
+    assert(header.equals(tarHeader(relative, size, executable(inside) ? 0o755 : 0o644)),
+      `non-canonical tar header: ${inside}`);
     expanded += size;
     assert(expanded <= MAXIMUM_EXPANDED_BYTES, "deterministic archive expansion exceeds maximum");
-    assert(offset + size <= tar.length, "truncated tar entry");
+    const padding = (512 - (size % 512)) % 512;
+    assert(offset + size + padding <= tar.length, "truncated tar entry");
     entries.push({ inside, bytes: tar.subarray(offset, offset + size), isExecutable: executable(inside) });
-    offset += size + ((512 - (size % 512)) % 512);
+    offset += size;
+    assert(tar.subarray(offset, offset + padding).every((byte) => byte === 0), `non-zero tar padding: ${inside}`);
+    offset += padding;
   }
   assert(count > 0, "deterministic archive is empty");
   assert(terminated, "deterministic archive has no complete terminator");
@@ -228,6 +295,20 @@ export function parseChecksumSidecar(text, expectedName = PUBLIC_DETERMINISTIC_A
   assert(match, "invalid checksum sidecar");
   assert.equal(match[2], expectedName, "checksum sidecar asset mismatch");
   return match[1];
+}
+
+export async function readChecksumSidecar(sidecarPath) {
+  const handle = await open(sidecarPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+  try {
+    const info = await handle.stat();
+    assert(info.isFile(), "checksum sidecar must be a regular file");
+    assert(info.size <= MAXIMUM_CHECKSUM_SIDECAR_BYTES, "checksum sidecar exceeds maximum size");
+    const bytes = await handle.readFile();
+    assert(bytes.length <= MAXIMUM_CHECKSUM_SIDECAR_BYTES, "checksum sidecar exceeds maximum size");
+    return bytes.toString("utf8");
+  } finally {
+    await handle.close();
+  }
 }
 
 async function walk(root, relative, output) {

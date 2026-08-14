@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
   extractDistributionArchive,
   parseChecksumSidecar,
+  readChecksumSidecar,
   readDistributionArchive,
   sha256,
   verifyDistributionTree,
@@ -24,7 +25,7 @@ try {
     const checksum = valueAfter("--checksum");
     assert(checksum !== null, "--checksum is required with --archive");
     const bytes = await readDistributionArchive(archivePath);
-    const expected = parseChecksumSidecar(await readFile(path.resolve(checksum), "utf8"), path.basename(archivePath));
+    const expected = parseChecksumSidecar(await readChecksumSidecar(path.resolve(checksum)), path.basename(archivePath));
     assert.equal(sha256(bytes), expected, "release asset checksum mismatch");
     extraction = await extractDistributionArchive(archivePath, root, bytes);
   }
