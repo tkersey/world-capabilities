@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import decisionContract from "./decision-contract.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-repair-decision-fixture";
-const APPLICATION_ID = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+const APPLICATION_ID = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
 export const DECISION_CONTRACT_DIGEST = "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",

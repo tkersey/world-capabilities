@@ -335,11 +335,11 @@ test("all adapters reject unsupported targets and status sets before effects", a
         effectAttempted: 0
       };
       if (name === "repository-repair-decision-fixture") {
-        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+        context.applicationId = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
         context.policy.repositoryRepairDecisionFixture = true;
       }
       if (name === "repository-repair-openai") {
-        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+        context.applicationId = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
         context.policy.openaiRepositoryRepair = true;
         context.secrets = { OPENAI_API_KEY: "fixture-secret" };
         context.openaiModel = "fixture-model";
@@ -347,7 +347,7 @@ test("all adapters reject unsupported targets and status sets before effects", a
         context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
       }
       if (name === "repository-workspace-actuality") {
-        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+        context.applicationId = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
         context.policy.repositoryActuality = true;
         context.workspaceRoot = root;
         context.workspaceRootReal = await realpath(root);

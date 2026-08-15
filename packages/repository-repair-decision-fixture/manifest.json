@@ -22,7 +22,7 @@
   ],
   "checksums": {
     "action-schema.json": "a06bb268a1e72928c4b2acc3e072bb72fe3d11a63cd44f10f718690419624ffb",
-    "adapter.mjs": "694fd1d6ff7fb6eb03dfe5c191a4f23b7e422a152f055a548ef3dfefc34d03f1",
+    "adapter.mjs": "25c81870e80e709d4f145529d21e50f9a58a6be02aed856558534be9da141fe9",
     "decision-contract.bin": "fd7df48eb8bc79c7e4150156de83e911e8a76593cb59850952ecb11385f49b94",
     "decision-contract.json": "0ae9cb01cf12217372c9d8fb933947124518fff117fec74debe83b90e80664cd"
   },
@@ -34,7 +34,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32"
+          "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
@@ -57,8 +57,8 @@
     "network": false
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-decision-fixture",
-  "packageVersion": "2.2.0",
-  "packFingerprint": "461efa55fc1b0308402b52d1f94d5a87b236dd87ead839ba5c9c4b3461cb3d0e",
+  "packageVersion": "2.2.1",
+  "packFingerprint": "fc4fffa78799d5b9c3d12603da1237870e4ccdf8ebb54a4194e00f2c8f96e237",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

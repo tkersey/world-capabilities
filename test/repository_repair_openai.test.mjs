@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import * as openai from "../packages/repository-repair-openai/adapter.mjs";
 
-const APPLICATION_ID = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+const APPLICATION_ID = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
 
 describe("repository repair OpenAI capability", () => {
   test("uses one fixed Responses request with strict output and no tools", async () => {
