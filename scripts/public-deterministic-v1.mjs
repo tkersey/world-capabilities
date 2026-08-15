@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { gunzipSync, gzipSync, inflateRawSync } from "node:zlib";
+import { gunzipSync, inflateRawSync } from "node:zlib";
 import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -22,7 +22,7 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "326c8d36de36ddc4dd72059ad88337940b36afdb7208a728e2850e05185d485d";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "e7d37c7191f897bdd3cd25e1b81a8b817c9e6107211ee5faca993ec4bf34d166";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
@@ -181,8 +181,7 @@ export async function writeDeterministicArchive(treeRoot, outputPath) {
     }
     chunks.push(Buffer.alloc(1024));
     const tar = Buffer.concat(chunks, projectedBytes);
-    const archive = gzipSync(tar, { level: 9, mtime: 0 });
-    archive[9] = 0xff;
+    const archive = canonicalGzip(tar);
     assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
     await mkdir(path.dirname(outputPath), { recursive: true });
     await writeFile(outputPath, archive);
@@ -217,12 +216,13 @@ export async function readDistributionArchive(archivePath) {
 export async function extractDistributionArchive(archivePath, destination, authenticatedArchive = null) {
   const archive = authenticatedArchive ?? await readDistributionArchive(archivePath);
   assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
-  assert.deepEqual(archive.subarray(0, 10), Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff]),
+  assert.deepEqual(archive.subarray(0, 10), Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff]),
     "deterministic archive has non-canonical gzip metadata");
   const inflated = inflateRawSync(archive.subarray(10), { info: true, maxOutputLength: MAXIMUM_EXPANDED_BYTES });
   assert.equal(10 + inflated.engine.bytesWritten + 8, archive.length,
     "deterministic archive must contain exactly one gzip member");
   const tar = gunzipSync(archive, { maxOutputLength: MAXIMUM_EXPANDED_BYTES });
+  assert(archive.equals(canonicalGzip(tar)), "deterministic archive gzip encoding is not canonical");
   assert.equal(tar.length % 512, 0, "tar payload is not block aligned");
   let offset = 0;
   let expanded = 0;
@@ -279,6 +279,37 @@ export async function extractDistributionArchive(archivePath, destination, authe
     await writeTreeFile(destination, entry.inside, entry.bytes, entry.isExecutable);
   }
   return { sha256: sha256(archive), bytes: archive.length, entries: count, expandedBytes: expanded };
+}
+
+export function canonicalGzip(bytes) {
+  const blocks = [];
+  for (let offset = 0; offset < bytes.length || blocks.length === 0;) {
+    const length = Math.min(0xffff, bytes.length - offset);
+    const final = offset + length === bytes.length;
+    const header = Buffer.alloc(5);
+    header[0] = final ? 1 : 0;
+    header.writeUInt16LE(length, 1);
+    header.writeUInt16LE(length ^ 0xffff, 3);
+    blocks.push(header, bytes.subarray(offset, offset + length));
+    offset += length;
+  }
+  const trailer = Buffer.alloc(8);
+  trailer.writeUInt32LE(crc32(bytes), 0);
+  trailer.writeUInt32LE(bytes.length >>> 0, 4);
+  return Buffer.concat([
+    Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff]),
+    ...blocks,
+    trailer,
+  ]);
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 export async function verifyDistributionTree(root) {

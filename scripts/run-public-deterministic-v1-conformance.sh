@@ -12,4 +12,4 @@ if [ ! -f "$runner" ]; then
   runner="$script_dir/run-public-deterministic-v1-conformance.mjs"
 fi
 WORLD_CAPABILITIES_CONFORMANCE_WRAPPER=1 exec env -u BUN_OPTIONS -u NODE_OPTIONS \
-  bun "$runner" "$@"
+  bun --config=/dev/null "$runner" "$@"

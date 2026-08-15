@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, readdir, rm, truncate } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { gunzipSync, gzipSync } from "node:zlib";
+import { gunzipSync } from "node:zlib";
 
 import {
   PUBLIC_DETERMINISTIC_ARCHIVE,
@@ -15,6 +15,7 @@ import {
   admitDistributionSourceContent,
   admitDistributionSourcePaths,
   buildDistributionTree,
+  canonicalGzip,
   distributionSourceContentDigest,
   distributionSourceIdentityDigest,
   distributionSourcePaths,
@@ -235,6 +236,21 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(preloadOutput).toBe("");
     expect(preloadError).toContain("BUN_OPTIONS and NODE_OPTIONS must be unset for deterministic conformance");
 
+    const ambient = path.join(root, "ambient-bunfig");
+    await mkdir(ambient);
+    const ambientMarker = path.join(ambient, "preload-ran");
+    await Bun.write(path.join(ambient, "ambient-preload.mjs"), `await Bun.write(${JSON.stringify(ambientMarker)}, "loaded");\n`);
+    await Bun.write(path.join(ambient, "bunfig.toml"), 'preload = ["./ambient-preload.mjs"]\n');
+    const ambientConformance = Bun.spawn([
+      "sh", path.resolve("scripts/run-public-deterministic-v1-conformance.sh"), "--root", extracted,
+    ], { cwd: ambient, stdout: "pipe", stderr: "pipe" });
+    const [ambientError, ambientExit] = await Promise.all([
+      new Response(ambientConformance.stderr).text(), ambientConformance.exited,
+    ]);
+    expect(ambientExit).not.toBe(0);
+    expect(ambientError).toContain("--archive is required for executable conformance");
+    await expect(readFile(ambientMarker)).rejects.toThrow();
+
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
     expect(checkSource).toContain("Bun.spawn([process.execPath");
@@ -283,12 +299,6 @@ function mutateArchiveHeader(archive, mutate) {
   header.fill(0x20, 148, 156);
   writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
   return canonicalGzip(tar);
-}
-
-function canonicalGzip(bytes) {
-  const archive = gzipSync(bytes, { level: 9, mtime: 0 });
-  archive[9] = 0xff;
-  return archive;
 }
 
 function writeOctal(buffer, offset, width, value) {
