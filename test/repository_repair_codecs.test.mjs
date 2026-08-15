@@ -12,7 +12,7 @@ describe("repository repair portable codecs", () => {
   test("round-trips every model Action branch through the closed Boundary union", () => {
     const actions = [
       { action: "list_repository", arguments: {} },
-      { action: "read_file", arguments: { path: "src/range.mjs" } },
+      { action: "read_file", arguments: { role: "source", path: "src/range.mjs" } },
       { action: "search_text", arguments: { query: "range", path_prefix: "src" } },
       { action: "run_tests", arguments: { suite: "default" } },
       {
@@ -40,7 +40,7 @@ describe("repository repair portable codecs", () => {
 
   test("rejects open actions, extra fields, invalid digests, and trailing bytes", () => {
     expect(() => encodeRepositoryRepairAction({ action: "shell", arguments: {} })).toThrow();
-    expect(() => encodeRepositoryRepairAction({ action: "read_file", arguments: { path: "src/range.mjs", extra: true } })).toThrow();
+    expect(() => encodeRepositoryRepairAction({ action: "read_file", arguments: { role: "source", path: "src/range.mjs", extra: true } })).toThrow();
     expect(() => encodeRepositoryRepairAction({
       action: "replace_file",
       arguments: { path: "src/range.mjs", expected_sha256: "no", replacement: "x", rationale: "x" }
@@ -50,7 +50,7 @@ describe("repository repair portable codecs", () => {
   });
 
   test("encodes bounded effect outcomes", () => {
-    expect(encodeRepositoryListResult({ entries: [{ path: "src/range.mjs", kind: "file", byteLength: 10 }] }).length).toBeGreaterThan(0);
+    expect(encodeRepositoryListResult({ entries: [{ path: "src/range.mjs", kind: "file" }], truncated: false }).length).toBeGreaterThan(0);
     expect(encodeRepositoryTestResult({
       exitCode: 0,
       passed: true,

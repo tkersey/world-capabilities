@@ -5,7 +5,15 @@
       "role": "adapter"
     },
     {
+      "path": "decision-contract.bin",
+      "role": "schema"
+    },
+    {
       "path": "decision-contract.json",
+      "role": "schema"
+    },
+    {
+      "path": "action-schema.json",
       "role": "schema"
     }
   ],
@@ -14,8 +22,10 @@
     "network.http"
   ],
   "checksums": {
-    "adapter.mjs": "8fffc179aab49459e8dfef0f8ac2376230897149fc47dd23dd2d265154e8abf8",
-    "decision-contract.json": "47a66ee17f4d518d9eee2d4092917e6d3ce242c288e23837f6412a9f399ab2be"
+    "action-schema.json": "a06bb268a1e72928c4b2acc3e072bb72fe3d11a63cd44f10f718690419624ffb",
+    "adapter.mjs": "57dc6ab0ca2c6f5665c2aacc9858cbd733a9786594a1fd90bd6e3ec13e888546",
+    "decision-contract.bin": "fd7df48eb8bc79c7e4150156de83e911e8a76593cb59850952ecb11385f49b94",
+    "decision-contract.json": "0ae9cb01cf12217372c9d8fb933947124518fff117fec74debe83b90e80664cd"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -25,21 +35,25 @@
     "interfaces": [
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
         "interfaceLabel": "model.decide.v1",
-        "payloadSchemaId": "9c77e9f50112cf7b620dd4d4f235365aff354615bf4b9e7f394434dc7cc367cb",
-        "resultSchemaId": "f881b59b5cd53a3cd073b8704794fdd52a99120ca9aeb7e6eb05f8054ce5cfb1"
+        "payloadSchemaId": "71a55185311a35066f51f4aecc2f4fd1c2ee7d0dc0b563a42f5ec2620d4d6cfd",
+        "resultSchemaId": "34d136f0796a2332d269477a46af9b478e42ab671e730584dc7c0582347b417a"
       }
     ]
   },
   "idempotencySupport": "result-journal-bound",
-  "maximumRequestBytes": 524288,
+  "maximumRequestBytes": 393216,
   "maximumResponseBytes": 4194304,
   "metadata": {
-    "allowedBuiltins": [],
+    "allowedBuiltins": [
+      "node:crypto",
+      "node:fs"
+    ],
+    "decisionContractDigest": "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f",
     "liveNetwork": true,
     "mode": "openai-responses-strict-json",
     "networkHosts": [
@@ -47,8 +61,8 @@
     ]
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-openai",
-  "packageVersion": "2.1.1",
-  "packFingerprint": "65bcc985a8a0a8f8af84d8aee5fea5b46d247a42682c745e34aabf6005a37e88",
+  "packageVersion": "2.2.0",
+  "packFingerprint": "3b7a33ba0f8441d53c7c3496450396548b621bb3afbf7af390de16372b9c1da5",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",

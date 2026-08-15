@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import * as openai from "../packages/repository-repair-openai/adapter.mjs";
 
-const APPLICATION_ID = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+const APPLICATION_ID = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
 
 describe("repository repair OpenAI capability", () => {
   test("uses one fixed Responses request with strict output and no tools", async () => {
@@ -25,12 +25,24 @@ describe("repository repair OpenAI capability", () => {
       expect(body.text.format.schema.properties.arguments.anyOf).toHaveLength(7);
       expect(body.previous_response_id).toBeUndefined();
       expect(body.conversation).toBeUndefined();
-      return response({ action: "read_file", arguments: { path: "src/range.mjs" } });
+      expect(body.input[0].content[0].text).toContain("Inspect the repository before editing");
+      expect(body.input[0].content[0].text).toContain("list_repository");
+      const dynamic = JSON.parse(body.input[1].content[0].text);
+      expect(dynamic).toEqual({
+        goal: { task: "Fix tests.", repository: "fixture" },
+        counters: { turns: 0, decisions: 0, effectActions: 0, childActions: 0 },
+        phase: "decide",
+        context: decisionContext(),
+        strategy_local: {}
+      });
+      expect(body.input[1].content[0].text).not.toContain("action_catalog");
+      expect(body.input[1].content[0].text).not.toContain("instructions");
+      return response({ action: "read_file", arguments: { role: "source", path: "src/range.mjs" } });
     });
 
     const resolved = await openai.resolve(context, request());
     expect(resolved.status).toBe("ok");
-    expect(resolved.payload).toEqual({ action: "read_file", arguments: { path: "src/range.mjs" } });
+    expect(resolved.payload).toEqual({ action: "read_file", arguments: { role: "source", path: "src/range.mjs" } });
     expect(resolved.claims).toEqual({
       provider: "openai",
       endpointClass: "responses",
@@ -88,15 +100,16 @@ describe("repository repair OpenAI capability", () => {
   });
 
   test("admits only exact closed Action objects and UTF-8 byte bounds", () => {
-    expect(() => openai.admitAction({ action: "read_file", arguments: { path: "x", extra: true } })).toThrow();
+    expect(() => openai.admitAction({ action: "read_file", arguments: { role: "source", path: "x", extra: true } })).toThrow();
     expect(() => openai.admitAction({ action: "read_file", arguments: { suite: "default" } })).toThrow();
+    expect(() => openai.admitAction({ action: "read_file", arguments: { role: "test", path: "src/range.mjs" } })).toThrow();
     expect(() => openai.admitAction({ action: "replace_file", arguments: {
       path: "src/range.mjs",
       expected_sha256: "not-a-digest",
       replacement: "x",
       rationale: "x"
     } })).toThrow();
-    expect(() => openai.admitAction({ action: "read_file", arguments: { path: "é".repeat(256) } })).toThrow();
+    expect(() => openai.admitAction({ action: "read_file", arguments: { role: "source", path: "é".repeat(256) } })).toThrow();
   });
 });
 
@@ -111,13 +124,26 @@ function request() {
     },
     responseSchema: { statuses: ["ok", "rejected", "failed"] },
     payload: {
-      instructions: "Inspect before editing.",
-      actionCatalog: [{ name: "read_file", description: "Read.", payloadSchemaDigest: "0".repeat(64), kind: "effect" }],
+      contractDigest: openai.DECISION_CONTRACT_DIGEST,
       goal: { task: "Fix tests.", repository: "fixture" },
       counters: { turns: 0, decisions: 0, effectActions: 0, childActions: 0 },
       phase: "decide",
-      history: []
+      context: decisionContext(),
+      strategyLocal: {}
     }
+  };
+}
+
+function decisionContext() {
+  return {
+    listing: null,
+    packageDocument: null,
+    sourceDocument: null,
+    testDocument: null,
+    latestSearch: null,
+    latestTest: null,
+    replacement: null,
+    evidence: { failingTestObserved: false, mutationApplied: false, passingTestObserved: false }
   };
 }
 

@@ -292,7 +292,11 @@ function payloadFor(name) {
     return { query: "portable algebraic effects", maximumItems: 2 };
   }
   if (name === "repository-repair-decision-fixture" || name === "repository-repair-openai") {
-    return { phase: "decide", history: [] };
+    return {
+      contractDigest: "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f",
+      phase: "decide",
+      context: {}
+    };
   }
   if (name === "repository-workspace-actuality") return { operation: "list" };
   if (name === "sandbox-files") return { operation: "read", path: "fixture.txt" };
@@ -331,19 +335,19 @@ test("all adapters reject unsupported targets and status sets before effects", a
         effectAttempted: 0
       };
       if (name === "repository-repair-decision-fixture") {
-        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.repositoryRepairDecisionFixture = true;
       }
       if (name === "repository-repair-openai") {
-        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.openaiRepositoryRepair = true;
         context.secrets = { OPENAI_API_KEY: "fixture-secret" };
         context.openaiModel = "fixture-model";
-        context.decisionContractDigest = "3e2e4a1bd58b047dc9343964cfdc413174bb50a39d573e340cb963bf29127800";
+        context.decisionContractDigest = "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f";
         context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
       }
       if (name === "repository-workspace-actuality") {
-        context.applicationId = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.repositoryActuality = true;
         context.workspaceRoot = root;
         context.workspaceRootReal = await realpath(root);

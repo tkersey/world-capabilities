@@ -1,12 +1,12 @@
 import * as fixture from "../../../packages/repository-repair-decision-fixture/adapter.mjs";
 import { effectInterfaceId } from "../protocol.mjs";
-import { decodeDecisionRequest, encodeAction } from "./repository_repair_codecs.mjs";
+import { decodeDecisionTurn, encodeAction } from "./repository_repair_codecs.mjs";
 import { ACTUALITY_APPLICATION_ID } from "./repository_workspace_binding.mjs";
 
 const DECISION_PAYLOAD_SCHEMA_ID =
-  "9c77e9f50112cf7b620dd4d4f235365aff354615bf4b9e7f394434dc7cc367cb";
+  "71a55185311a35066f51f4aecc2f4fd1c2ee7d0dc0b563a42f5ec2620d4d6cfd";
 const ACTION_RESULT_SCHEMA_ID =
-  "f881b59b5cd53a3cd073b8704794fdd52a99120ca9aeb7e6eb05f8054ce5cfb1";
+  "34d136f0796a2332d269477a46af9b478e42ab671e730584dc7c0582347b417a";
 
 export function repositoryRepairDecisionFixtureBinding(options = {}) {
   const adapter = options.adapter ?? fixture;
@@ -25,7 +25,7 @@ export function repositoryRepairDecisionFixtureBinding(options = {}) {
       actuationClass: "model"
     },
     adapter,
-    decodePayload: decodeDecisionRequest,
+    decodePayload: decodeDecisionTurn,
     encodeOutcome: (outcome) => encodeAction(outcome.payload),
     recoveryClass: "pure"
   };

@@ -5,7 +5,7 @@ import { gunzipSync, inflateRawSync } from "node:zlib";
 import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export const PUBLIC_DETERMINISTIC_VERSION = "2.1.2";
+export const PUBLIC_DETERMINISTIC_VERSION = "2.2.0";
 export const PUBLIC_DETERMINISTIC_ROOT = `world-capabilities-v${PUBLIC_DETERMINISTIC_VERSION}-deterministic`;
 export const PUBLIC_DETERMINISTIC_ARCHIVE = `${PUBLIC_DETERMINISTIC_ROOT}.tar.gz`;
 export const MAXIMUM_ARCHIVE_BYTES = 32 << 20;
@@ -21,8 +21,8 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.sh", "run-conformance.sh"],
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
-const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "37a49bb6e717c13f1a16b4c9a164790db165597d453cf4ac5422c15f2f4f12ab";
+const DISTRIBUTION_SOURCE_PATHS_SHA256 = "5037ff6f70d73913431fa1c215d54f8620f868854138b52a81254cdc533df22a";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "2cf3bfa63434b5c11ea5450836d81b52f2a21fae039b2e8836dcddbab75a7b2a";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
