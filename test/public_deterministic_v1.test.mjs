@@ -271,13 +271,15 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
 
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
-    expect(checkSource).toContain("Bun.spawn([process.execPath");
+    expect(checkSource).not.toContain("Bun.spawn");
+    expect(checkSource).toContain("executesArchiveCode: false");
     expect(conformanceSource).not.toContain('[process.execPath, "run", "proof"]');
     expect(conformanceSource).toContain('[process.execPath, "harness/check-pack.mjs", "--all"]');
     expect(conformanceSource).toContain('[process.execPath, "scripts/check-corpus.mjs"]');
     expect(conformanceSource).toContain('[process.execPath, "test"]');
     expect(conformanceSource).toContain("archiveSha256: expected");
     const repositoryReadme = await readFile("README.md", "utf8");
+    expect(repositoryReadme).toContain("separately obtained trusted release lock");
     expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)");
     expect(repositoryReadme).toContain("run-conformance.sh \\\n  --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256");
     expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/check-distribution.mjs"));
