@@ -29,10 +29,10 @@ import {
   writeDeterministicArchive,
 } from "../scripts/public-deterministic-v1.mjs";
 
-test("v2.2.1 deterministic distribution binds the reviewed ENF runtime bytes", async () => {
+test("v2.2.2 deterministic distribution binds the reviewed ENF runtime bytes", async () => {
   expect(await runtimeTreeDigest(process.cwd())).toEqual({
     fileCount: 90,
-    sha256: "3dd85b1d234b38a8164a84adede3f5cef8b097d824e510e79a9889fb42347f9c",
+    sha256: "9ec75228642efc292ca79522fbc6c476409ca497cf26e6a5acc4178605a9f147",
   });
 });
 
@@ -280,8 +280,8 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(conformanceSource).toContain("archiveSha256: expected");
     const repositoryReadme = await readFile("README.md", "utf8");
     expect(repositoryReadme).toContain("separately obtained trusted release lock");
-    expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.2.1-deterministic.tar.gz.sha256)");
-    expect(repositoryReadme).toContain("run-conformance.sh \\\n  --archive ../world-capabilities-v2.2.1-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.2.1-deterministic.tar.gz.sha256");
+    expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.2.2-deterministic.tar.gz.sha256)");
+    expect(repositoryReadme).toContain("run-conformance.sh \\\n  --archive ../world-capabilities-v2.2.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.2.2-deterministic.tar.gz.sha256");
     expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/check-distribution.mjs"));
     expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("sh conformance/run-conformance.sh"));
     const workflow = await readFile(".github/workflows/public-reference-stack.yml", "utf8");

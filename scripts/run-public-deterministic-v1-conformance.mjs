@@ -56,7 +56,7 @@ try {
   const tests = await run(root, [process.execPath, "test"]);
   const receipt = {
     schema: "world-capabilities-public-deterministic-conformance/v1",
-    version: "2.2.1",
+    version: "2.2.2",
     archiveSha256: expected,
     inspectedPackCount: names.length,
     staticInspectionImportedAdapters: false,

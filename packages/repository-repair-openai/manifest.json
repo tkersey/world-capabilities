@@ -23,9 +23,9 @@
   ],
   "checksums": {
     "action-schema.json": "b51e15d9a5bc21f93f6f7ba0b39bbde3485342d8f9070bff3cadfb8d820cfb57",
-    "adapter.mjs": "2cea4fc483361e2fc57f3bf9edfe44b1658939e9616d92038fbe48cbd457e002",
-    "decision-contract.bin": "2ea75d022c0c3abbb3fa92ea571cbe040d3b97ff590f14911f8b2ae7ad68c99f",
-    "decision-contract.json": "9ac621c66dd63b22cc46e3bd8bd6c1c8f4d6e2d71506661cb52afdc98e38efd1"
+    "adapter.mjs": "5eb3f3f1d95f64efd46598801043c4856338ed2e1d000943a62b29a21f63323e",
+    "decision-contract.bin": "235cff9231965d5650b12d8605a309c501e91c3b15e08d7e087c7ca928ea043e",
+    "decision-contract.json": "c9cba76c98310a216a99d50221907f0c4c1a6cc73aef4438d353376d04c100d7"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -35,7 +35,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "14926c1ecd6436230718f3e1772f2946916ec0959fc81a8fab94190cc2e9a3d5"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
@@ -53,7 +53,7 @@
       "node:crypto",
       "node:fs"
     ],
-    "decisionContractDigest": "871aecb1a6dd95c27f31b3d246961b88dabf8044f29c1452a56ea0b1eef516d5",
+    "decisionContractDigest": "dddc4713e9cb478afc7beef464f35374fdb9aeb1b59d9307edc43438c1e192b5",
     "liveNetwork": true,
     "mode": "openai-responses-strict-json",
     "networkHosts": [
@@ -61,8 +61,8 @@
     ]
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-openai",
-  "packageVersion": "2.2.1",
-  "packFingerprint": "72b028c62442a4c067f4b9bc95e38020ac3cf0da57cecb27b359f8ee583fbe23",
+  "packageVersion": "2.2.2",
+  "packFingerprint": "3e7ab339e65e4d2619686b867ff659cad55c77ad2ed1a17b4a3c2158030117dd",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",
