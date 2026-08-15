@@ -37,9 +37,11 @@ https://github.com/tkersey/world-capabilities/releases/download/v2.1.2/world-cap
 ```
 
 The archive contains the Effect v1 router/codecs, checksum-bound packs,
-synthetic corpora, static pack inspection, and deterministic conformance. The
-packaged verifier runs without a source checkout, GitHub authentication,
-GitHub CLI, or receiver secret:
+synthetic corpora, static pack inspection, and deterministic conformance. Bind
+the archive SHA-256 to a separately obtained trusted release lock before
+executing anything from the archive. The trusted-source outer verifier is
+data-only; the packaged verifier and conformance then run without a source
+checkout, GitHub authentication, GitHub CLI, or receiver secret:
 
 ```sh
 (cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)

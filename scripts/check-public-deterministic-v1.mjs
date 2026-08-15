@@ -30,31 +30,16 @@ try {
     extraction = await extractDistributionArchive(archivePath, root, bytes);
   }
   const receipt = await verifyDistributionTree(root);
-  let packagedVerifier = null;
-  if (archive !== null) {
-    const child = Bun.spawn([process.execPath, path.join(root, "conformance/check-distribution.mjs"), "--root", root], {
-      cwd: root,
-      env: sanitizedEnvironment(),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
-    ]);
-    assert.equal(exitCode, 0, stderr || "packaged deterministic verifier failed");
-    packagedVerifier = JSON.parse(stdout);
-    assert.equal(packagedVerifier.schema, "world-capabilities-public-deterministic-check/v1");
-  }
-  process.stdout.write(`${JSON.stringify({ schema: "world-capabilities-public-deterministic-check/v1", ...receipt, archive: extraction, packagedVerifier }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({
+    schema: "world-capabilities-public-deterministic-check/v1",
+    ...receipt,
+    archive: extraction,
+    executesArchiveCode: false,
+  }, null, 2)}\n`);
 } finally {
   if (temporary !== null) await rm(temporary, { recursive: true, force: true });
 }
 
-function sanitizedEnvironment() {
-  const env = { ...process.env };
-  for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "OPENAI_API_KEY"]) delete env[name];
-  return env;
-}
 function valueAfter(flag) {
   const index = process.argv.indexOf(flag);
   if (index === -1) return null;
