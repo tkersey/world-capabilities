@@ -27,7 +27,7 @@
     "test": "bun test",
     "build:public-deterministic-v1": "bun scripts/build-public-deterministic-v1.mjs",
     "check:public-deterministic-v1": "bun scripts/build-public-deterministic-v1.mjs && bun scripts/check-public-deterministic-v1.mjs --archive zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz.sha256",
-    "conformance:public-deterministic-v1": "bun scripts/run-public-deterministic-v1-conformance.mjs --archive zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz.sha256"
+    "conformance:public-deterministic-v1": "sh scripts/run-public-deterministic-v1-conformance.sh --archive zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.1.2-deterministic.tar.gz.sha256"
   },
   "dependencies": {},
   "devDependencies": {}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { gunzipSync, gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync, inflateRawSync } from "node:zlib";
 import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -18,10 +18,11 @@ const SOURCE_FILES = Object.freeze(["LICENSE", "scripts/build-packs.mjs", "scrip
 const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/public-deterministic-v1.mjs", "public-deterministic-v1.mjs"],
   ["scripts/check-public-deterministic-v1.mjs", "check-distribution.mjs"],
+  ["scripts/run-public-deterministic-v1-conformance.sh", "run-conformance.sh"],
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "163c87a801cd1acb22fde88c036da23ef9d64abdf434ddcbb2ccde02def5d499";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "29f43c2a426999899fbfb2d184f3b2fb37c1ae51e39770954dfab448b597544c";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "326c8d36de36ddc4dd72059ad88337940b36afdb7208a728e2850e05185d485d";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
@@ -121,7 +122,7 @@ export async function buildDistributionTree(repository, outputRoot) {
     dependencies: {},
     devDependencies: {},
   }, null, 2)}\n`));
-  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nAuthenticate the complete release archive before executing any bundled code, then inspect and run conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/check-distribution.mjs --root .\nbun conformance/run-conformance.mjs --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
+  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nAuthenticate the complete release archive before executing any bundled code, then inspect and run conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/check-distribution.mjs --root .\nsh conformance/run-conformance.sh --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
   for (const [source, target] of CONFORMANCE_SOURCE_FILES) {
     await writeTreeFile(outputRoot, `conformance/${target}`, snapshot.get(source), true);
   }
@@ -216,6 +217,11 @@ export async function readDistributionArchive(archivePath) {
 export async function extractDistributionArchive(archivePath, destination, authenticatedArchive = null) {
   const archive = authenticatedArchive ?? await readDistributionArchive(archivePath);
   assert(archive.length <= MAXIMUM_ARCHIVE_BYTES, "deterministic archive exceeds maximum size");
+  assert.deepEqual(archive.subarray(0, 10), Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff]),
+    "deterministic archive has non-canonical gzip metadata");
+  const inflated = inflateRawSync(archive.subarray(10), { info: true, maxOutputLength: MAXIMUM_EXPANDED_BYTES });
+  assert.equal(10 + inflated.engine.bytesWritten + 8, archive.length,
+    "deterministic archive must contain exactly one gzip member");
   const tar = gunzipSync(archive, { maxOutputLength: MAXIMUM_EXPANDED_BYTES });
   assert.equal(tar.length % 512, 0, "tar payload is not block aligned");
   let offset = 0;

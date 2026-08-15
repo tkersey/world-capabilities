@@ -83,6 +83,15 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     const firstBytes = await readFile(first);
     expect(sha256(firstBytes)).toBe(left.sha256);
     expect(firstBytes[9]).toBe(0xff);
+    const gzipMetadata = Buffer.from(firstBytes);
+    gzipMetadata[4] = 1;
+    await expect(extractDistributionArchive(first, path.join(root, "gzip-metadata-output"), gzipMetadata)).rejects.toThrow(
+      "non-canonical gzip metadata",
+    );
+    const extraGzipMember = Buffer.concat([firstBytes, canonicalGzip(Buffer.alloc(512))]);
+    await expect(extractDistributionArchive(first, path.join(root, "extra-gzip-member-output"), extraGzipMember)).rejects.toThrow(
+      "exactly one gzip member",
+    );
     expect(() => admitExpandedArchiveBytes(MAXIMUM_EXPANDED_BYTES + 1)).toThrow(
       "deterministic archive expansion exceeds maximum",
     );
@@ -101,7 +110,7 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     await expect(extractDistributionArchive(traversal, path.join(root, "traversal-output"))).rejects.toThrow("unsafe archive path");
 
     const trailing = path.join(root, "trailing.tar.gz");
-    await Bun.write(trailing, gzipSync(Buffer.concat([gunzipSync(await readFile(first)), Buffer.alloc(512, 0x41)])), { createPath: true });
+    await Bun.write(trailing, canonicalGzip(Buffer.concat([gunzipSync(await readFile(first)), Buffer.alloc(512, 0x41)])), { createPath: true });
     await expect(extractDistributionArchive(trailing, path.join(root, "trailing-output"))).rejects.toThrow(
       "non-zero data follows tar terminator",
     );
@@ -128,7 +137,7 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     const nonZeroPadding = path.join(root, "non-zero-padding.tar.gz");
     const paddedTar = gunzipSync(minimalArchive(`${PUBLIC_DETERMINISTIC_ROOT}/LICENSE`, Buffer.from("x")));
     paddedTar[513] = 1;
-    await Bun.write(nonZeroPadding, gzipSync(paddedTar, { level: 9, mtime: 0 }));
+    await Bun.write(nonZeroPadding, canonicalGzip(paddedTar));
     await expect(extractDistributionArchive(nonZeroPadding, path.join(root, "non-zero-padding-output"))).rejects.toThrow(
       "non-zero tar padding",
     );
@@ -162,10 +171,7 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(mkfifo.exitCode).toBe(0);
     await expect(verifyDistributionTree(extracted)).rejects.toThrow("unsupported distribution entry");
 
-    for (const script of [
-      "scripts/check-public-deterministic-v1.mjs",
-      "scripts/run-public-deterministic-v1-conformance.mjs",
-    ]) {
+    for (const script of ["scripts/check-public-deterministic-v1.mjs"]) {
       const missingChecksum = Bun.spawn(["bun", script, "--archive", first], {
         cwd: process.cwd(), stdout: "pipe", stderr: "pipe",
       });
@@ -176,7 +182,25 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
       expect(missingChecksumError).toContain("--checksum is required with --archive");
     }
 
-    const rootConformance = Bun.spawn([process.execPath, "scripts/run-public-deterministic-v1-conformance.mjs", "--root", extracted], {
+    const missingConformanceChecksum = Bun.spawn([
+      "sh", "scripts/run-public-deterministic-v1-conformance.sh", "--archive", first,
+    ], { cwd: process.cwd(), stdout: "pipe", stderr: "pipe" });
+    const [missingConformanceChecksumError, missingConformanceChecksumExit] = await Promise.all([
+      new Response(missingConformanceChecksum.stderr).text(), missingConformanceChecksum.exited,
+    ]);
+    expect(missingConformanceChecksumExit).not.toBe(0);
+    expect(missingConformanceChecksumError).toContain("--checksum is required with --archive");
+
+    const packagedMissingChecksum = Bun.spawn([
+      "sh", path.join(extracted, "conformance/run-conformance.sh"), "--archive", first,
+    ], { cwd: process.cwd(), stdout: "pipe", stderr: "pipe" });
+    const [packagedMissingChecksumError, packagedMissingChecksumExit] = await Promise.all([
+      new Response(packagedMissingChecksum.stderr).text(), packagedMissingChecksum.exited,
+    ]);
+    expect(packagedMissingChecksumExit).not.toBe(0);
+    expect(packagedMissingChecksumError).toContain("--checksum is required with --archive");
+
+    const rootConformance = Bun.spawn(["sh", "scripts/run-public-deterministic-v1-conformance.sh", "--root", extracted], {
       cwd: process.cwd(), stdout: "pipe", stderr: "pipe",
     });
     const [rootConformanceError, rootConformanceExit] = await Promise.all([
@@ -190,8 +214,8 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     const sidecar = `${first}.sha256`;
     await Bun.write(sidecar, `${left.sha256}  ${PUBLIC_DETERMINISTIC_ARCHIVE}\n`);
     const preloadConformance = Bun.spawn([
-      process.execPath,
-      "scripts/run-public-deterministic-v1-conformance.mjs",
+      "sh",
+      "scripts/run-public-deterministic-v1-conformance.sh",
       "--archive",
       first,
       "--checksum",
@@ -209,7 +233,7 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     ]);
     expect(preloadExit).not.toBe(0);
     expect(preloadOutput).toBe("");
-    expect(preloadError).toContain("BUN_OPTIONS must be unset for deterministic conformance");
+    expect(preloadError).toContain("BUN_OPTIONS and NODE_OPTIONS must be unset for deterministic conformance");
 
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
@@ -221,9 +245,9 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(conformanceSource).toContain("archiveSha256: expected");
     const repositoryReadme = await readFile("README.md", "utf8");
     expect(repositoryReadme).toContain("(cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)");
-    expect(repositoryReadme).toContain("run-conformance.mjs \\\n  --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256");
+    expect(repositoryReadme).toContain("run-conformance.sh \\\n  --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \\\n  --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256");
     expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/check-distribution.mjs"));
-    expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("bun conformance/run-conformance.mjs"));
+    expect(repositoryReadme.indexOf("shasum -a 256")).toBeLessThan(repositoryReadme.indexOf("sh conformance/run-conformance.sh"));
     const workflow = await readFile(".github/workflows/public-reference-stack.yml", "utf8");
     expect(workflow).toContain("persist-credentials: false");
   } finally {
@@ -249,7 +273,7 @@ function minimalArchive(nameOrEntries, contents = null) {
     writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
     chunks.push(header, entryContents, Buffer.alloc((512 - (entryContents.length % 512)) % 512));
   }
-  return gzipSync(Buffer.concat([...chunks, Buffer.alloc(1024)]), { level: 9, mtime: 0 });
+  return canonicalGzip(Buffer.concat([...chunks, Buffer.alloc(1024)]));
 }
 
 function mutateArchiveHeader(archive, mutate) {
@@ -258,7 +282,13 @@ function mutateArchiveHeader(archive, mutate) {
   mutate(header);
   header.fill(0x20, 148, 156);
   writeOctal(header, 148, 8, [...header].reduce((sum, byte) => sum + byte, 0));
-  return gzipSync(tar, { level: 9, mtime: 0 });
+  return canonicalGzip(tar);
+}
+
+function canonicalGzip(bytes) {
+  const archive = gzipSync(bytes, { level: 9, mtime: 0 });
+  archive[9] = 0xff;
+  return archive;
 }
 
 function writeOctal(buffer, offset, width, value) {

@@ -15,6 +15,7 @@ import {
 } from "./public-deterministic-v1.mjs";
 
 const archive = valueAfter("--archive");
+assert.equal(process.env.WORLD_CAPABILITIES_CONFORMANCE_WRAPPER, "1", "use run-public-deterministic-v1-conformance.sh");
 const rootArgument = valueAfter("--root");
 assert(archive !== null, "--archive is required for executable conformance");
 assert(rootArgument === null, "--root is forbidden for executable conformance");
@@ -91,7 +92,7 @@ async function withCwd(cwd, operation) {
 }
 function sanitizedEnvironment() {
   const env = { ...process.env };
-  for (const name of ["BUN_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN", "NODE_OPTIONS", "OPENAI_API_KEY"]) delete env[name];
+  for (const name of ["BUN_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN", "NODE_OPTIONS", "OPENAI_API_KEY", "WORLD_CAPABILITIES_CONFORMANCE_WRAPPER"]) delete env[name];
   return env;
 }
 function valueAfter(flag) {

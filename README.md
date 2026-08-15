@@ -44,7 +44,7 @@ GitHub CLI, or receiver secret:
 ```sh
 (cd .. && shasum -a 256 -c world-capabilities-v2.1.2-deterministic.tar.gz.sha256)
 bun conformance/check-distribution.mjs --root .
-bun conformance/run-conformance.mjs \
+sh conformance/run-conformance.sh \
   --archive ../world-capabilities-v2.1.2-deterministic.tar.gz \
   --checksum ../world-capabilities-v2.1.2-deterministic.tar.gz.sha256
 ```
