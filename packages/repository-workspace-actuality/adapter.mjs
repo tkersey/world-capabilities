@@ -15,7 +15,7 @@ import { dirname, isAbsolute, join, relative, resolve as resolvePath } from "nod
 import { kill as killProcess } from "node:process";
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-workspace-actuality";
-const APPLICATION_ID = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
+const APPLICATION_ID = "14926c1ecd6436230718f3e1772f2946916ec0959fc81a8fab94190cc2e9a3d5";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",

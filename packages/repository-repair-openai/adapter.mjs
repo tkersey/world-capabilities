@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs";
 import decisionContract from "./decision-contract.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-repair-openai";
-const APPLICATION_ID = "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
+const APPLICATION_ID = "14926c1ecd6436230718f3e1772f2946916ec0959fc81a8fab94190cc2e9a3d5";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
   "turnClosureBytes", "worldAuthoredEvidence", "boundaryAuthoredEvidence", "archiveMomentBytes",
   "archiveSealBytes"
 ];
-export const DECISION_CONTRACT_DIGEST = "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f";
+export const DECISION_CONTRACT_DIGEST = "871aecb1a6dd95c27f31b3d246961b88dabf8044f29c1452a56ea0b1eef516d5";
 export const RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const MAXIMUM_RESPONSE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 180_000;

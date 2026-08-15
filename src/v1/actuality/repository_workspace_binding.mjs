@@ -17,7 +17,7 @@ import {
 } from "./repository_repair_codecs.mjs";
 
 export const ACTUALITY_APPLICATION_ID =
-  "0fbb283a46e495774dad29c808a03eaeec21411700feb3bdcac625a85a4675c2";
+  "14926c1ecd6436230718f3e1772f2946916ec0959fc81a8fab94190cc2e9a3d5";
 
 const SITE = Object.freeze({
   list: Object.freeze({
