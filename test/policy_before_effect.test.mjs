@@ -293,7 +293,7 @@ function payloadFor(name) {
   }
   if (name === "repository-repair-decision-fixture" || name === "repository-repair-openai") {
     return {
-      contractDigest: "eff01f65a1bc5d46693af84be7a2ce2a0cd07e7f6d7f20b7cb91aee76c2ad639",
+      contractDigest: "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f",
       phase: "decide",
       context: {}
     };
@@ -335,19 +335,19 @@ test("all adapters reject unsupported targets and status sets before effects", a
         effectAttempted: 0
       };
       if (name === "repository-repair-decision-fixture") {
-        context.applicationId = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.repositoryRepairDecisionFixture = true;
       }
       if (name === "repository-repair-openai") {
-        context.applicationId = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.openaiRepositoryRepair = true;
         context.secrets = { OPENAI_API_KEY: "fixture-secret" };
         context.openaiModel = "fixture-model";
-        context.decisionContractDigest = "eff01f65a1bc5d46693af84be7a2ce2a0cd07e7f6d7f20b7cb91aee76c2ad639";
+        context.decisionContractDigest = "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f";
         context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
       }
       if (name === "repository-workspace-actuality") {
-        context.applicationId = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
+        context.applicationId = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
         context.policy.repositoryActuality = true;
         context.workspaceRoot = root;
         context.workspaceRootReal = await realpath(root);

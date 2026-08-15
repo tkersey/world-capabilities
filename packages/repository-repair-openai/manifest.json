@@ -23,9 +23,9 @@
   ],
   "checksums": {
     "action-schema.json": "a06bb268a1e72928c4b2acc3e072bb72fe3d11a63cd44f10f718690419624ffb",
-    "adapter.mjs": "4a68543ee2ac7e228471c530cf16154d8e8e05c4c684b41869d352c5211efbcc",
-    "decision-contract.bin": "b4dbb25a02cb787400088201e311f346c42038fad1a19bfcdc347ac2aad59000",
-    "decision-contract.json": "7085a707bfde60cd1c638b68b3874ea5516aed4087d927ffcf86b113deab6eec"
+    "adapter.mjs": "57dc6ab0ca2c6f5665c2aacc9858cbd733a9786594a1fd90bd6e3ec13e888546",
+    "decision-contract.bin": "fd7df48eb8bc79c7e4150156de83e911e8a76593cb59850952ecb11385f49b94",
+    "decision-contract.json": "0ae9cb01cf12217372c9d8fb933947124518fff117fec74debe83b90e80664cd"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -35,7 +35,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
+          "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
@@ -53,7 +53,7 @@
       "node:crypto",
       "node:fs"
     ],
-    "decisionContractDigest": "eff01f65a1bc5d46693af84be7a2ce2a0cd07e7f6d7f20b7cb91aee76c2ad639",
+    "decisionContractDigest": "35b9a4670ec3a81dbfd0761900388a24ea28e49628da96ca68b97042ee15373f",
     "liveNetwork": true,
     "mode": "openai-responses-strict-json",
     "networkHosts": [
@@ -62,7 +62,7 @@
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-openai",
   "packageVersion": "2.2.0",
-  "packFingerprint": "2fbcc9a6d31e2b95e673292c59545f035437270217699c989326ee150a35f895",
+  "packFingerprint": "3b7a33ba0f8441d53c7c3496450396548b621bb3afbf7af390de16372b9c1da5",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",

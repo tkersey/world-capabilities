@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import * as workspace from "../packages/repository-workspace-actuality/adapter.mjs";
 
-const APPLICATION_ID = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
+const APPLICATION_ID = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
 const INITIAL_SOURCE = `export function normalizeRange(start, end) {
   if (start > end) {
     return { start, end };
