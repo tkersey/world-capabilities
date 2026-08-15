@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import * as fixture from "../packages/repository-repair-decision-fixture/adapter.mjs";
 
-const APPLICATION_ID = "ed145c722e0a0cf8cfa4c9bce4846ecca6d74aab08cb92a6b14537817dfc3f32";
+const APPLICATION_ID = "14926c1ecd6436230718f3e1772f2946916ec0959fc81a8fab94190cc2e9a3d5";
 
 describe("repository repair deterministic decision v2", () => {
   test("selects actions from bounded working-set evidence instead of transcript length", async () => {
