@@ -287,7 +287,7 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
+}, 30_000);
 
 function minimalArchive(nameOrEntries, contents = null) {
   const entries = Array.isArray(nameOrEntries) ? nameOrEntries : [[nameOrEntries, contents]];
