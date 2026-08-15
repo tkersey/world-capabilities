@@ -1,0 +1,32 @@
+name: Public reference stack
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-capabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun run check
+      - run: bun run check:public-deterministic-v1
+        env:
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
+          OPENAI_API_KEY: ""
+      - run: bun run conformance:public-deterministic-v1
+        env:
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
+          OPENAI_API_KEY: ""
