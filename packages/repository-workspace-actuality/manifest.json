@@ -11,7 +11,7 @@
     "human"
   ],
   "checksums": {
-    "adapter.mjs": "acbcb4e96a14d129a97f3f2ce9a4f2368747584b673ab1eae2b979d1db1df5e2"
+    "adapter.mjs": "6eea0113ff41f81409f767cd358c77f69819b5e38df573974dff973ed89055e3"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -21,47 +21,47 @@
     "interfaces": [
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "2",
         "interfaceId": "1d0437d70eb08141c448c017b974a51226c90c0a38ae52d0cc6f20ac1d2f3ccb",
         "interfaceLabel": "repo.list.v1",
         "payloadSchemaId": "a0daed086016083f9ca1f3e218bf4d87a31ecd59df343c96cee04a2966f3a084",
-        "resultSchemaId": "8de09da11baeadd10c4ccf236787833b9525663526c502adb7e10ec36198169c"
+        "resultSchemaId": "3b014169da863d8aa4dcc9869a54388d4ba7742f579a84514247f94c3763efa1"
       },
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "2",
         "interfaceId": "d91f56cf1e18924f9540a2bd448c522593e4912f485879c6fb0b2006b3e6e2af",
         "interfaceLabel": "repo.read.v1",
-        "payloadSchemaId": "6c31f668ba8e37cef069f121f6fc0226c5c6109dbbbb40e88df2729be29cbd0f",
-        "resultSchemaId": "04edc72994e39d3e8d2220546653a7b19098c1efacd5453bdaa9d3ff28c39c6c"
+        "payloadSchemaId": "017baa484f81869bf82b34408d483e93be77164caf80ac5b445692a69a5aa1d9",
+        "resultSchemaId": "0ab085b6f5907acca30164145cee04860fa3e4f978585b8a3bf342f0c23d549e"
       },
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "2",
         "interfaceId": "44805fc95f4777061d0b5ce327aaec84c50dc199d39bb8bf61e14b5ce1785033",
         "interfaceLabel": "repo.search.v1",
         "payloadSchemaId": "47969b29a68017cd5182e7a137c94451d83516d5d52791bab61deb29304f92c4",
-        "resultSchemaId": "77f3173a5cb6fe6b3e1c2d195a8824e7ffa634b41f3d35f2d0feed8584dea3ad"
+        "resultSchemaId": "d83cc693f03934c13c077e0c7942664dceddd0d9b9e7b8ad0d0e3f9dbd46a508"
       },
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "6",
         "interfaceId": "cef6816e298237de1f3b81fdee02b82e3df3b7bbb92d3edcc40eac537d081234",
         "interfaceLabel": "repo.test.v1",
         "payloadSchemaId": "24410ad4e4d67a9045bf094f6535e0866753bf28918b25536f09ec43285d1e2c",
-        "resultSchemaId": "493358f8ffff3e49159e3edc3b4118cc79e81d51e4a65567c8502a9fb76f68a0"
+        "resultSchemaId": "78c8c914d3fc220cd0c35cde51d36d7456a2de8414c20852571e2cf949bcecc3"
       },
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "20",
         "interfaceId": "94a8a7c1121c1cba6f85f306a9f55113413a861e0e0db85cd5ce5d85b5ab04dd",
@@ -92,8 +92,8 @@
     "mode": "temporary-repository-actuality"
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-actuality",
-  "packageVersion": "2.1.1",
-  "packFingerprint": "80dc7651823f21e757f7dd4955dbd470cd73b6ebff373f2ed9736247f1434aed",
+  "packageVersion": "2.2.0",
+  "packFingerprint": "f63838a7acc217d0dab7215ec1bbf426f43aec95e53793bdb49069ceb22c4d28",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",

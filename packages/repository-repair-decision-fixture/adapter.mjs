@@ -1,5 +1,10 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import decisionContract from "./decision-contract.json" with { type: "json" };
+
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-repair-decision-fixture";
-const APPLICATION_ID = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+const APPLICATION_ID = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
+export const DECISION_CONTRACT_DIGEST = "eff01f65a1bc5d46693af84be7a2ce2a0cd07e7f6d7f20b7cb91aee76c2ad639";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -13,6 +18,7 @@ const CORRECTED_SOURCE = `export function normalizeRange(start, end) {
   return { start: end, end: start };
 }
 `;
+const admittedContract = admitDecisionContract();
 
 const packManifest = Object.freeze({
   driverId: "repository-repair-decision-fixture",
@@ -22,7 +28,8 @@ const packManifest = Object.freeze({
   supportedActuatorRefs: ["actuator.repository-repair-decision-fixture.v1"],
   supportedDescriptorFingerprints: ["desc.repository-repair-decision-fixture.v1"],
   supportedResponseStatuses: ["ok", "rejected", "failed"],
-  secretRequirements: []
+  secretRequirements: [],
+  decisionContractDigest: admittedContract.semanticDigest
 });
 
 export function manifest() { return structuredClone(packManifest); }
@@ -79,8 +86,11 @@ function admissionReason(context, request) {
   if (context?.applicationId !== APPLICATION_ID) return "application_not_admitted";
   if (context?.policy?.repositoryRepairDecisionFixture !== true) return "fixture_policy_required";
   if (!request.payload || typeof request.payload !== "object") return "decision_request_required";
+  if (request.payload.contractDigest !== DECISION_CONTRACT_DIGEST) return "decision_contract_mismatch";
   if (request.payload.phase !== "decide") return "unsupported_decision_phase";
-  if (!Array.isArray(request.payload.history)) return "decision_history_required";
+  if (!request.payload.context || typeof request.payload.context !== "object") return "decision_context_required";
+  if (Object.hasOwn(request.payload, "instructions") || Object.hasOwn(request.payload, "actionCatalog") ||
+      Object.hasOwn(request.payload, "history")) return "static_contract_in_dynamic_turn";
   return null;
 }
 
@@ -113,57 +123,51 @@ function hostilePayloadReason(value, depth = 0) {
 }
 
 function scriptedAction(request) {
-  const history = request.history;
-  switch (history.length) {
-    case 0: return action("list_repository", {});
-    case 1: requireObservation(history, 0, "list_repository"); return action("read_file", { path: "package.json" });
-    case 2: requireObservation(history, 1, "read_file", "package.json"); return action("read_file", { path: "src/range.mjs" });
-    case 3: requireObservation(history, 2, "read_file", "src/range.mjs"); return action("read_file", { path: "test/range.test.mjs" });
-    case 4: {
-      requireObservation(history, 3, "read_file", "test/range.test.mjs");
-      return action("search_text", { query: "normalizeRange", path_prefix: "src" });
-    }
-    case 5: {
-      requireObservation(history, 4, "search_text");
-      return action("run_tests", { suite: "default" });
-    }
-    case 6: {
-      const test = requireObservation(history, 5, "run_tests");
-      if (test.passed !== false) throw new Error("failing_test_required");
-      const source = requireObservation(history, 2, "read_file", "src/range.mjs");
-      return action("replace_file", {
-        path: "src/range.mjs",
-        expected_sha256: source.sha256,
-        replacement: CORRECTED_SOURCE,
-        rationale: "normalizeRange must preserve ascending bounds and swap only descending bounds."
-      });
-    }
-    case 7: {
-      const outcome = requireObservation(history, 6, "replace_file");
-      if (outcome.kind !== "applied") throw new Error("replacement_application_required");
-      return action("run_tests", { suite: "default" });
-    }
-    case 8: {
-      const test = requireObservation(history, 7, "run_tests");
-      if (test.passed !== true) throw new Error("passing_test_required");
-      const replacement = requireObservation(history, 6, "replace_file");
-      if (replacement.kind !== "applied") throw new Error("replacement_application_required");
-      return action("final", {
-        summary: "Corrected normalizeRange and observed the complete Bun test suite passing.",
-        changed_files: ["src/range.mjs"],
-        tests_passed: true,
-        final_source_sha256: replacement.payload.newSha256
-      });
-    }
-    default: throw new Error("fixture_history_not_admitted");
+  const context = request.context;
+  const evidence = context.evidence;
+  if (!context.listing) return action("list_repository", {});
+  if (!context.packageDocument) return action("read_file", { role: "package", path: "package.json" });
+  if (!context.sourceDocument && !evidence.mutationApplied) {
+    return action("read_file", { role: "source", path: "src/range.mjs" });
   }
+  if (!context.testDocument) return action("read_file", { role: "test", path: "test/range.test.mjs" });
+  if (!context.latestSearch && !evidence.mutationApplied) {
+    return action("search_text", { query: "normalizeRange", path_prefix: "src" });
+  }
+  if (!evidence.failingTestObserved) return action("run_tests", { suite: "default" });
+  if (!evidence.mutationApplied) {
+    if (context.latestTest?.passed !== false) throw new Error("failing_test_required");
+    if (context.sourceDocument?.path !== "src/range.mjs") throw new Error("source_document_required");
+    return action("replace_file", {
+      path: "src/range.mjs",
+      expected_sha256: context.sourceDocument.sha256,
+      replacement: CORRECTED_SOURCE,
+      rationale: "normalizeRange must preserve ascending bounds and swap only descending bounds."
+    });
+  }
+  if (!evidence.passingTestObserved) return action("run_tests", { suite: "default" });
+  if (context.latestTest?.passed !== true) throw new Error("passing_test_required");
+  if (context.replacement?.kind !== "applied") throw new Error("replacement_application_required");
+  return action("final", {
+    summary: "Corrected normalizeRange and observed the complete Bun test suite passing.",
+    changed_files: ["src/range.mjs"],
+    tests_passed: true,
+    final_source_sha256: context.replacement.payload.newSha256
+  });
 }
 
-function requireObservation(history, index, kind, path = null) {
-  const observation = history.at(index);
-  if (!observation || observation.kind !== kind) throw new Error("fixture_history_mismatch");
-  if (path !== null && observation.payload?.path !== path) throw new Error("fixture_path_mismatch");
-  return observation.payload;
+function admitDecisionContract() {
+  const bytes = readFileSync(new URL("./decision-contract.bin", import.meta.url));
+  if (bytes.length < 40 || bytes.subarray(0, 8).toString("ascii") !== "AGT_DCT2") {
+    throw new Error("decision_contract_format_invalid");
+  }
+  const semanticDigest = bytes.subarray(-32).toString("hex");
+  const computedDigest = createHash("sha256").update(bytes.subarray(0, -32)).digest("hex");
+  if (semanticDigest !== computedDigest || semanticDigest !== DECISION_CONTRACT_DIGEST ||
+      decisionContract.semanticDigest !== semanticDigest || decisionContract.format !== "agent-decision-contract/v2") {
+    throw new Error("decision_contract_mismatch");
+  }
+  return Object.freeze({ semanticDigest });
 }
 
 function action(name, argumentsValue) { return Object.freeze({ action: name, arguments: Object.freeze(argumentsValue) }); }

@@ -15,7 +15,7 @@ import { dirname, isAbsolute, join, relative, resolve as resolvePath } from "nod
 import { kill as killProcess } from "node:process";
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-workspace-actuality";
-const APPLICATION_ID = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+const APPLICATION_ID = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -23,10 +23,10 @@ const FORBIDDEN_EVIDENCE_KEYS = [
   "archiveSealBytes"
 ];
 const MAXIMUM_FILE_BYTES = 32 * 1024;
-const MAXIMUM_PROCESS_BYTES = 16 * 1024;
-const MAXIMUM_ENTRIES = 128;
-const MAXIMUM_HITS = 32;
-const MAXIMUM_EXCERPT_BYTES = 512;
+const MAXIMUM_PROCESS_BYTES = 4 * 1024;
+const MAXIMUM_ENTRIES = 32;
+const MAXIMUM_HITS = 8;
+const MAXIMUM_EXCERPT_BYTES = 256;
 const TEST_TIMEOUT_MS = 30_000;
 const READABLE_ROOTS = new Set(["README.md", "package.json", "src", "test"]);
 const WRITABLE_PATH = "src/range.mjs";
@@ -74,7 +74,12 @@ export async function resolve(context, request) {
   try {
     switch (request.payload.operation) {
       case "list": return ok(request, await listRepository(context, admitted.root));
-      case "read": return ok(request, await readRepositoryFile(context, admitted.root, request.payload.path));
+      case "read": return ok(request, await readRepositoryFile(
+        context,
+        admitted.root,
+        request.payload.role,
+        request.payload.path
+      ));
       case "search": return ok(request, await searchRepository(context, admitted.root, request.payload));
       case "test": return ok(request, await runTests(context, admitted.root));
       case "replace": return ok(request, await replaceApproved(context, admitted.root, request));
@@ -133,6 +138,7 @@ async function admit(context, request) {
     return denied("unsupported_operation");
   }
   if (operation === "read") {
+    if (!roleMatchesPath(payload.role, payload.path)) return denied("read_role_path_mismatch");
     const path = await admittedPath(root, payload.path, { requireFile: true, writable: false });
     if (!path.ok) return path;
   }
@@ -189,19 +195,23 @@ function hostilePayloadReason(value, depth = 0) {
 
 async function listRepository(context, root) {
   const entries = [];
+  let truncated = false;
   for (const name of ["README.md", "package.json", "src", "test"]) {
+    if (entries.length === MAXIMUM_ENTRIES) { truncated = true; break; }
     const full = join(root, name);
     let info;
     try { info = await lstat(full); } catch { continue; }
     if (info.isSymbolicLink()) throw new Error("symlink_rejected");
-    if (info.isFile()) entries.push({ path: name, kind: "file", byteLength: checkedU32(info.size) });
-    else if (info.isDirectory()) await walk(full, name, entries);
+    if (info.isFile()) entries.push({ path: name, kind: "file" });
+    else if (info.isDirectory() && await walk(full, name, entries)) {
+      truncated = true;
+      break;
+    }
   }
   entries.sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)));
-  if (entries.length > MAXIMUM_ENTRIES) throw new Error("listing_capacity_exceeded");
   bump(context, "effectAttempts");
   bump(context, "fileReads");
-  return { entries };
+  return { entries, truncated };
 }
 
 async function walk(directory, prefix, entries) {
@@ -209,24 +219,34 @@ async function walk(directory, prefix, entries) {
   names.sort((left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)));
   for (const entry of names) {
     if (entry.name.startsWith(".")) continue;
+    if (entries.length === MAXIMUM_ENTRIES) return true;
     const path = `${prefix}/${entry.name}`;
     const full = join(directory, entry.name);
     const info = await lstat(full);
     if (info.isSymbolicLink()) throw new Error("symlink_rejected");
-    if (info.isDirectory()) await walk(full, path, entries);
-    else if (info.isFile()) entries.push({ path, kind: "file", byteLength: checkedU32(info.size) });
+    if (info.isDirectory()) {
+      if (await walk(full, path, entries)) return true;
+    }
+    else if (info.isFile()) entries.push({ path, kind: "file" });
     else throw new Error("special_file_rejected");
-    if (entries.length > MAXIMUM_ENTRIES) throw new Error("listing_capacity_exceeded");
   }
+  return false;
 }
 
-async function readRepositoryFile(context, root, requested) {
+async function readRepositoryFile(context, root, role, requested) {
   const admitted = await admittedPath(root, requested, { requireFile: true, writable: false });
   if (!admitted.ok) throw new Error(admitted.reason);
   const contents = await readUtf8Bounded(admitted.full);
   bump(context, "effectAttempts");
   bump(context, "fileReads");
-  return { path: admitted.path, sha256: sha256(contents), contents };
+  return { role, path: admitted.path, sha256: sha256(contents), contents };
+}
+
+function roleMatchesPath(role, path) {
+  if (role === "package") return path === "package.json";
+  if (role === "source") return typeof path === "string" && path.startsWith("src/");
+  if (role === "test") return typeof path === "string" && path.startsWith("test/");
+  return false;
 }
 
 async function searchRepository(context, root, payload) {

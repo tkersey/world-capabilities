@@ -3,13 +3,28 @@
     {
       "path": "adapter.mjs",
       "role": "adapter"
+    },
+    {
+      "path": "decision-contract.bin",
+      "role": "schema"
+    },
+    {
+      "path": "decision-contract.json",
+      "role": "schema"
+    },
+    {
+      "path": "action-schema.json",
+      "role": "schema"
     }
   ],
   "authorityLabels": [
     "model.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "23b43a184b1305be50efdcc8a3e2dc0a799cf918f3652f29cfd938df7f009572"
+    "action-schema.json": "a06bb268a1e72928c4b2acc3e072bb72fe3d11a63cd44f10f718690419624ffb",
+    "adapter.mjs": "2994b1dc10d13479ce5a7843f47970cd86b6aca828d183aa5be43e8386f3a6b9",
+    "decision-contract.bin": "b4dbb25a02cb787400088201e311f346c42038fad1a19bfcdc347ac2aad59000",
+    "decision-contract.json": "7085a707bfde60cd1c638b68b3874ea5516aed4087d927ffcf86b113deab6eec"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -19,26 +34,31 @@
     "interfaces": [
       {
         "applicationIds": [
-          "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb"
+          "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
         "interfaceLabel": "model.decide.v1",
-        "payloadSchemaId": "9c77e9f50112cf7b620dd4d4f235365aff354615bf4b9e7f394434dc7cc367cb",
-        "resultSchemaId": "f881b59b5cd53a3cd073b8704794fdd52a99120ca9aeb7e6eb05f8054ce5cfb1"
+        "payloadSchemaId": "71a55185311a35066f51f4aecc2f4fd1c2ee7d0dc0b563a42f5ec2620d4d6cfd",
+        "resultSchemaId": "34d136f0796a2332d269477a46af9b478e42ab671e730584dc7c0582347b417a"
       }
     ]
   },
   "idempotencySupport": "full-world-key-bound",
-  "maximumRequestBytes": 524288,
+  "maximumRequestBytes": 393216,
   "maximumResponseBytes": 65536,
   "metadata": {
+    "allowedBuiltins": [
+      "node:crypto",
+      "node:fs"
+    ],
+    "decisionContractDigest": "eff01f65a1bc5d46693af84be7a2ce2a0cd07e7f6d7f20b7cb91aee76c2ad639",
     "mode": "deterministic-actuality-fixture",
     "network": false
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-decision-fixture",
-  "packageVersion": "2.1.1",
-  "packFingerprint": "5ceb77889208d2d6e0d34c56ca6a8b2eb0537437d8a9307d6ca107960a22f6c0",
+  "packageVersion": "2.2.0",
+  "packFingerprint": "6e7a357d43f6b4cb22060ca3c273ba2cec0228ccafc0c234b283c172fc8f4bd6",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

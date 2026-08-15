@@ -4,22 +4,19 @@ const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 export const LIMITS = Object.freeze({
   path: 256,
-  goal: 4096,
+  goal: 2048,
   query: 256,
-  excerpt: 512,
+  excerpt: 256,
   file: 32 * 1024,
-  process: 16 * 1024,
+  process: 4 * 1024,
   summary: 4096,
   digest: 64,
   repository: 128,
   denialReason: 256,
-  treeEntries: 128,
-  searchHits: 32,
+  treeEntries: 32,
+  searchHits: 8,
   changedFiles: 4,
-  observations: 8,
-  actions: 7,
-  actionName: 15,
-  actionDescription: 116
+  actions: 7
 });
 
 export const ACTION_TAG = Object.freeze({
@@ -42,7 +39,6 @@ export const OBSERVATION_TAG = Object.freeze({
 
 const FAILURE_NAMES = Object.freeze([
   "budget_exhausted",
-  "history_overflow",
   "arithmetic_overflow",
   "invalid_index",
   "invalid_variant",
@@ -51,7 +47,7 @@ const FAILURE_NAMES = Object.freeze([
 ]);
 
 const ENTRY_KIND_NAMES = Object.freeze(["file", "directory"]);
-const ACTION_KIND_NAMES = Object.freeze(["effect", "final", "fail"]);
+const DOCUMENT_ROLE_NAMES = Object.freeze(["package", "source", "test"]);
 const DECISION_PHASE_NAMES = Object.freeze(["decide", "propose", "reflect"]);
 const REPLACE_OUTCOME_NAMES = Object.freeze(["applied", "denied", "conflict"]);
 
@@ -64,6 +60,7 @@ export function decodeListRequest(bytes) {
 
 export function decodeReadRequest(bytes) {
   return decode(bytes, "ERR_ACTUALITY_READ_REQUEST", (reader) => Object.freeze({
+    role: reader.enumName(DOCUMENT_ROLE_NAMES, "role"),
     path: reader.text(LIMITS.path, "path")
   }));
 }
@@ -90,18 +87,9 @@ export function decodeReplaceRequest(bytes) {
   }));
 }
 
-export function decodeDecisionRequest(bytes) {
+export function decodeDecisionTurn(bytes) {
   return decode(bytes, "ERR_ACTUALITY_DECISION_REQUEST", (reader) => {
-    const instructions = reader.text(4096, "instructions");
-    const actionCatalog = reader.vector(LIMITS.actions, "action_catalog", (_, index) => Object.freeze({
-      name: reader.text(LIMITS.actionName, `action_catalog[${index}].name`),
-      description: reader.text(
-        LIMITS.actionDescription,
-        `action_catalog[${index}].description`
-      ),
-      payloadSchemaDigest: reader.fixed(32).toString("hex"),
-      kind: reader.enumName(ACTION_KIND_NAMES, `action_catalog[${index}].kind`)
-    }));
+    const contractDigest = reader.fixed(32).toString("hex");
     const goal = Object.freeze({
       task: reader.text(LIMITS.goal, "goal.task"),
       repository: reader.text(LIMITS.repository, "goal.repository")
@@ -113,21 +101,19 @@ export function decodeDecisionRequest(bytes) {
       childActions: reader.u32()
     });
     const phase = reader.enumName(DECISION_PHASE_NAMES, "phase");
-    const history = reader.vector(
-      LIMITS.observations,
-      "history",
-      () => decodeObservationFrom(reader)
-    );
+    const context = decodeDecisionViewFrom(reader);
     return Object.freeze({
-      instructions,
-      actionCatalog,
+      contractDigest,
       goal,
       counters,
       phase,
-      history
+      context,
+      strategyLocal: Object.freeze({})
     });
   });
 }
+
+export const decodeDecisionRequest = decodeDecisionTurn;
 
 export function encodeAction(value) {
   const [action, argumentsValue] = exactRecord(
@@ -174,6 +160,7 @@ export function decodeAction(bytes) {
     switch (action) {
       case "list_repository": argumentsValue = Object.freeze({}); break;
       case "read_file": argumentsValue = Object.freeze({
+        role: reader.enumName(DOCUMENT_ROLE_NAMES, "arguments.role"),
         path: reader.text(LIMITS.path, "arguments.path")
       }); break;
       case "search_text": argumentsValue = Object.freeze({
@@ -203,29 +190,31 @@ export function decodeFinalResult(bytes) {
 
 export function encodeListResult(value) {
   const writer = new Writer("ERR_ACTUALITY_LIST_RESULT");
-  const [entries] = exactRecord(value, ["entries"], writer.errorCode, "result");
+  const [entries, truncated] = exactRecord(value, ["entries", "truncated"], writer.errorCode, "result");
   writer.vector(entries, LIMITS.treeEntries, "entries", (entry, index) => {
-    const [path, kind, byteLength] = exactRecord(
+    const [path, kind] = exactRecord(
       entry,
-      ["path", "kind", "byteLength"],
+      ["path", "kind"],
       writer.errorCode,
       `entries[${index}]`
     );
     writer.text(path, LIMITS.path, `entries[${index}].path`);
     writer.enumValue(kind, ENTRY_KIND_NAMES, `entries[${index}].kind`);
-    writer.u32Value(byteLength, `entries[${index}].byteLength`);
   });
+  writer.bool(truncated, "truncated");
   return writer.finish();
 }
 
 export function encodeReadResult(value) {
   const writer = new Writer("ERR_ACTUALITY_READ_RESULT");
-  const [path, sha256, contents] = exactRecord(
+  const [role, path, sha256, contents] = exactRecord(
     value,
-    ["path", "sha256", "contents"],
+    ["role", "path", "sha256", "contents"],
     writer.errorCode,
     "result"
   );
+  writer.enumValue(role, DOCUMENT_ROLE_NAMES, "role");
+  writer.fixed(Buffer.from([DOCUMENT_ROLE_NAMES.indexOf(role)]));
   writer.text(path, LIMITS.path, "path");
   writer.digestText(sha256, "sha256");
   writer.text(contents, LIMITS.file, "contents");
@@ -318,6 +307,98 @@ export function encodeReplaceOutcome(value) {
   return writer.finish();
 }
 
+function decodeDecisionViewFrom(reader) {
+  return Object.freeze({
+    listing: decodeOptional(reader, "context.listing", () => decodeListingFrom(reader, "context.listing")),
+    packageDocument: decodeOptional(reader, "context.package_document", () => decodeReadResultFrom(reader, "context.package_document")),
+    sourceDocument: decodeOptional(reader, "context.source_document", () => decodeReadResultFrom(reader, "context.source_document")),
+    testDocument: decodeOptional(reader, "context.test_document", () => decodeReadResultFrom(reader, "context.test_document")),
+    latestSearch: decodeOptional(reader, "context.latest_search", () => decodeSearchResultFrom(reader, "context.latest_search")),
+    latestTest: decodeOptional(reader, "context.latest_test", () => decodeCompactTestResultFrom(reader, "context.latest_test")),
+    replacement: decodeOptional(reader, "context.replacement", () => decodeReplaceOutcomeFrom(reader, "context.replacement")),
+    evidence: Object.freeze({
+      failingTestObserved: reader.bool("context.evidence.failing_test_observed"),
+      mutationApplied: reader.bool("context.evidence.mutation_applied"),
+      passingTestObserved: reader.bool("context.evidence.passing_test_observed")
+    })
+  });
+}
+
+function decodeOptional(reader, label, decodeValue) {
+  return reader.bool(`${label}.present`) ? decodeValue() : null;
+}
+
+function decodeListingFrom(reader, label) {
+  return Object.freeze({
+    entries: reader.vector(LIMITS.treeEntries, `${label}.entries`, (_, index) => Object.freeze({
+      path: reader.text(LIMITS.path, `${label}.entries[${index}].path`),
+      kind: reader.enumName(ENTRY_KIND_NAMES, `${label}.entries[${index}].kind`)
+    })),
+    truncated: reader.bool(`${label}.truncated`)
+  });
+}
+
+function decodeReadResultFrom(reader, label) {
+  const role = reader.enumName(DOCUMENT_ROLE_NAMES, `${label}.role`);
+  const roleCode = reader.fixed(1)[0];
+  if (roleCode !== DOCUMENT_ROLE_NAMES.indexOf(role)) actualityFail(reader.errorCode, `${label}.role_code`);
+  return Object.freeze({
+    role,
+    path: reader.text(LIMITS.path, `${label}.path`),
+    sha256: reader.digestText(`${label}.sha256`),
+    contents: reader.text(LIMITS.file, `${label}.contents`)
+  });
+}
+
+function decodeSearchResultFrom(reader, label) {
+  return Object.freeze({
+    hits: reader.vector(LIMITS.searchHits, `${label}.hits`, (_, index) => Object.freeze({
+      path: reader.text(LIMITS.path, `${label}.hits[${index}].path`),
+      line: reader.u32(),
+      excerpt: reader.text(LIMITS.excerpt, `${label}.hits[${index}].excerpt`)
+    })),
+    truncated: reader.bool(`${label}.truncated`)
+  });
+}
+
+function decodeTestResultFrom(reader, label) {
+  return Object.freeze({
+    exitCode: reader.i32(),
+    passed: reader.bool(`${label}.passed`),
+    stdout: reader.text(LIMITS.process, `${label}.stdout`),
+    stderr: reader.text(LIMITS.process, `${label}.stderr`),
+    stdoutTruncated: reader.bool(`${label}.stdout_truncated`),
+    stderrTruncated: reader.bool(`${label}.stderr_truncated`)
+  });
+}
+
+function decodeCompactTestResultFrom(reader, label) {
+  return {
+    exitCode: reader.i32(`${label}.exit_code`),
+    passed: reader.bool(`${label}.passed`),
+    stdoutTruncated: reader.bool(`${label}.stdout_truncated`),
+    stderrTruncated: reader.bool(`${label}.stderr_truncated`)
+  };
+}
+
+function decodeReplaceOutcomeFrom(reader, label) {
+  const kind = reader.enumName(REPLACE_OUTCOME_NAMES, `${label}.variant`);
+  if (kind === "applied") return Object.freeze({ kind, payload: Object.freeze({
+    path: reader.text(LIMITS.path, `${label}.path`),
+    oldSha256: reader.digestText(`${label}.old_sha256`),
+    newSha256: reader.digestText(`${label}.new_sha256`),
+    alreadyApplied: reader.bool(`${label}.already_applied`)
+  }) });
+  if (kind === "denied") return Object.freeze({ kind, payload: Object.freeze({
+    reason: reader.text(LIMITS.denialReason, `${label}.reason`)
+  }) });
+  return Object.freeze({ kind, payload: Object.freeze({
+    path: reader.text(LIMITS.path, `${label}.path`),
+    expectedSha256: reader.digestText(`${label}.expected_sha256`),
+    actualSha256: reader.digestText(`${label}.actual_sha256`)
+  }) });
+}
+
 function decodeObservationFrom(reader) {
   const kind = reader.enumName(Object.keys(OBSERVATION_TAG), "history.variant");
   let payload;
@@ -383,7 +464,8 @@ function decodeObservationFrom(reader) {
 }
 
 function encodeReadRequestInto(writer, value) {
-  const [path] = exactRecord(value, ["path"], writer.errorCode, "arguments");
+  const [role, path] = exactRecord(value, ["role", "path"], writer.errorCode, "arguments");
+  writer.enumValue(role, DOCUMENT_ROLE_NAMES, "arguments.role");
   writer.text(path, LIMITS.path, "arguments.path");
 }
 

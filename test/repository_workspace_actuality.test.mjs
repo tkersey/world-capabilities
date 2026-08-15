@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import * as workspace from "../packages/repository-workspace-actuality/adapter.mjs";
 
-const APPLICATION_ID = "26f5ab2b7e86994e5d3b234bb32447891906276853c094f0ac73def2b99610bb";
+const APPLICATION_ID = "9de00d549101541f91554399aa4114020ea9e4470fe64c1a40b93f52e6243245";
 const INITIAL_SOURCE = `export function normalizeRange(start, end) {
   if (start > end) {
     return { start, end };
@@ -47,8 +47,9 @@ describe("repository workspace actuality", () => {
       "src/range.mjs",
       "test/range.test.mjs"
     ]);
+    expect(listing.payload.truncated).toBe(false);
 
-    const read = await workspace.resolve(context, request("read", { path: "src/range.mjs" }));
+    const read = await workspace.resolve(context, request("read", { role: "source", path: "src/range.mjs" }));
     expect(read.status).toBe("ok");
     expect(read.payload.contents).toBe(INITIAL_SOURCE);
 
@@ -103,8 +104,10 @@ describe("repository workspace actuality", () => {
 
   test("rejects traversal, metadata writes, stale approval, and stale digests before writing", async () => {
     const context = await fixtureContext();
-    expect((await workspace.preflight(context, request("read", { path: "../secret" }))).payload.reason)
+    expect((await workspace.preflight(context, request("read", { role: "source", path: "src/../secret" }))).payload.reason)
       .toBe("path_not_normalized");
+    expect((await workspace.preflight(context, request("read", { role: "test", path: "src/range.mjs" }))).payload.reason)
+      .toBe("read_role_path_mismatch");
 
     const metadata = request("replace", {
       path: "package.json",
