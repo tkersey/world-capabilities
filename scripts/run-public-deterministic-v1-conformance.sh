@@ -12,4 +12,5 @@ if [ ! -f "$runner" ]; then
   runner="$script_dir/run-public-deterministic-v1-conformance.mjs"
 fi
 WORLD_CAPABILITIES_CONFORMANCE_WRAPPER=1 exec env -u BUN_OPTIONS -u NODE_OPTIONS \
-  bun --config=/dev/null "$runner" "$@"
+  -u GH_TOKEN -u GITHUB_TOKEN -u OPENAI_API_KEY \
+  bun --config=/dev/null --no-env-file "$runner" "$@"

@@ -251,6 +251,24 @@ test("deterministic distribution is reproducible and safely self-verifying", asy
     expect(ambientError).toContain("--archive is required for executable conformance");
     await expect(readFile(ambientMarker)).rejects.toThrow();
 
+    await Bun.write(path.join(ambient, ".env"), "OPENAI_API_KEY=must-not-load\n");
+    const envFileConformance = Bun.spawn([
+      "sh",
+      path.resolve("scripts/run-public-deterministic-v1-conformance.sh"),
+      "--archive",
+      first,
+      "--checksum",
+      sidecar,
+    ], { cwd: ambient, stdout: "pipe", stderr: "pipe" });
+    const [envFileOutput, envFileError, envFileExit] = await Promise.all([
+      new Response(envFileConformance.stdout).text(),
+      new Response(envFileConformance.stderr).text(),
+      envFileConformance.exited,
+    ]);
+    expect(envFileExit).toBe(0);
+    expect(envFileError).toBe("");
+    expect(JSON.parse(envFileOutput).receiverSecretsRequired).toBe(false);
+
     const checkSource = await readFile("scripts/check-public-deterministic-v1.mjs", "utf8");
     const conformanceSource = await readFile("scripts/run-public-deterministic-v1-conformance.mjs", "utf8");
     expect(checkSource).toContain("Bun.spawn([process.execPath");
