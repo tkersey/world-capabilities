@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import decisionContract from "./decision-contract.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/router-adequacy-decision-fixture";
-const APPLICATION_ID = "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+const APPLICATION_ID = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
 export const DECISION_CONTRACT_DIGEST = "a649bded9c3088cb82d13eaf10c6ca3a6a404e66b735e7118d94d00f63303fd2";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",

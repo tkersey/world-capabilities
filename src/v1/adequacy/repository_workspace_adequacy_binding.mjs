@@ -17,7 +17,7 @@ import {
 } from "./router_adequacy_codecs.mjs";
 
 export const ADEQUACY_APPLICATION_ID =
-  "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+  "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
 
 const SITE = Object.freeze({
   list: Object.freeze({

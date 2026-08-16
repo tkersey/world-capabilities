@@ -11,7 +11,7 @@
     "human"
   ],
   "checksums": {
-    "adapter.mjs": "bc1dd982bc75e94c2fc5ab311bfa84f39daf0fc8fbbd404b23b14de562b04ebc"
+    "adapter.mjs": "db3e6cc08c53a27010abb5554feb356edda07c6aa02f6ab44ab41049a5faa867"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -21,7 +21,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "2",
         "interfaceId": "3f2e61219c650cf8a02f57886d907bc5421b103385e02ab6a59686ae710e2dbc",
@@ -31,7 +31,7 @@
       },
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "2",
         "interfaceId": "e0c67e16bd5780b6b27ae2504ccf527f8878c9341725757afe8fcd0af541f221",
@@ -41,7 +41,7 @@
       },
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "2",
         "interfaceId": "07bf8bfc1f0c942279a93e68205dff29a383a1a0546bc11a8cf20628cb84a304",
@@ -51,7 +51,7 @@
       },
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "6",
         "interfaceId": "3c00dad19367960603b86074a4ccfca73e771a98b7f3724bd8e1e701a132c155",
@@ -61,7 +61,7 @@
       },
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "20",
         "interfaceId": "376223d3858d4c25f625593ed41e3d8dedf9775620c01e08ffefa594cf70efec",
@@ -93,7 +93,7 @@
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-adequacy",
   "packageVersion": "2.3.0",
-  "packFingerprint": "120bc378b6fe8d8264e5e6c3bfecfa5872c3f306b8c99825d066538e73337c15",
+  "packFingerprint": "8dd597e27b65929fbd7fbfca56be67f819cae2c4da4a3dd9cc21b3ff6d6782d6",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",

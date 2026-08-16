@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import * as workspace from "../packages/repository-workspace-adequacy/adapter.mjs";
 
-const APPLICATION_ID = "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+const APPLICATION_ID = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
 const PATHS = {
   readme: "README.md",
   package: "package.json",

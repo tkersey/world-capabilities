@@ -33,7 +33,7 @@
     "model.fixture"
   ],
   "checksums": {
-    "adapter.mjs": "a89a81b2d2582e9d220f02f6bdd2c80cef094fa43a1ef4376cecec1ff7551858",
+    "adapter.mjs": "495eaf870050ef1b915bb1ed6554de306ea2f1ffeba0cc669fdb32b9cab8112a",
     "decision-contract.bin": "60083b0bef866af0291d111489efcaa2ff691f3185a5f3f4fcbe0c94248b1128",
     "decision-contract.json": "24780daf784b3053a2ef0f2525052b230952dad29636ee6fd063a74e136709d2",
     "solution/errors.txt": "a75d135faec7a834c9fc34a68d76fdce669930406484cb25e258230ba8e0c035",
@@ -49,7 +49,7 @@
     "interfaces": [
       {
         "applicationIds": [
-          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
@@ -73,7 +73,7 @@
   },
   "packageName": "@tkersey/world-capabilities/router-adequacy-decision-fixture",
   "packageVersion": "2.3.0",
-  "packFingerprint": "9b12ed50016f223e2c3a9759f32b3fae404c36d8f5db7810f8c61d9e74b366a4",
+  "packFingerprint": "ec174a421a0710f8a9176e3fbd4de6cdfe74b7ae87874e4cf1e09628bcd20f93",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

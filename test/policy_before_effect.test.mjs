@@ -380,11 +380,11 @@ test("all adapters reject unsupported targets and status sets before effects", a
         context.bunExecutable = process.execPath;
       }
       if (name === "router-adequacy-decision-fixture") {
-        context.applicationId = "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
         context.policy.routerAdequacyDecisionFixture = true;
       }
       if (name === "router-adequacy-openai") {
-        context.applicationId = "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
         context.policy.openaiRouterAdequacy = true;
         context.secrets = { OPENAI_API_KEY: "fixture-secret" };
         context.openaiModel = "fixture-model";
@@ -392,7 +392,7 @@ test("all adapters reject unsupported targets and status sets before effects", a
         context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
       }
       if (name === "repository-workspace-adequacy") {
-        context.applicationId = "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c";
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
         context.policy.repositoryAdequacy = true;
         context.workspaceRoot = root;
         context.workspaceRootReal = await realpath(root);

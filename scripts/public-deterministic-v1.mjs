@@ -22,7 +22,7 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
 const DISTRIBUTION_SOURCE_PATHS_SHA256 = "2ba655fc983e9c43f2e3cc339774effa2b3de5d2d9b2a18df52feebf58373330";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "5302c8383dedceb3b3846ebd8dde5b37223da6b84d635830eceec5f23940367e";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "41a3dc46a9c9c0f1aacf7066018ac70bd000f94805faea1b09c57d756376586a";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
