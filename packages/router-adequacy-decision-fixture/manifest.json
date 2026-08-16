@@ -1,0 +1,106 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    },
+    {
+      "path": "decision-contract.bin",
+      "role": "schema"
+    },
+    {
+      "path": "decision-contract.json",
+      "role": "schema"
+    },
+    {
+      "path": "solution/methods.txt",
+      "role": "fixture"
+    },
+    {
+      "path": "solution/errors.txt",
+      "role": "fixture"
+    },
+    {
+      "path": "solution/router.txt",
+      "role": "fixture"
+    },
+    {
+      "path": "solution/index.txt",
+      "role": "fixture"
+    }
+  ],
+  "authorityLabels": [
+    "model.fixture"
+  ],
+  "checksums": {
+    "adapter.mjs": "495eaf870050ef1b915bb1ed6554de306ea2f1ffeba0cc669fdb32b9cab8112a",
+    "decision-contract.bin": "60083b0bef866af0291d111489efcaa2ff691f3185a5f3f4fcbe0c94248b1128",
+    "decision-contract.json": "24780daf784b3053a2ef0f2525052b230952dad29636ee6fd063a74e136709d2",
+    "solution/errors.txt": "a75d135faec7a834c9fc34a68d76fdce669930406484cb25e258230ba8e0c035",
+    "solution/index.txt": "f8fa48ef0a9c2b6df21260863fa7d86bc225924727b71ebe3cf0230260e42e61",
+    "solution/methods.txt": "d80a36e5c9e3688849e2746b4cfd0a75c6b8baa3c179caccffd02470d21a8f1b",
+    "solution/router.txt": "5ce1b0145494f44f00274d1d09b931a4157e501bb44efdc2f98aaf184b97c1c8"
+  },
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "driverAbiVersion": "capability-driver-v1",
+  "driverId": "router-adequacy-decision-fixture",
+  "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "9",
+        "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
+        "interfaceLabel": "model.decide.v1",
+        "payloadSchemaId": "aace2967929a1dfcbe84fad29b6db4845da67be4845447976aafcb3fa448f702",
+        "resultSchemaId": "fee2bec3c17e756cc3c80d5a5fa9c0815a098aab03cd36565ab06e183838762b"
+      }
+    ]
+  },
+  "idempotencySupport": "full-world-key-bound",
+  "maximumRequestBytes": 262144,
+  "maximumResponseBytes": 24576,
+  "metadata": {
+    "allowedBuiltins": [
+      "node:crypto",
+      "node:fs"
+    ],
+    "decisionContractDigest": "a649bded9c3088cb82d13eaf10c6ca3a6a404e66b735e7118d94d00f63303fd2",
+    "mode": "adequacy-fixture-auto",
+    "network": false
+  },
+  "packageName": "@tkersey/world-capabilities/router-adequacy-decision-fixture",
+  "packageVersion": "2.3.0",
+  "packFingerprint": "ec174a421a0710f8a9176e3fbd4de6cdfe74b7ae87874e4cf1e09628bcd20f93",
+  "packFormatVersion": "foundry-effect-pack-v1",
+  "recoverSupport": true,
+  "recoveryClass": "pure",
+  "replaySupport": true,
+  "secretRequirements": [],
+  "shadowSupport": true,
+  "supportedActuationClasses": [
+    "model"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.router-adequacy-decision-fixture.v1"
+  ],
+  "supportedApplianceAbiVersions": [
+    "world-application-abi-v1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.router-adequacy-decision-fixture.v1"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "world-frame-v1"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-effect-v1"
+  ]
+}

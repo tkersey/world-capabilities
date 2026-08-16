@@ -1,0 +1,134 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    }
+  ],
+  "authorityLabels": [
+    "file.read",
+    "file.write",
+    "human"
+  ],
+  "checksums": {
+    "adapter.mjs": "db3e6cc08c53a27010abb5554feb356edda07c6aa02f6ab44ab41049a5faa867"
+  },
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "driverAbiVersion": "capability-driver-v1",
+  "driverId": "repository-workspace-adequacy",
+  "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "2",
+        "interfaceId": "3f2e61219c650cf8a02f57886d907bc5421b103385e02ab6a59686ae710e2dbc",
+        "interfaceLabel": "repo.list.v2",
+        "payloadSchemaId": "a0daed086016083f9ca1f3e218bf4d87a31ecd59df343c96cee04a2966f3a084",
+        "resultSchemaId": "3ab7407035609a7ca158f9519e33ff4a76d6c531c4a9dd4cdb80a4d67ef6fe0c"
+      },
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "2",
+        "interfaceId": "e0c67e16bd5780b6b27ae2504ccf527f8878c9341725757afe8fcd0af541f221",
+        "interfaceLabel": "repo.read.v2",
+        "payloadSchemaId": "546f886ded70c0a0fea51781b65f5d25772e562f3bd06641c6fde4e540dd903b",
+        "resultSchemaId": "5db72109d35d6f64b4da5ab2c1688514f03cbd43346a0aa35884a998b62459cf"
+      },
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "2",
+        "interfaceId": "07bf8bfc1f0c942279a93e68205dff29a383a1a0546bc11a8cf20628cb84a304",
+        "interfaceLabel": "repo.search.v2",
+        "payloadSchemaId": "47969b29a68017cd5182e7a137c94451d83516d5d52791bab61deb29304f92c4",
+        "resultSchemaId": "bf22ace7693284eeaeeeae80efd14f839a6a3898bff4025810f1cc6ab40d9833"
+      },
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "6",
+        "interfaceId": "3c00dad19367960603b86074a4ccfca73e771a98b7f3724bd8e1e701a132c155",
+        "interfaceLabel": "repo.test.v2",
+        "payloadSchemaId": "24410ad4e4d67a9045bf094f6535e0866753bf28918b25536f09ec43285d1e2c",
+        "resultSchemaId": "f495213500302f67163eaae4587abc929ccf992f5c5035ce1a5df713366c8b77"
+      },
+      {
+        "applicationIds": [
+          "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa"
+        ],
+        "authorityRequirements": "20",
+        "interfaceId": "376223d3858d4c25f625593ed41e3d8dedf9775620c01e08ffefa594cf70efec",
+        "interfaceLabel": "repo.replace.approved.v2",
+        "payloadSchemaId": "3b519b6bd6fe0164235f78f63d704f8955a74b87291c224ab33d46e0b1e2f44b",
+        "resultSchemaId": "51685ffb0c53aabfc5e7896056ef1c43072426b5cde1ba3d72643c9739ef583e"
+      }
+    ]
+  },
+  "idempotencySupport": "digest-and-result-journal-bound",
+  "maximumRequestBytes": 262144,
+  "maximumResponseBytes": 65536,
+  "metadata": {
+    "allowedBuiltins": [
+      "node:child_process",
+      "node:crypto",
+      "node:fs/promises",
+      "node:path",
+      "node:process"
+    ],
+    "fixedProcess": {
+      "argv": [
+        "test"
+      ],
+      "executable": "receiver-context",
+      "shell": false
+    },
+    "mode": "controlled-router-adequacy-workspace"
+  },
+  "packageName": "@tkersey/world-capabilities/repository-workspace-adequacy",
+  "packageVersion": "2.3.0",
+  "packFingerprint": "8dd597e27b65929fbd7fbfca56be67f819cae2c4da4a3dd9cc21b3ff6d6782d6",
+  "packFormatVersion": "foundry-effect-pack-v1",
+  "recoverSupport": true,
+  "recoveryClass": "idempotent",
+  "replaySupport": true,
+  "secretRequirements": [],
+  "shadowSupport": true,
+  "supportedActuationClasses": [
+    "repository"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.repository-list.v2",
+    "actuator.repository-read.v2",
+    "actuator.repository-search.v2",
+    "actuator.repository-test.v2",
+    "actuator.repository-replace-approved.v2"
+  ],
+  "supportedApplianceAbiVersions": [
+    "world-application-abi-v1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.repository-list.v2",
+    "desc.repository-read.v2",
+    "desc.repository-search.v2",
+    "desc.repository-test.v2",
+    "desc.repository-replace-approved.v2"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "world-frame-v1"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-effect-v1"
+  ]
+}

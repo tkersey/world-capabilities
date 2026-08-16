@@ -1,6 +1,6 @@
 {
   "name": "@tkersey/world-capabilities",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -26,14 +26,19 @@
     "proof:actuality-workspace": "bun run proof:actuality-workspace-v2",
     "proof:actuality-workspace-v2": "bun test test/repository_workspace_actuality.test.mjs",
     "proof:actuality-v2-live": "bun scripts/run-agent-actuality-v2-live.mjs",
+    "proof:adequacy": "bun run proof:adequacy-codecs && bun run proof:adequacy-workspace && bun run proof:adequacy-openai-mock && bun test test/router_adequacy_fixture.test.mjs && bun harness/check-pack.mjs router-adequacy-decision-fixture router-adequacy-openai repository-workspace-adequacy",
+    "proof:adequacy-codecs": "bun test test/router_adequacy_codecs.test.mjs",
+    "proof:adequacy-workspace": "bun test test/repository_workspace_adequacy.test.mjs",
+    "proof:adequacy-openai-mock": "bun test test/router_adequacy_openai.test.mjs",
+    "proof:adequacy-live": "bun scripts/run-agent-adequacy-live.mjs",
     "corpus:check": "bun scripts/check-corpus.mjs",
     "corpus:update": "bun scripts/update-corpus.mjs",
     "packs:build": "bun scripts/build-packs.mjs",
     "packs:verify": "bun scripts/verify-packs.mjs",
     "test": "bun test",
     "build:public-deterministic-v1": "bun scripts/build-public-deterministic-v1.mjs",
-    "check:public-deterministic-v1": "bun scripts/build-public-deterministic-v1.mjs && bun scripts/check-public-deterministic-v1.mjs --archive zig-out/public-deterministic/world-capabilities-v2.2.2-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.2.2-deterministic.tar.gz.sha256",
-    "conformance:public-deterministic-v1": "sh scripts/run-public-deterministic-v1-conformance.sh --archive zig-out/public-deterministic/world-capabilities-v2.2.2-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.2.2-deterministic.tar.gz.sha256"
+    "check:public-deterministic-v1": "bun scripts/build-public-deterministic-v1.mjs && bun scripts/check-public-deterministic-v1.mjs --archive zig-out/public-deterministic/world-capabilities-v2.3.0-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.3.0-deterministic.tar.gz.sha256",
+    "conformance:public-deterministic-v1": "sh scripts/run-public-deterministic-v1-conformance.sh --archive zig-out/public-deterministic/world-capabilities-v2.3.0-deterministic.tar.gz --checksum zig-out/public-deterministic/world-capabilities-v2.3.0-deterministic.tar.gz.sha256"
   },
   "dependencies": {},
   "devDependencies": {}

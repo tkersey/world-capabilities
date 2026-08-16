@@ -298,6 +298,31 @@ function payloadFor(name) {
       context: {}
     };
   }
+  if (name === "router-adequacy-decision-fixture" || name === "router-adequacy-openai") {
+    return {
+      contractDigest: "a649bded9c3088cb82d13eaf10c6ca3a6a404e66b735e7118d94d00f63303fd2",
+      goal: { task: "Upgrade router policy.", repository: "fixture" },
+      counters: { turns: 0, decisions: 0, effectActions: 0, childActions: 0 },
+      phase: "decide",
+      context: {
+        listing: null,
+        documents: [],
+        latestSearch: null,
+        latestTest: null,
+        latestReplace: null,
+        mutations: [],
+        evidence: {
+          baselineFailureObserved: false,
+          latestTestPassed: false,
+          mutationCount: 0,
+          lastTestMutationCount: 0,
+          testCount: 0
+        }
+      },
+      strategyLocal: {}
+    };
+  }
+  if (name === "repository-workspace-adequacy") return { operation: "list" };
   if (name === "repository-workspace-actuality") return { operation: "list" };
   if (name === "sandbox-files") return { operation: "read", path: "fixture.txt" };
   return { fixture: true };
@@ -354,6 +379,26 @@ test("all adapters reject unsupported targets and status sets before effects", a
         context.temporaryHome = root;
         context.bunExecutable = process.execPath;
       }
+      if (name === "router-adequacy-decision-fixture") {
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
+        context.policy.routerAdequacyDecisionFixture = true;
+      }
+      if (name === "router-adequacy-openai") {
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
+        context.policy.openaiRouterAdequacy = true;
+        context.secrets = { OPENAI_API_KEY: "fixture-secret" };
+        context.openaiModel = "fixture-model";
+        context.decisionContractDigest = "a649bded9c3088cb82d13eaf10c6ca3a6a404e66b735e7118d94d00f63303fd2";
+        context.fetchImplementation = async () => { throw new Error("preflight_must_not_fetch"); };
+      }
+      if (name === "repository-workspace-adequacy") {
+        context.applicationId = "7eb84c4aa723014876aa7edf68d0fcbe73915af98cecc98ef382c3ed3c343aaa";
+        context.policy.repositoryAdequacy = true;
+        context.workspaceRoot = root;
+        context.workspaceRootReal = await realpath(root);
+        context.temporaryHome = root;
+        context.bunExecutable = process.execPath;
+      }
       const wrongTarget = await adapter.resolve(context, {
         ...request,
         target: { ...request.target, descriptorFingerprint: "desc.unsupported.v0" }
@@ -377,7 +422,7 @@ test("all adapters reject unsupported targets and status sets before effects", a
         ...request,
         responseSchema: { statuses: [...pack.manifest.supportedResponseStatuses, "extra-compatible-status"] }
       });
-      expect(supersetSchema.status).toBe("ok");
+      expect(supersetSchema.status, name).toBe("ok");
 
       const operationSchema = await adapter.preflight(context, {
         ...request,
