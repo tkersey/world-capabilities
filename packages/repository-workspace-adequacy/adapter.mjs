@@ -401,6 +401,16 @@ function approvalDenial(context, request) {
   const digest = proposalDigest(request.payload);
   if (approval.proposalDigest !== digest) return "approval_proposal_mismatch";
   if (approval.mode === "interactive") return null;
+  if (approval.mode === "adequacy-receiver-verified") {
+    const verification = context?.proposalVerification;
+    if (!verification || verification.requestId !== request.requestId ||
+        verification.proposalDigest !== digest) return "receiver_verification_binding_mismatch";
+    if (verification.verifier !== "router-policy-proposal-v1" ||
+        !/^[0-9a-f]{64}$/.test(verification.evidenceDigest ?? "")) {
+      return "receiver_verifier_not_admitted";
+    }
+    return verification.passed === true ? null : "receiver_verification_failed";
+  }
   if (approval.mode !== "adequacy-fixture-auto") return "approval_mode_not_admitted";
   const plan = context.fixturePlan ?? [];
   const expected = plan.at(context.mutationsApplied ?? 0);

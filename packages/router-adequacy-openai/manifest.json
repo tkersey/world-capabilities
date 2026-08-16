@@ -18,7 +18,7 @@
     "network.http"
   ],
   "checksums": {
-    "adapter.mjs": "a15790a1c241f9ade5a9ed4a0497183928b9930fcd2803d87b967341e21cd536",
+    "adapter.mjs": "b79300adf059c0bfbe7e7164d192a902649ff3214320aa5d7f6627d42cd920d5",
     "decision-contract.bin": "60083b0bef866af0291d111489efcaa2ff691f3185a5f3f4fcbe0c94248b1128",
     "decision-contract.json": "24780daf784b3053a2ef0f2525052b230952dad29636ee6fd063a74e136709d2"
   },
@@ -56,8 +56,8 @@
     ]
   },
   "packageName": "@tkersey/world-capabilities/router-adequacy-openai",
-  "packageVersion": "2.3.1",
-  "packFingerprint": "b19b038b89b78f84f9ad4a893c00a797fa577cdee17835ea9a22f0967d317f10",
+  "packageVersion": "2.3.2",
+  "packFingerprint": "6394621ca0020cd8012547948d551fe1d35b094dbe45e4f3d630ef8251a2ebb4",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",
