@@ -5,7 +5,7 @@ import { gunzipSync, inflateRawSync } from "node:zlib";
 import { lstat, mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export const PUBLIC_DETERMINISTIC_VERSION = "2.2.2";
+export const PUBLIC_DETERMINISTIC_VERSION = "2.3.0";
 export const PUBLIC_DETERMINISTIC_ROOT = `world-capabilities-v${PUBLIC_DETERMINISTIC_VERSION}-deterministic`;
 export const PUBLIC_DETERMINISTIC_ARCHIVE = `${PUBLIC_DETERMINISTIC_ROOT}.tar.gz`;
 export const MAXIMUM_ARCHIVE_BYTES = 32 << 20;
@@ -21,8 +21,8 @@ const CONFORMANCE_SOURCE_FILES = Object.freeze([
   ["scripts/run-public-deterministic-v1-conformance.sh", "run-conformance.sh"],
   ["scripts/run-public-deterministic-v1-conformance.mjs", "run-conformance.mjs"],
 ]);
-const DISTRIBUTION_SOURCE_PATHS_SHA256 = "5037ff6f70d73913431fa1c215d54f8620f868854138b52a81254cdc533df22a";
-const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "df36edf6a9ed8484dedeaf64841f428c9751ef1a6e329b60cbe30cb8918985c0";
+const DISTRIBUTION_SOURCE_PATHS_SHA256 = "2ba655fc983e9c43f2e3cc339774effa2b3de5d2d9b2a18df52feebf58373330";
+const DISTRIBUTION_SOURCE_CONTENT_SHA256 = "5302c8383dedceb3b3846ebd8dde5b37223da6b84d635830eceec5f23940367e";
 
 export async function distributionSourcePaths(repository) {
   const admitted = await reviewedDistributionSourcePaths(repository);
@@ -122,7 +122,7 @@ export async function buildDistributionTree(repository, outputRoot) {
     dependencies: {},
     devDependencies: {},
   }, null, 2)}\n`));
-  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nAuthenticate the complete release archive before executing any bundled code, then inspect and run conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/check-distribution.mjs --root .\nsh conformance/run-conformance.sh --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
+  await writeTreeFile(outputRoot, "README.md", Buffer.from(`# world-capabilities v${PUBLIC_DETERMINISTIC_VERSION} deterministic conformance\n\nThis source-independent distribution verifies Effect protocol v1 packs and executes only synthetic or mocked conformance. It requires Bun 1.3.14 or newer and no GitHub or provider credential. Live adapter source is inspectable, but conformance makes no live provider call. It includes the exact deterministic router-policy adequacy decision and workspace packs. The research fixture remains bound to its exact World \`v3.0.0\` release.\n\nAuthenticate the complete release archive before executing any bundled code, then inspect and run conformance:\n\n\`\`\`sh\n(cd .. && shasum -a 256 -c ${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256)\nbun conformance/check-distribution.mjs --root .\nsh conformance/run-conformance.sh --archive ../${PUBLIC_DETERMINISTIC_ARCHIVE} --checksum ../${PUBLIC_DETERMINISTIC_ARCHIVE}.sha256\n\`\`\`\n`));
   for (const [source, target] of CONFORMANCE_SOURCE_FILES) {
     await writeTreeFile(outputRoot, `conformance/${target}`, snapshot.get(source), true);
   }
@@ -317,7 +317,11 @@ export async function verifyDistributionTree(root) {
   for (const required of [
     "LICENSE", "README.md", "package.json", "manifest.json", "checksums.sha256",
     "src/v1/router.mjs", "src/v1/protocol.mjs", "packages/repository-repair-decision-fixture/adapter.mjs",
-    "packages/repository-workspace-actuality/adapter.mjs", "conformance/check-distribution.mjs",
+    "packages/repository-workspace-actuality/adapter.mjs",
+    "packages/router-adequacy-decision-fixture/adapter.mjs",
+    "packages/repository-workspace-adequacy/adapter.mjs",
+    "src/v1/adequacy/router_adequacy_codecs.mjs",
+    "conformance/check-distribution.mjs",
     "conformance/run-conformance.mjs",
   ]) assert(files.includes(required), `missing deterministic file: ${required}`);
   for (const relative of files) {

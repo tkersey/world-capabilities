@@ -1,0 +1,22 @@
+{
+  "corpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "driverId": "router-adequacy-decision-fixture",
+  "vectors": [
+    {
+      "id": "exact-24-decision-sequence",
+      "passed": true
+    },
+    {
+      "id": "exact-application-binding",
+      "passed": true
+    },
+    {
+      "id": "all-documents-and-baseline-before-mutation",
+      "passed": true
+    },
+    {
+      "id": "four-tested-mutations-before-final",
+      "passed": true
+    }
+  ]
+}

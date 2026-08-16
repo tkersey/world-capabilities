@@ -1,0 +1,92 @@
+{
+  "artifacts": [
+    {
+      "path": "adapter.mjs",
+      "role": "adapter"
+    },
+    {
+      "path": "decision-contract.bin",
+      "role": "schema"
+    },
+    {
+      "path": "decision-contract.json",
+      "role": "schema"
+    }
+  ],
+  "authorityLabels": [
+    "model",
+    "network.http"
+  ],
+  "checksums": {
+    "adapter.mjs": "82674f4ba320eba3353ab888a1cdfb3ababf4b87fd7551bf52ebe96b41956d41",
+    "decision-contract.bin": "60083b0bef866af0291d111489efcaa2ff691f3185a5f3f4fcbe0c94248b1128",
+    "decision-contract.json": "24780daf784b3053a2ef0f2525052b230952dad29636ee6fd063a74e136709d2"
+  },
+  "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
+  "driverAbiVersion": "capability-driver-v1",
+  "driverId": "router-adequacy-openai",
+  "dryRunSupport": true,
+  "effectProtocolV1": {
+    "interfaces": [
+      {
+        "applicationIds": [
+          "6f26bd0ac8bd4351f4263c2f64fb68db5459d5b25f8f7ac2d060f40fea7c063c"
+        ],
+        "authorityRequirements": "9",
+        "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
+        "interfaceLabel": "model.decide.v1",
+        "payloadSchemaId": "aace2967929a1dfcbe84fad29b6db4845da67be4845447976aafcb3fa448f702",
+        "resultSchemaId": "fee2bec3c17e756cc3c80d5a5fa9c0815a098aab03cd36565ab06e183838762b"
+      }
+    ]
+  },
+  "idempotencySupport": "result-journal-bound",
+  "maximumRequestBytes": 262144,
+  "maximumResponseBytes": 4194304,
+  "metadata": {
+    "allowedBuiltins": [
+      "node:crypto",
+      "node:fs"
+    ],
+    "decisionContractDigest": "a649bded9c3088cb82d13eaf10c6ca3a6a404e66b735e7118d94d00f63303fd2",
+    "liveNetwork": true,
+    "mode": "openai-responses-strict-json",
+    "networkHosts": [
+      "api.openai.com"
+    ]
+  },
+  "packageName": "@tkersey/world-capabilities/router-adequacy-openai",
+  "packageVersion": "2.3.0",
+  "packFingerprint": "0de1a7679176b08c0cda58129e1255ce0e9f08f9c3c7c8f0f765c0537338dc10",
+  "packFormatVersion": "foundry-effect-pack-v1",
+  "recoverSupport": true,
+  "recoveryClass": "retryable",
+  "replaySupport": true,
+  "secretRequirements": [
+    "OPENAI_API_KEY"
+  ],
+  "shadowSupport": true,
+  "supportedActuationClasses": [
+    "model"
+  ],
+  "supportedActuatorRefs": [
+    "actuator.router-adequacy-openai.v1"
+  ],
+  "supportedApplianceAbiVersions": [
+    "world-application-abi-v1"
+  ],
+  "supportedDescriptorFingerprints": [
+    "desc.router-adequacy-openai.v1"
+  ],
+  "supportedResponseStatuses": [
+    "ok",
+    "rejected",
+    "failed"
+  ],
+  "supportedTurnClosureVersions": [
+    "world-frame-v1"
+  ],
+  "supportedWorldProtocolVersions": [
+    "world-effect-v1"
+  ]
+}

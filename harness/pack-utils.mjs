@@ -2901,7 +2901,8 @@ function admitsFixedProcess(pack) {
   );
   assert(
     Array.isArray(pack.manifest.supportedActuatorRefs) &&
-      pack.manifest.supportedActuatorRefs.includes("actuator.repository-test.v1"),
+      (pack.manifest.supportedActuatorRefs.includes("actuator.repository-test.v1") ||
+        pack.manifest.supportedActuatorRefs.includes("actuator.repository-test.v2")),
     `${pack.name}: fixed process actuator binding required`
   );
   return true;

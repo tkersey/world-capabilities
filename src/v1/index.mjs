@@ -60,3 +60,27 @@ export {
   ACTUALITY_APPLICATION_ID,
   repositoryWorkspaceBindings
 } from "./actuality/repository_workspace_binding.mjs";
+export {
+  ACTION_TAG as ROUTER_ADEQUACY_ACTION_TAG,
+  LIMITS as ROUTER_ADEQUACY_LIMITS,
+  decodeAction as decodeRouterAdequacyAction,
+  decodeDecisionTurn as decodeRouterAdequacyDecisionTurn,
+  decodeFinalResult as decodeRouterAdequacyFinalResult,
+  decodeListRequest as decodeRouterAdequacyListRequest,
+  decodeReadRequest as decodeRouterAdequacyReadRequest,
+  decodeReplaceRequest as decodeRouterAdequacyReplaceRequest,
+  decodeSearchRequest as decodeRouterAdequacySearchRequest,
+  decodeTestRequest as decodeRouterAdequacyTestRequest,
+  encodeAction as encodeRouterAdequacyAction,
+  encodeListResult as encodeRouterAdequacyListResult,
+  encodeReadResult as encodeRouterAdequacyReadResult,
+  encodeReplaceOutcome as encodeRouterAdequacyReplaceOutcome,
+  encodeSearchResult as encodeRouterAdequacySearchResult,
+  encodeTestResult as encodeRouterAdequacyTestResult
+} from "./adequacy/router_adequacy_codecs.mjs";
+export { routerAdequacyDecisionFixtureBinding } from "./adequacy/router_adequacy_fixture_binding.mjs";
+export { routerAdequacyOpenAIBinding } from "./adequacy/router_adequacy_openai_binding.mjs";
+export {
+  ADEQUACY_APPLICATION_ID,
+  repositoryWorkspaceAdequacyBindings
+} from "./adequacy/repository_workspace_adequacy_binding.mjs";
