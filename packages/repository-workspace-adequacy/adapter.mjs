@@ -100,7 +100,12 @@ export async function resolve(context, request) {
       ));
       case "search": return ok(request, await searchRepository(context, admitted.root, request.payload));
       case "test": return ok(request, await runTests(context, admitted.root));
-      case "replace": return ok(request, await replaceApproved(context, admitted.root, request));
+      case "replace": {
+        const approvalReason = approvalDenial(context, request);
+        return ok(request, approvalReason
+          ? deniedReplacement(request.payload, approvalReason)
+          : await replaceApproved(context, admitted.root, request));
+      }
       default: return reject(request, "unsupported_operation");
     }
   } catch (error) {
@@ -180,8 +185,6 @@ async function admit(context, request) {
     if (typeof payload.replacement !== "string" || Buffer.byteLength(payload.replacement, "utf8") > MAXIMUM_FILE_BYTES) {
       return denied("replacement_not_admitted");
     }
-    const approvalReason = approvalDenial(context, request);
-    if (approvalReason) return denied(approvalReason);
   }
   return { ok: true, root };
 }

@@ -72,8 +72,8 @@
     "network": false
   },
   "packageName": "@tkersey/world-capabilities/router-adequacy-decision-fixture",
-  "packageVersion": "2.3.0",
-  "packFingerprint": "ec174a421a0710f8a9176e3fbd4de6cdfe74b7ae87874e4cf1e09628bcd20f93",
+  "packageVersion": "2.3.1",
+  "packFingerprint": "3f862590826da203df71f8e7efb99b5bcb5223200f79301c94d7f9b878cc7d43",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

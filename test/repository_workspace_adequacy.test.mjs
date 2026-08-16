@@ -59,6 +59,26 @@ describe("repository workspace adequacy", () => {
     }];
     const request = hostRequest("replace", payload);
     const proposalDigest = workspace.proposalDigest(payload);
+    const humanDenied = await workspace.resolve(context, request);
+    expect(humanDenied.status).toBe("ok");
+    expect(humanDenied.payload.kind).toBe("denied");
+    expect(humanDenied.payload.payload.reason).toBe("approval_required");
+    expect(context.mutationAttempts ?? 0).toBe(0);
+    expect(context.mutationsApplied ?? 0).toBe(0);
+
+    context.approval = {
+      approved: false,
+      requestId: request.requestId,
+      proposalDigest,
+      mode: "interactive"
+    };
+    const explicitlyDenied = await workspace.resolve(context, request);
+    expect(explicitlyDenied.status).toBe("ok");
+    expect(explicitlyDenied.payload.kind).toBe("denied");
+    expect(explicitlyDenied.payload.payload.reason).toBe("approval_required");
+    expect(context.mutationAttempts ?? 0).toBe(0);
+    expect(context.mutationsApplied ?? 0).toBe(0);
+
     context.approval = {
       approved: true,
       requestId: request.requestId,
