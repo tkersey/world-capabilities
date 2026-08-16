@@ -11,7 +11,7 @@
     "human"
   ],
   "checksums": {
-    "adapter.mjs": "db3e6cc08c53a27010abb5554feb356edda07c6aa02f6ab44ab41049a5faa867"
+    "adapter.mjs": "0d7dc4eeb552c4f143e0ca2b28d83c69cf687f18c1d6a77f3036a589374f5e48"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -92,8 +92,8 @@
     "mode": "controlled-router-adequacy-workspace"
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-adequacy",
-  "packageVersion": "2.3.0",
-  "packFingerprint": "8dd597e27b65929fbd7fbfca56be67f819cae2c4da4a3dd9cc21b3ff6d6782d6",
+  "packageVersion": "2.3.1",
+  "packFingerprint": "6f98946d6f6b6f7477dc9f9492fca5068f6b8251dc1b1b9b8b4c45f47f40b5b3",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",

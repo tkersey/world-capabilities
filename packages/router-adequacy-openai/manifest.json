@@ -56,8 +56,8 @@
     ]
   },
   "packageName": "@tkersey/world-capabilities/router-adequacy-openai",
-  "packageVersion": "2.3.0",
-  "packFingerprint": "96d48cec3b4816f48363c7f73181f4db671d10d8062cd6059fc57595d86f8ab4",
+  "packageVersion": "2.3.1",
+  "packFingerprint": "b19b038b89b78f84f9ad4a893c00a797fa577cdee17835ea9a22f0967d317f10",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "retryable",
