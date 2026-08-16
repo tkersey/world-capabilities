@@ -17,6 +17,11 @@ describe("router adequacy OpenAI capability", () => {
       expect(body.store).toBe(false);
       expect(body.background).toBe(false);
       expect(body.tools).toEqual([]);
+      expect(body.input[0].content[0].text).toContain("the mandatory next Action is run_tests");
+      expect(body.input[0].content[0].text).toContain("maximum_decisions=32");
+      expect(body.input[0].content[0].text).toContain("amounts already consumed");
+      expect(body.input[0].content[0].text).toContain("fresh failing test after mutations one, two, or three is expected");
+      expect(body.input[0].content[0].text).toContain("continue the required inspection");
       expect(body.text.format).toMatchObject({ type: "json_schema", strict: true });
       expect(body.text.format.schema.properties.action.enum).toHaveLength(7);
       expect(body.text.format.schema.properties.arguments.anyOf).toHaveLength(7);
@@ -43,6 +48,25 @@ describe("router adequacy OpenAI capability", () => {
     });
     expect(resolved.claims.store).toBe(false);
     expect(calls).toBe(1);
+  });
+
+  test("directs the next legal mutation instead of aborting after an expected intermediate failure", () => {
+    const pending = request();
+    pending.payload.context.listing = { entries: [], truncated: false };
+    pending.payload.context.documents = Array.from({ length: 9 }, (_, slotCode) => ({ slotCode }));
+    pending.payload.context.latestSearch = { hits: [], truncated: false };
+    pending.payload.context.latestTest = { passed: false };
+    pending.payload.context.mutations = [{ slot: "methods_source" }];
+    pending.payload.context.evidence = {
+      baselineFailureObserved: true,
+      latestTestPassed: false,
+      mutationCount: 1,
+      lastTestMutationCount: 1,
+      testCount: 2
+    };
+
+    const body = openai.buildResponsesRequest(liveContext(async () => {}), pending);
+    expect(body.input[0].content[0].text).toContain("return replace_file for errors_source now");
   });
 
   test("fails closed on provider and Action failures", async () => {

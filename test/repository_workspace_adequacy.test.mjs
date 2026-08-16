@@ -67,6 +67,26 @@ describe("repository workspace adequacy", () => {
     expect(context.mutationsApplied ?? 0).toBe(0);
 
     context.approval = {
+      approved: true,
+      requestId: request.requestId,
+      proposalDigest,
+      mode: "adequacy-receiver-verified"
+    };
+    context.proposalVerification = {
+      requestId: request.requestId,
+      proposalDigest,
+      passed: false,
+      verifier: "router-policy-proposal-v1",
+      evidenceDigest: "a".repeat(64)
+    };
+    const verifierDenied = await workspace.resolve(context, request);
+    expect(verifierDenied.status).toBe("ok");
+    expect(verifierDenied.payload.kind).toBe("denied");
+    expect(verifierDenied.payload.payload.reason).toBe("receiver_verification_failed");
+    expect(context.mutationAttempts ?? 0).toBe(0);
+    expect(context.mutationsApplied ?? 0).toBe(0);
+
+    context.approval = {
       approved: false,
       requestId: request.requestId,
       proposalDigest,

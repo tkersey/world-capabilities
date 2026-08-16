@@ -23,17 +23,17 @@ secret, live provider transcript, runtime store, or private policy.
 
 ## Public deterministic distribution
 
-Release `v2.3.1` publishes:
+Release `v2.3.2` publishes:
 
 ```text
-world-capabilities-v2.3.1-deterministic.tar.gz
-world-capabilities-v2.3.1-deterministic.tar.gz.sha256
+world-capabilities-v2.3.2-deterministic.tar.gz
+world-capabilities-v2.3.2-deterministic.tar.gz.sha256
 ```
 
 The stable release URL is:
 
 ```text
-https://github.com/tkersey/world-capabilities/releases/download/v2.3.1/world-capabilities-v2.3.1-deterministic.tar.gz
+https://github.com/tkersey/world-capabilities/releases/download/v2.3.2/world-capabilities-v2.3.2-deterministic.tar.gz
 ```
 
 The archive contains the Effect v1 router/codecs, checksum-bound packs,
@@ -44,11 +44,11 @@ data-only; the packaged verifier and conformance then run without a source
 checkout, GitHub authentication, GitHub CLI, or receiver secret:
 
 ```sh
-(cd .. && shasum -a 256 -c world-capabilities-v2.3.1-deterministic.tar.gz.sha256)
+(cd .. && shasum -a 256 -c world-capabilities-v2.3.2-deterministic.tar.gz.sha256)
 bun conformance/check-distribution.mjs --root .
 sh conformance/run-conformance.sh \
-  --archive ../world-capabilities-v2.3.1-deterministic.tar.gz \
-  --checksum ../world-capabilities-v2.3.1-deterministic.tar.gz.sha256
+  --archive ../world-capabilities-v2.3.2-deterministic.tar.gz \
+  --checksum ../world-capabilities-v2.3.2-deterministic.tar.gz.sha256
 ```
 
 From a source checkout:
