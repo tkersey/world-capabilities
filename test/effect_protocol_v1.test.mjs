@@ -255,7 +255,8 @@ describe("CapabilityRouterV1 authority boundary", () => {
         resolve: async () => outcome
       },
       encodeOutcome: (admitted) => {
-        assert.deepEqual(admitted.payload, { value: 41 });
+        assert.equal(Object.getPrototypeOf(admitted.payload), null);
+        assert.equal(admitted.payload.value, 41);
         const bytes = Buffer.alloc(8);
         bytes.writeBigInt64LE(BigInt(admitted.payload.value));
         return bytes;

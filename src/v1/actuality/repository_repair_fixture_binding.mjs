@@ -1,7 +1,6 @@
 import * as fixture from "../../../packages/repository-repair-decision-fixture/adapter.mjs";
 import { effectInterfaceId } from "../protocol.mjs";
 import { decodeDecisionTurn, encodeAction } from "./repository_repair_codecs.mjs";
-import { ACTUALITY_APPLICATION_ID } from "./repository_workspace_binding.mjs";
 
 const DECISION_PAYLOAD_SCHEMA_ID =
   "71a55185311a35066f51f4aecc2f4fd1c2ee7d0dc0b563a42f5ec2620d4d6cfd";
@@ -17,7 +16,7 @@ export function repositoryRepairDecisionFixtureBinding(options = {}) {
     interfaceId: effectInterfaceId("model.decide.v1"),
     payloadSchemaId: digest(DECISION_PAYLOAD_SCHEMA_ID),
     resultSchemaId: digest(ACTION_RESULT_SCHEMA_ID),
-    applicationIds: [digest(ACTUALITY_APPLICATION_ID)],
+    applicationIds: fixture.ADMITTED_APPLICATION_IDS.map(digest),
     authorityRequirements: 9n,
     target: {
       descriptorFingerprint: "desc.repository-repair-decision-fixture.v1",

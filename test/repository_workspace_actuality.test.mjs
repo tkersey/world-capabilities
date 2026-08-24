@@ -4,8 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as workspace from "../packages/repository-workspace-actuality/adapter.mjs";
+import workspaceManifest from "../packages/repository-workspace-actuality/manifest.json" with { type: "json" };
+import { repositoryWorkspaceBindings } from "../src/v1/actuality/repository_workspace_binding.mjs";
 
 const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+const INTERPRETATION_APPLICATION_ID = "cdd619cc1342cc9d35b5105b7abf9d359025ff71040e5ee99512d18c1188d039";
 const INITIAL_SOURCE = `export function normalizeRange(start, end) {
   if (start > end) {
     return { start, end };
@@ -36,6 +39,29 @@ afterEach(async () => {
 });
 
 describe("repository workspace actuality", () => {
+  test("admits the existing and Boundary 1.6 application identities only", async () => {
+    expect(workspace.ADMITTED_APPLICATION_IDS).toEqual([
+      APPLICATION_ID,
+      INTERPRETATION_APPLICATION_ID
+    ]);
+    for (const effect of workspaceManifest.effectProtocolV1.interfaces) {
+      expect(effect.applicationIds).toEqual(workspace.ADMITTED_APPLICATION_IDS);
+    }
+    for (const binding of repositoryWorkspaceBindings()) {
+      expect(binding.applicationIds.map((id) => id.toString("hex")))
+        .toEqual(workspace.ADMITTED_APPLICATION_IDS);
+    }
+
+    const context = await fixtureContext();
+    for (const applicationId of workspace.ADMITTED_APPLICATION_IDS) {
+      context.applicationId = applicationId;
+      expect((await workspace.preflight(context, request("list", {}))).status).toBe("ok");
+    }
+    context.applicationId = "0".repeat(64);
+    expect((await workspace.preflight(context, request("list", {}))).payload.reason)
+      .toBe("application_not_admitted");
+  });
+
   test("observes failure, requires request-bound approval, mutates once, then passes", async () => {
     const context = await fixtureContext();
 
@@ -64,6 +90,8 @@ describe("repository workspace actuality", () => {
     const before = await workspace.resolve(context, request("test", { suite: "default" }));
     expect(before.status).toBe("ok");
     expect(before.payload.passed).toBe(false);
+    expect(before.payload.stderr).not.toContain(context.workspaceRootReal);
+    expect(before.payload.stderr).not.toMatch(/\[\d+(?:\.\d+)?ms\]/);
     expect(context.preMutationTestFailed).toBe(true);
 
     const replacePayload = {

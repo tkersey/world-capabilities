@@ -1,10 +1,44 @@
 import { describe, expect, test } from "bun:test";
 
 import * as fixture from "../packages/repository-repair-decision-fixture/adapter.mjs";
+import fixtureManifest from "../packages/repository-repair-decision-fixture/manifest.json" with { type: "json" };
+import { repositoryRepairDecisionFixtureBinding } from "../src/v1/actuality/repository_repair_fixture_binding.mjs";
 
 const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+const INTERPRETATION_APPLICATION_ID = "cdd619cc1342cc9d35b5105b7abf9d359025ff71040e5ee99512d18c1188d039";
 
 describe("repository repair deterministic decision v2", () => {
+  test("admits the existing and Boundary 1.6 application identities only", async () => {
+    expect(fixture.ADMITTED_APPLICATION_IDS).toEqual([
+      APPLICATION_ID,
+      INTERPRETATION_APPLICATION_ID
+    ]);
+    expect(fixtureManifest.effectProtocolV1.interfaces.at(0).applicationIds)
+      .toEqual(fixture.ADMITTED_APPLICATION_IDS);
+    expect(repositoryRepairDecisionFixtureBinding().applicationIds.map((id) => id.toString("hex")))
+      .toEqual(fixture.ADMITTED_APPLICATION_IDS);
+
+    const contracts = [
+      fixture.DECISION_CONTRACT_DIGEST,
+      fixture.INTERPRETATION_DECISION_CONTRACT_DIGEST
+    ];
+    for (const [index, applicationId] of fixture.ADMITTED_APPLICATION_IDS.entries()) {
+      const context = receiverContext();
+      context.applicationId = applicationId;
+      const turn = decisionTurn();
+      turn.contractDigest = contracts[index];
+      expect((await fixture.preflight(context, request(turn))).status).toBe("ok");
+    }
+    const crossed = receiverContext();
+    crossed.applicationId = INTERPRETATION_APPLICATION_ID;
+    expect((await fixture.preflight(crossed, request(decisionTurn()))).payload.reason)
+      .toBe("decision_contract_mismatch");
+    const unknown = receiverContext();
+    unknown.applicationId = "0".repeat(64);
+    expect((await fixture.preflight(unknown, request(decisionTurn()))).payload.reason)
+      .toBe("application_not_admitted");
+  });
+
   test("selects actions from bounded working-set evidence instead of transcript length", async () => {
     const context = receiverContext();
     const turn = decisionTurn();

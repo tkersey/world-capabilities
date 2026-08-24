@@ -13,9 +13,10 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { kill as killProcess } from "node:process";
+import applicationIdentity from "./application-ids.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-workspace-actuality";
-const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+export const ADMITTED_APPLICATION_IDS = admittedApplicationIds(applicationIdentity);
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -119,7 +120,7 @@ async function admit(context, request) {
   if (packageReason) return denied(packageReason);
   const hostileReason = hostilePayloadReason(request.payload);
   if (hostileReason) return denied(hostileReason);
-  if (context?.applicationId !== APPLICATION_ID) return denied("application_not_admitted");
+  if (!ADMITTED_APPLICATION_IDS.includes(context?.applicationId)) return denied("application_not_admitted");
   if (context?.policy?.repositoryActuality !== true) return denied("repository_policy_required");
   if (typeof context.workspaceRoot !== "string" || typeof context.workspaceRootReal !== "string") {
     return denied("workspace_root_required");
@@ -172,6 +173,13 @@ function packagePolicyReason(context) {
   if (policy && Object.prototype.hasOwnProperty.call(policy, "allowPackages") &&
       (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(PACKAGE_NAME))) return "package_not_allowed";
   return null;
+}
+
+function admittedApplicationIds(identity) {
+  if (!Array.isArray(identity.applicationIds) || identity.applicationIds.length === 0) {
+    throw new Error("application_admission_manifest_invalid");
+  }
+  return Object.freeze([...identity.applicationIds]);
 }
 
 function hostilePayloadReason(value, depth = 0) {
@@ -297,7 +305,7 @@ async function collectReadableFiles(directory, prefix, result) {
 async function runTests(context, root) {
   bump(context, "effectAttempts");
   bump(context, "testRuns");
-  const result = await spawnBounded(context.bunExecutable, ["test"], {
+  const captured = await spawnBounded(context.bunExecutable, ["test"], {
     cwd: root,
     env: {
       HOME: context.temporaryHome,
@@ -305,9 +313,18 @@ async function runTests(context, root) {
       NO_COLOR: "1"
     }
   });
+  const result = {
+    ...captured,
+    stdout: canonicalProcessOutput(captured.stdout, root),
+    stderr: canonicalProcessOutput(captured.stderr, root)
+  };
   context.lastTestPassed = result.passed;
   if (!result.passed) context.preMutationTestFailed = true;
   return result;
+}
+
+function canonicalProcessOutput(value, root) {
+  return value.split(root).join("<workspace>").replace(/ \[\d+(?:\.\d+)?ms\]/g, "");
 }
 
 async function replaceApproved(context, root, request) {
@@ -376,7 +393,8 @@ function approvalDenial(context, request) {
   if (approval.proposalDigest !== digest) return "approval_proposal_mismatch";
   if (approval.mode === "interactive") return null;
   if (approval.mode !== "fixture-auto") return "approval_mode_not_admitted";
-  if (context.applicationId !== APPLICATION_ID || context.fixtureInitialManifestMatched !== true ||
+  if (!ADMITTED_APPLICATION_IDS.includes(context.applicationId) ||
+      context.fixtureInitialManifestMatched !== true ||
       context.preMutationTestFailed !== true || request.payload.path !== WRITABLE_PATH ||
       context.fixtureRequestDigest !== digest) {
     return "fixture_auto_approval_not_admitted";

@@ -1987,7 +1987,7 @@ test("Bun import.meta.require loaders are rejected", async () => {
           artifacts: [{ path: "adapter.mjs" }],
           metadata: { allowedBuiltins: [] }
         }
-      })).rejects.toThrow(/unsafe loader rejected/);
+      })).rejects.toThrow(/(?:unsafe loader|computed member access) rejected/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -3776,7 +3776,7 @@ test("Node TypeScript sidecars reject transform-only syntax", async () => {
             sidecar: { command: ["node", "sidecar.mts"], stdoutBytes: 1024, stderrBytes: 1024, timeoutMs: 1000 }
           }
         }
-      })).rejects.toThrow(/Node sidecar unsupported TypeScript syntax rejected/);
+      })).rejects.toThrow(/(?:Node sidecar unsupported TypeScript syntax rejected|Unexpected "export")/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

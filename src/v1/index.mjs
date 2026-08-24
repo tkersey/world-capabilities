@@ -58,6 +58,7 @@ export { repositoryRepairDecisionFixtureBinding } from "./actuality/repository_r
 export { repositoryRepairOpenAIBinding } from "./actuality/repository_repair_openai_binding.mjs";
 export {
   ACTUALITY_APPLICATION_ID,
+  ACTUALITY_APPLICATION_IDS,
   repositoryWorkspaceBindings
 } from "./actuality/repository_workspace_binding.mjs";
 export {
