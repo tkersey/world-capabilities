@@ -3,8 +3,29 @@ import { describe, expect, test } from "bun:test";
 import * as openai from "../packages/repository-repair-openai/adapter.mjs";
 
 const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+const INTERPRETATION_APPLICATION_ID = "cdd619cc1342cc9d35b5105b7abf9d359025ff71040e5ee99512d18c1188d039";
 
 describe("repository repair OpenAI capability", () => {
+  test("pairs both actuality identities with their exact decision contracts", async () => {
+    const pairs = [
+      [APPLICATION_ID, openai.DECISION_CONTRACT_DIGEST],
+      [INTERPRETATION_APPLICATION_ID, openai.INTERPRETATION_DECISION_CONTRACT_DIGEST]
+    ];
+    expect(openai.ADMITTED_APPLICATION_IDS).toEqual(pairs.map(([applicationId]) => applicationId));
+    for (const [applicationId, contractDigest] of pairs) {
+      const context = liveContext(async () => { throw new Error("must not fetch"); }, {
+        applicationId,
+        contractDigest
+      });
+      expect((await openai.preflight(context, request(contractDigest))).status).toBe("ok");
+    }
+    const crossed = liveContext(async () => { throw new Error("must not fetch"); }, {
+      applicationId: INTERPRETATION_APPLICATION_ID,
+      contractDigest: openai.DECISION_CONTRACT_DIGEST
+    });
+    expect((await openai.preflight(crossed, request())).payload.reason).toBe("decision_contract_mismatch");
+  });
+
   test("uses one fixed Responses request with strict output and no tools", async () => {
     let calls = 0;
     const context = liveContext(async (url, options) => {
@@ -113,7 +134,7 @@ describe("repository repair OpenAI capability", () => {
   });
 });
 
-function request() {
+function request(contractDigest = openai.DECISION_CONTRACT_DIGEST) {
   return {
     requestId: "a".repeat(64),
     idempotencyKey: "idempotency",
@@ -124,7 +145,7 @@ function request() {
     },
     responseSchema: { statuses: ["ok", "rejected", "failed"] },
     payload: {
-      contractDigest: openai.DECISION_CONTRACT_DIGEST,
+      contractDigest,
       goal: { task: "Fix tests.", repository: "fixture" },
       counters: { turns: 0, decisions: 0, effectActions: 0, childActions: 0 },
       phase: "decide",
@@ -147,14 +168,17 @@ function decisionContext() {
   };
 }
 
-function liveContext(fetchImplementation) {
+function liveContext(fetchImplementation, {
+  applicationId = APPLICATION_ID,
+  contractDigest = openai.DECISION_CONTRACT_DIGEST
+} = {}) {
   return {
-    applicationId: APPLICATION_ID,
+    applicationId,
     policy: { openaiRepositoryRepair: true },
     secrets: { OPENAI_API_KEY: "test-secret" },
     openaiModel: "test-model-2026-08-10",
     allowedModels: ["test-model-2026-08-10"],
-    decisionContractDigest: openai.DECISION_CONTRACT_DIGEST,
+    decisionContractDigest: contractDigest,
     fetchImplementation
   };
 }

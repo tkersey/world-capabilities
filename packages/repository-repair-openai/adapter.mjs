@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import decisionContract from "./decision-contract.json" with { type: "json" };
+import applicationIdentity from "./application-ids.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-repair-openai";
-const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+export const ADMITTED_APPLICATION_IDS = Object.freeze([...applicationIdentity.applicationIds]);
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -11,13 +12,14 @@ const FORBIDDEN_EVIDENCE_KEYS = [
   "archiveSealBytes"
 ];
 export const DECISION_CONTRACT_DIGEST = "dddc4713e9cb478afc7beef464f35374fdb9aeb1b59d9307edc43438c1e192b5";
+export const INTERPRETATION_DECISION_CONTRACT_DIGEST = "28ad8f64d48be98b260c14d91ef7a61387c0782b61f0cca641bd38ed8efae7ae";
 export const RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const MAXIMUM_RESPONSE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_MAXIMUM_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAXIMUM_MODEL_CALLS = 16;
 const defaultFetch = fetch;
-const admittedContract = admitDecisionContract();
+const admittedContracts = admitDecisionContracts();
 const openAiDecisionSchema = openAiStrictSchema(decisionContract.actionSchema);
 
 const packManifest = Object.freeze({
@@ -31,7 +33,8 @@ const packManifest = Object.freeze({
   secretRequirements: ["OPENAI_API_KEY"],
   liveNetwork: true,
   networkHosts: ["api.openai.com"],
-  decisionContractDigest: admittedContract.semanticDigest
+  decisionContractDigest: DECISION_CONTRACT_DIGEST,
+  decisionContractDigests: admittedContracts.map((contract) => contract.semanticDigest)
 });
 
 export function manifest() { return structuredClone(packManifest); }
@@ -152,9 +155,9 @@ export function buildResponsesRequest(context, request) {
     max_output_tokens: maximumOutputTokens(context),
     tools: [],
     metadata: {
-      application_id: APPLICATION_ID,
+      application_id: context.applicationId,
       effect_request_id: request.requestId,
-      decision_contract: DECISION_CONTRACT_DIGEST
+      decision_contract: context.decisionContractDigest
     }
   };
 }
@@ -268,14 +271,16 @@ function admissionReason(context, request) {
   if (packageReason) return packageReason;
   const hostileReason = hostilePayloadReason(request.payload);
   if (hostileReason) return hostileReason;
-  if (context?.applicationId !== APPLICATION_ID) return "application_not_admitted";
+  const applicationIndex = ADMITTED_APPLICATION_IDS.indexOf(context?.applicationId);
+  if (applicationIndex < 0) return "application_not_admitted";
   if (context?.policy?.openaiRepositoryRepair !== true) return "openai_policy_required";
   if (typeof context?.secrets?.OPENAI_API_KEY !== "string" || context.secrets.OPENAI_API_KEY.length === 0) return "openai_api_key_required";
   if (typeof context?.openaiModel !== "string" || context.openaiModel.length === 0) return "openai_model_required";
   if (Array.isArray(context.allowedModels) && !context.allowedModels.includes(context.openaiModel)) return "openai_model_not_allowed";
-  if (context.decisionContractDigest !== DECISION_CONTRACT_DIGEST) return "decision_contract_mismatch";
+  const expectedContract = admittedContracts.at(applicationIndex).semanticDigest;
+  if (context.decisionContractDigest !== expectedContract) return "decision_contract_mismatch";
   if (!request.payload || typeof request.payload !== "object") return "decision_request_required";
-  if (request.payload.contractDigest !== DECISION_CONTRACT_DIGEST) return "decision_contract_mismatch";
+  if (request.payload.contractDigest !== expectedContract) return "decision_contract_mismatch";
   if (request.payload.phase !== "decide") return "unsupported_decision_phase";
   if (!request.payload.context || typeof request.payload.context !== "object") return "decision_context_required";
   if (Object.hasOwn(request.payload, "instructions") || Object.hasOwn(request.payload, "actionCatalog") ||
@@ -359,15 +364,23 @@ function developerText() {
     "The receiver may deny mutation.";
 }
 
-function admitDecisionContract() {
-  const bytes = readFileSync(new URL("./decision-contract.bin", import.meta.url));
+function admitDecisionContracts() {
+  return Object.freeze([
+    admitDecisionContract("decision-contract.bin", DECISION_CONTRACT_DIGEST),
+    admitDecisionContract("decision-contract-agent-v2.7.bin", INTERPRETATION_DECISION_CONTRACT_DIGEST)
+  ]);
+}
+
+function admitDecisionContract(path, expectedDigest) {
+  const bytes = readFileSync(new URL(path, import.meta.url));
   if (bytes.length < 40 || bytes.subarray(0, 8).toString("ascii") !== "AGT_DCT2") {
     throw new Error("decision_contract_format_invalid");
   }
   const semanticDigest = bytes.subarray(-32).toString("hex");
   const computedDigest = createHash("sha256").update(bytes.subarray(0, -32)).digest("hex");
-  if (semanticDigest !== computedDigest || semanticDigest !== DECISION_CONTRACT_DIGEST ||
-      decisionContract.semanticDigest !== semanticDigest || decisionContract.format !== "agent-decision-contract/v2") {
+  if (semanticDigest !== computedDigest || semanticDigest !== expectedDigest ||
+      (path === "decision-contract.bin" &&
+        (decisionContract.semanticDigest !== semanticDigest || decisionContract.format !== "agent-decision-contract/v2"))) {
     throw new Error("decision_contract_mismatch");
   }
   return Object.freeze({ semanticDigest });
