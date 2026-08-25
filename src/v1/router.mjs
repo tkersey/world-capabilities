@@ -229,16 +229,15 @@ function admitOutcome(value, path = "$", depth = 0) {
   const admitted = isArray ? new Array(arrayLength) : Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const label = typeof key === "string" ? key : String(key);
+    if (typeof key !== "string") fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     const descriptor = descriptors[key];
     if (!descriptor || !Object.hasOwn(descriptor, "value")) {
       fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     }
-    if (typeof key === "string") {
-      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
-        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
-      }
+    const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+      fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
     }
     if (isArray && key === "length") {
       continue;

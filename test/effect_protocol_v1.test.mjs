@@ -124,6 +124,14 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(Object.getPrototypeOf(admitted), null);
     assert.equal(admitted.payload.value, 41);
     assert.equal(Object.isFrozen(admitted), true);
+    assert.throws(
+      () => admitCapabilityOutcomeV1({
+        requestId: "test",
+        status: "ok",
+        [Symbol("worldState")]: Buffer.from("forbidden")
+      }),
+      { code: "ERR_CAPABILITY_V1_OUTCOME" }
+    );
   });
 
   it("inspects without executing adapter code and enforces policy before resolve", async () => {

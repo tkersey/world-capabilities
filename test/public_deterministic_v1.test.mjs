@@ -32,7 +32,7 @@ import {
 test("v2.3.3 deterministic distribution binds the reviewed ENF runtime bytes", async () => {
   expect(await runtimeTreeDigest(process.cwd())).toEqual({
     fileCount: 125,
-    sha256: "ffda7612579057a53bbea23c1adf0318b6c99293ddb34904a918a0f8c8cc429d",
+    sha256: "e4639509b0613a16b0aa4dac53d0020cbbaaff265643d53ac8bf9d8e69c166e6",
   });
 });
 
