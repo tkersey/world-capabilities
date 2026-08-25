@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import {
   CapabilityRouterV1,
   EffectStatus,
+  admitCapabilityOutcomeV1,
   createEffectResult,
   decodeEffectRequest,
   decodeEffectResult,
@@ -114,6 +115,17 @@ describe("World Effect protocol v1", () => {
 });
 
 describe("CapabilityRouterV1 authority boundary", () => {
+  it("exposes the router's exact receiver-owned outcome admission", () => {
+    assert.throws(
+      () => admitCapabilityOutcomeV1({ requestId: "test", status: "ok", worldState: Buffer.from("forbidden") }),
+      { code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE" }
+    );
+    const admitted = admitCapabilityOutcomeV1({ requestId: "test", status: "ok", payload: { value: 41 } });
+    assert.equal(Object.getPrototypeOf(admitted), null);
+    assert.equal(admitted.payload.value, 41);
+    assert.equal(Object.isFrozen(admitted), true);
+  });
+
   it("inspects without executing adapter code and enforces policy before resolve", async () => {
     let preflightCalls = 0;
     let effectCalls = 0;

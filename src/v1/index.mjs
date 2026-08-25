@@ -16,7 +16,7 @@ export {
   stringValueSchemaId,
   validateEffectResultForRequest
 } from "./protocol.mjs";
-export { CapabilityRouterV1 } from "./router.mjs";
+export { CapabilityRouterV1, admitCapabilityOutcomeV1 } from "./router.mjs";
 export { fixtureAgentBindings } from "./fixture_agent_bindings.mjs";
 export { createAgentInvokeAdapter } from "./agent_invoke.mjs";
 export { decodeJsonStringValue, encodeJsonStringValue } from "./json_string_codec.mjs";

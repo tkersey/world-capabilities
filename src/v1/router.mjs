@@ -127,6 +127,10 @@ export class CapabilityRouterV1 {
   }
 }
 
+export function admitCapabilityOutcomeV1(value) {
+  return admitOutcome(value);
+}
+
 function assertBinding(binding) {
   if (!binding || typeof binding !== "object" || typeof binding.bindingId !== "string" || binding.bindingId.length === 0 ||
       typeof binding.driverId !== "string" || binding.driverId.length === 0 ||
