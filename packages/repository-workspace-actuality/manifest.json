@@ -1,6 +1,10 @@
 {
   "artifacts": [
     {
+      "path": "application-ids.json",
+      "role": "schema"
+    },
+    {
       "path": "adapter.mjs",
       "role": "adapter"
     }
@@ -11,7 +15,8 @@
     "human"
   ],
   "checksums": {
-    "adapter.mjs": "3fc7f02ea786be80d7efda766e90cd68d04ed2aab220b4042dbbea88727f9acc"
+    "adapter.mjs": "bc1bf9efd822390d3d5d04a65d63a6903ef2a81141bf4f06b1b21398c2a61b9a",
+    "application-ids.json": "f9652d47d758390d19738d0f93f00e3af0baaeb3a593e00f89cfbfcc61c9f9b5"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
   "driverAbiVersion": "capability-driver-v1",
@@ -21,7 +26,8 @@
     "interfaces": [
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "2",
         "interfaceId": "1d0437d70eb08141c448c017b974a51226c90c0a38ae52d0cc6f20ac1d2f3ccb",
@@ -31,7 +37,8 @@
       },
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "2",
         "interfaceId": "d91f56cf1e18924f9540a2bd448c522593e4912f485879c6fb0b2006b3e6e2af",
@@ -41,7 +48,8 @@
       },
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "2",
         "interfaceId": "44805fc95f4777061d0b5ce327aaec84c50dc199d39bb8bf61e14b5ce1785033",
@@ -51,7 +59,8 @@
       },
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "6",
         "interfaceId": "cef6816e298237de1f3b81fdee02b82e3df3b7bbb92d3edcc40eac537d081234",
@@ -61,7 +70,8 @@
       },
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "20",
         "interfaceId": "94a8a7c1121c1cba6f85f306a9f55113413a861e0e0db85cd5ce5d85b5ab04dd",
@@ -92,8 +102,8 @@
     "mode": "temporary-repository-actuality"
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-actuality",
-  "packageVersion": "2.2.2",
-  "packFingerprint": "4684e32221a3a06fc3a5057aeae45fdf171fadce4e42399389734acd33086b99",
+  "packageVersion": "2.3.3",
+  "packFingerprint": "32faeb6519100801470b3d5c0f821038c119b811644157c8fca8a337ed38fc43",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",

@@ -16,7 +16,7 @@ export {
   stringValueSchemaId,
   validateEffectResultForRequest
 } from "./protocol.mjs";
-export { CapabilityRouterV1 } from "./router.mjs";
+export { CapabilityRouterV1, admitCapabilityOutcomeV1 } from "./router.mjs";
 export { fixtureAgentBindings } from "./fixture_agent_bindings.mjs";
 export { createAgentInvokeAdapter } from "./agent_invoke.mjs";
 export { decodeJsonStringValue, encodeJsonStringValue } from "./json_string_codec.mjs";
@@ -58,6 +58,7 @@ export { repositoryRepairDecisionFixtureBinding } from "./actuality/repository_r
 export { repositoryRepairOpenAIBinding } from "./actuality/repository_repair_openai_binding.mjs";
 export {
   ACTUALITY_APPLICATION_ID,
+  ACTUALITY_APPLICATION_IDS,
   repositoryWorkspaceBindings
 } from "./actuality/repository_workspace_binding.mjs";
 export {

@@ -13,9 +13,10 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { kill as killProcess } from "node:process";
+import applicationIdentity from "./application-ids.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-workspace-actuality";
-const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+export const ADMITTED_APPLICATION_IDS = admittedApplicationIds(applicationIdentity);
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -119,7 +120,7 @@ async function admit(context, request) {
   if (packageReason) return denied(packageReason);
   const hostileReason = hostilePayloadReason(request.payload);
   if (hostileReason) return denied(hostileReason);
-  if (context?.applicationId !== APPLICATION_ID) return denied("application_not_admitted");
+  if (!ADMITTED_APPLICATION_IDS.includes(context?.applicationId)) return denied("application_not_admitted");
   if (context?.policy?.repositoryActuality !== true) return denied("repository_policy_required");
   if (typeof context.workspaceRoot !== "string" || typeof context.workspaceRootReal !== "string") {
     return denied("workspace_root_required");
@@ -172,6 +173,13 @@ function packagePolicyReason(context) {
   if (policy && Object.prototype.hasOwnProperty.call(policy, "allowPackages") &&
       (!Array.isArray(policy.allowPackages) || !policy.allowPackages.includes(PACKAGE_NAME))) return "package_not_allowed";
   return null;
+}
+
+function admittedApplicationIds(identity) {
+  if (!Array.isArray(identity.applicationIds) || identity.applicationIds.length === 0) {
+    throw new Error("application_admission_manifest_invalid");
+  }
+  return Object.freeze([...identity.applicationIds]);
 }
 
 function hostilePayloadReason(value, depth = 0) {
@@ -297,17 +305,47 @@ async function collectReadableFiles(directory, prefix, result) {
 async function runTests(context, root) {
   bump(context, "effectAttempts");
   bump(context, "testRuns");
-  const result = await spawnBounded(context.bunExecutable, ["test"], {
+  const workspaceAliases = [...new Set([
+    root,
+    context.workspaceRoot,
+    context.workspaceRootReal
+  ].filter((value) => typeof value === "string" && value.length > 0))]
+    .sort((left, right) => right.length - left.length);
+  const captured = await spawnBounded(context.bunExecutable, ["test"], {
     cwd: root,
     env: {
       HOME: context.temporaryHome,
       TMPDIR: context.temporaryHome,
       NO_COLOR: "1"
-    }
+    },
+    maximumCaptureBytes: canonicalCaptureBytes(workspaceAliases)
   });
+  const canonicalStdout = canonicalProcessOutput(captured.stdout, workspaceAliases);
+  const canonicalStderr = canonicalProcessOutput(captured.stderr, workspaceAliases);
+  const result = {
+    ...captured,
+    stdout: truncateUtf8(canonicalStdout, MAXIMUM_PROCESS_BYTES),
+    stderr: truncateUtf8(canonicalStderr, MAXIMUM_PROCESS_BYTES),
+    stdoutTruncated: captured.stdoutTruncated ||
+      Buffer.byteLength(canonicalStdout, "utf8") > MAXIMUM_PROCESS_BYTES,
+    stderrTruncated: captured.stderrTruncated ||
+      Buffer.byteLength(canonicalStderr, "utf8") > MAXIMUM_PROCESS_BYTES
+  };
   context.lastTestPassed = result.passed;
   if (!result.passed) context.preMutationTestFailed = true;
   return result;
+}
+
+function canonicalProcessOutput(value, workspaceAliases) {
+  let canonical = value;
+  for (const root of workspaceAliases) canonical = canonical.split(root).join("<workspace>");
+  return canonical.replace(/ \[\d+(?:\.\d+)?(?:ms|s|µs|us|ns)\](?=\r?$)/gm, "");
+}
+
+function canonicalCaptureBytes(workspaceAliases) {
+  const rootBytes = Math.max(...workspaceAliases.map((root) => Buffer.byteLength(root, "utf8")));
+  const replacementBytes = Buffer.byteLength("<workspace>", "utf8");
+  return MAXIMUM_PROCESS_BYTES * Math.max(1, Math.ceil(rootBytes / replacementBytes)) + rootBytes;
 }
 
 async function replaceApproved(context, root, request) {
@@ -376,7 +414,8 @@ function approvalDenial(context, request) {
   if (approval.proposalDigest !== digest) return "approval_proposal_mismatch";
   if (approval.mode === "interactive") return null;
   if (approval.mode !== "fixture-auto") return "approval_mode_not_admitted";
-  if (context.applicationId !== APPLICATION_ID || context.fixtureInitialManifestMatched !== true ||
+  if (!ADMITTED_APPLICATION_IDS.includes(context.applicationId) ||
+      context.fixtureInitialManifestMatched !== true ||
       context.preMutationTestFailed !== true || request.payload.path !== WRITABLE_PATH ||
       context.fixtureRequestDigest !== digest) {
     return "fixture_auto_approval_not_admitted";
@@ -440,7 +479,16 @@ async function readUtf8Bounded(path) {
 
 function spawnBounded(executable, argv, options) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(executable, argv, { ...options, shell: false, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const {
+      maximumCaptureBytes = MAXIMUM_PROCESS_BYTES,
+      ...spawnOptions
+    } = options;
+    const child = spawn(executable, argv, {
+      ...spawnOptions,
+      shell: false,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
     const stdout = [];
     const stderr = [];
     let stdoutLength = 0;
@@ -449,12 +497,14 @@ function spawnBounded(executable, argv, options) {
     let stderrTruncated = false;
     const capture = (parts, lengthName, truncatedName) => (chunk) => {
       let length = lengthName === "stdout" ? stdoutLength : stderrLength;
-      if (length < MAXIMUM_PROCESS_BYTES) {
-        const admitted = Buffer.from(chunk).subarray(0, MAXIMUM_PROCESS_BYTES - length);
+      const bytes = Buffer.from(chunk);
+      const remaining = Math.max(0, maximumCaptureBytes - length);
+      if (remaining > 0) {
+        const admitted = bytes.subarray(0, remaining);
         parts.push(admitted);
         length += admitted.length;
       }
-      if (length < chunk.length || length >= MAXIMUM_PROCESS_BYTES) {
+      if (bytes.length > remaining) {
         if (truncatedName === "stdout") stdoutTruncated = true;
         else stderrTruncated = true;
       }

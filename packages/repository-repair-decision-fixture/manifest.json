@@ -1,11 +1,19 @@
 {
   "artifacts": [
     {
+      "path": "application-ids.json",
+      "role": "schema"
+    },
+    {
       "path": "adapter.mjs",
       "role": "adapter"
     },
     {
       "path": "decision-contract.bin",
+      "role": "schema"
+    },
+    {
+      "path": "decision-contract-agent-v2.7.bin",
       "role": "schema"
     },
     {
@@ -22,7 +30,9 @@
   ],
   "checksums": {
     "action-schema.json": "b51e15d9a5bc21f93f6f7ba0b39bbde3485342d8f9070bff3cadfb8d820cfb57",
-    "adapter.mjs": "eba02991b29532d34ae3a5de591822057d69feb89a4b713e71e3d54a73d0ec23",
+    "adapter.mjs": "26291c102b0ee251aee4ef43e4e82aa56e378296d24b4270948fce30fb34a5ef",
+    "application-ids.json": "f9652d47d758390d19738d0f93f00e3af0baaeb3a593e00f89cfbfcc61c9f9b5",
+    "decision-contract-agent-v2.7.bin": "f9da12026b6af0489a584bdceb88e020e00156137d54205b27c5d13bf32ed29d",
     "decision-contract.bin": "235cff9231965d5650b12d8605a309c501e91c3b15e08d7e087c7ca928ea043e",
     "decision-contract.json": "c9cba76c98310a216a99d50221907f0c4c1a6cc73aef4438d353376d04c100d7"
   },
@@ -34,7 +44,8 @@
     "interfaces": [
       {
         "applicationIds": [
-          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72"
+          "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72",
+          "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c"
         ],
         "authorityRequirements": "9",
         "interfaceId": "a39de632b7ea696d278027d02dcd6080b53cd19e8e4e26085c2fe227fe468c71",
@@ -53,12 +64,16 @@
       "node:fs"
     ],
     "decisionContractDigest": "dddc4713e9cb478afc7beef464f35374fdb9aeb1b59d9307edc43438c1e192b5",
+    "decisionContractDigests": [
+      "dddc4713e9cb478afc7beef464f35374fdb9aeb1b59d9307edc43438c1e192b5",
+      "28ad8f64d48be98b260c14d91ef7a61387c0782b61f0cca641bd38ed8efae7ae"
+    ],
     "mode": "deterministic-actuality-fixture",
     "network": false
   },
   "packageName": "@tkersey/world-capabilities/repository-repair-decision-fixture",
-  "packageVersion": "2.2.2",
-  "packFingerprint": "13f99d6340739d833b17cd4d99db86910d8700a86c9ff851448867c3a1fe2ec0",
+  "packageVersion": "2.3.3",
+  "packFingerprint": "2205b826bf28fd5b98cee646663f2dc261baea914826ebd39d1e6855ffd154cb",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "pure",

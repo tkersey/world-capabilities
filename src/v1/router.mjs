@@ -69,11 +69,18 @@ export class CapabilityRouterV1 {
   async resolve(context, requestBytes) {
     const request = decodeEffectRequest(requestBytes, this.limits);
     const binding = this.#bindingFor(request);
+    assertContextApplication(context, request);
     const projected = projectRequest(binding, request);
-    const preflight = admitOutcome(await binding.adapter.preflight(context, projected));
+    const preflight = admitCapabilityOutcomeV1(
+      await binding.adapter.preflight(context, projected),
+      projected.requestId
+    );
     assertOutcome(preflight, projected);
     const outcome = preflight.status === "ok"
-      ? admitOutcome(await binding.adapter.resolve(context, projected))
+      ? admitCapabilityOutcomeV1(
+        await binding.adapter.resolve(context, projected),
+        projected.requestId
+      )
       : preflight;
     assertOutcome(outcome, projected);
     const status = statusCode(outcome.status);
@@ -125,6 +132,21 @@ export class CapabilityRouterV1 {
     }
     return binding;
   }
+}
+
+export function admitCapabilityOutcomeV1(value, expectedRequestId = null) {
+  const admitted = admitOutcome(value);
+  if (!admitted || typeof admitted !== "object" || Array.isArray(admitted) ||
+      typeof admitted.requestId !== "string" || admitted.requestId.length === 0) {
+    fail("ERR_CAPABILITY_V1_OUTCOME");
+  }
+  if (expectedRequestId !== null &&
+      (typeof expectedRequestId !== "string" || expectedRequestId.length === 0 ||
+        admitted.requestId !== expectedRequestId)) {
+    fail("ERR_CAPABILITY_V1_OUTCOME_TARGET");
+  }
+  statusCode(admitted.status);
+  return admitted;
 }
 
 function assertBinding(binding) {
@@ -188,6 +210,17 @@ function assertOutcome(value, request) {
   statusCode(value.status);
 }
 
+function assertContextApplication(context, request) {
+  if (!context || typeof context !== "object" ||
+      !Object.prototype.hasOwnProperty.call(context, "applicationId")) return;
+  const expected = Buffer.from(request.applicationId);
+  const actual = context.applicationId;
+  const matched = typeof actual === "string"
+    ? /^[0-9a-f]{64}$/.test(actual) && actual === expected.toString("hex")
+    : actual instanceof Uint8Array && sameBytes(actual, expected);
+  if (!matched) fail("ERR_CAPABILITY_V1_APPLICATION_CONTEXT_MISMATCH");
+}
+
 function admitOutcome(value, path = "$", depth = 0) {
   if (depth > 16) fail("ERR_CAPABILITY_V1_OUTCOME_DEPTH", path);
   if (typeof value === "function") fail("ERR_CAPABILITY_V1_OUTCOME", path);
@@ -225,16 +258,15 @@ function admitOutcome(value, path = "$", depth = 0) {
   const admitted = isArray ? new Array(arrayLength) : Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const label = typeof key === "string" ? key : String(key);
+    if (typeof key !== "string") fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     if (!Object.hasOwn(descriptors, key)) fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     const descriptor = descriptors[key];
     if (!descriptor || !Object.hasOwn(descriptor, "value")) {
       fail("ERR_CAPABILITY_V1_OUTCOME", `${path}.${label}`);
     }
-    if (typeof key === "string") {
-      const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-      if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
-        fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
-      }
+    const normal = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (FORBIDDEN_OUTPUT_KEYS.has(key) || FORBIDDEN_OUTPUT_KEY_NORMAL_FORMS.has(normal)) {
+      fail("ERR_CAPABILITY_V1_WORLD_EVIDENCE", `${path}.${key}`);
     }
     if (isArray && key === "length") {
       continue;

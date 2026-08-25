@@ -18,6 +18,7 @@ import {
 
 export const ACTUALITY_APPLICATION_ID =
   "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+export const ACTUALITY_APPLICATION_IDS = workspace.ADMITTED_APPLICATION_IDS;
 
 const SITE = Object.freeze({
   list: Object.freeze({
@@ -86,7 +87,7 @@ export function repositoryWorkspaceBindings(options = {}) {
     interfaceId: effectInterfaceId(site.label),
     payloadSchemaId: digest(site.payload),
     resultSchemaId: digest(site.result),
-    applicationIds: [digest(ACTUALITY_APPLICATION_ID)],
+    applicationIds: ACTUALITY_APPLICATION_IDS.map(digest),
     authorityRequirements: site.authority,
     target: {
       descriptorFingerprint: site.descriptor,

@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import decisionContract from "./decision-contract.json" with { type: "json" };
+import applicationIdentity from "./application-ids.json" with { type: "json" };
 
 const PACKAGE_NAME = "@tkersey/world-capabilities/repository-repair-decision-fixture";
-const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
+export const ADMITTED_APPLICATION_IDS = Object.freeze(
+  [...applicationIdentity.applicationIds]
+);
 export const DECISION_CONTRACT_DIGEST = "dddc4713e9cb478afc7beef464f35374fdb9aeb1b59d9307edc43438c1e192b5";
+export const INTERPRETATION_DECISION_CONTRACT_DIGEST = "28ad8f64d48be98b260c14d91ef7a61387c0782b61f0cca641bd38ed8efae7ae";
 const FORBIDDEN_EVIDENCE_KEYS = [
   "turnReceiptBytes", "archiveAppendBatchBytes", "capsuleBytes", "chronicleEventBytes",
   "chronicleCommitBytes", "actuationReceiptBytes", "boundaryModuleBytes", "executableImageBytes",
@@ -18,7 +22,7 @@ const CORRECTED_SOURCE = `export function normalizeRange(start, end) {
   return { start: end, end: start };
 }
 `;
-const admittedContract = admitDecisionContract();
+const admittedContracts = admitDecisionContracts();
 
 const packManifest = Object.freeze({
   driverId: "repository-repair-decision-fixture",
@@ -29,7 +33,8 @@ const packManifest = Object.freeze({
   supportedDescriptorFingerprints: ["desc.repository-repair-decision-fixture.v1"],
   supportedResponseStatuses: ["ok", "rejected", "failed"],
   secretRequirements: [],
-  decisionContractDigest: admittedContract.semanticDigest
+  decisionContractDigest: DECISION_CONTRACT_DIGEST,
+  decisionContractDigests: admittedContracts.map((contract) => contract.semanticDigest)
 });
 
 export function manifest() { return structuredClone(packManifest); }
@@ -83,10 +88,13 @@ function admissionReason(context, request) {
   if (packageReason) return packageReason;
   const hostileReason = hostilePayloadReason(request.payload);
   if (hostileReason) return hostileReason;
-  if (context?.applicationId !== APPLICATION_ID) return "application_not_admitted";
+  if (!ADMITTED_APPLICATION_IDS.includes(context?.applicationId)) return "application_not_admitted";
   if (context?.policy?.repositoryRepairDecisionFixture !== true) return "fixture_policy_required";
   if (!request.payload || typeof request.payload !== "object") return "decision_request_required";
-  if (request.payload.contractDigest !== DECISION_CONTRACT_DIGEST) return "decision_contract_mismatch";
+  const applicationIndex = ADMITTED_APPLICATION_IDS.indexOf(context.applicationId);
+  if (applicationIndex < 0 || request.payload.contractDigest !== admittedContracts.at(applicationIndex).semanticDigest) {
+    return "decision_contract_mismatch";
+  }
   if (request.payload.phase !== "decide") return "unsupported_decision_phase";
   if (!request.payload.context || typeof request.payload.context !== "object") return "decision_context_required";
   if (Object.hasOwn(request.payload, "instructions") || Object.hasOwn(request.payload, "actionCatalog") ||
@@ -156,15 +164,23 @@ function scriptedAction(request) {
   });
 }
 
-function admitDecisionContract() {
-  const bytes = readFileSync(new URL("./decision-contract.bin", import.meta.url));
+function admitDecisionContracts() {
+  return Object.freeze([
+    admitDecisionContract("decision-contract.bin", DECISION_CONTRACT_DIGEST),
+    admitDecisionContract("decision-contract-agent-v2.7.bin", INTERPRETATION_DECISION_CONTRACT_DIGEST)
+  ]);
+}
+
+function admitDecisionContract(path, expectedDigest) {
+  const bytes = readFileSync(new URL(path, import.meta.url));
   if (bytes.length < 40 || bytes.subarray(0, 8).toString("ascii") !== "AGT_DCT2") {
     throw new Error("decision_contract_format_invalid");
   }
   const semanticDigest = bytes.subarray(-32).toString("hex");
   const computedDigest = createHash("sha256").update(bytes.subarray(0, -32)).digest("hex");
-  if (semanticDigest !== computedDigest || semanticDigest !== DECISION_CONTRACT_DIGEST ||
-      decisionContract.semanticDigest !== semanticDigest || decisionContract.format !== "agent-decision-contract/v2") {
+  if (semanticDigest !== computedDigest || semanticDigest !== expectedDigest ||
+      (path === "decision-contract.bin" &&
+        (decisionContract.semanticDigest !== semanticDigest || decisionContract.format !== "agent-decision-contract/v2"))) {
     throw new Error("decision_contract_mismatch");
   }
   return Object.freeze({ semanticDigest });
