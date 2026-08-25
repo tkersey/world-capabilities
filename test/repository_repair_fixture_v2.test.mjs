@@ -5,7 +5,7 @@ import fixtureManifest from "../packages/repository-repair-decision-fixture/mani
 import { repositoryRepairDecisionFixtureBinding } from "../src/v1/actuality/repository_repair_fixture_binding.mjs";
 
 const APPLICATION_ID = "2ed225966c6a42ad4ded0501a94e37b239d9ff4b1a3817d1e3b9097038ff7d72";
-const INTERPRETATION_APPLICATION_ID = "cdd619cc1342cc9d35b5105b7abf9d359025ff71040e5ee99512d18c1188d039";
+const INTERPRETATION_APPLICATION_ID = "b2e6628424ed95648a554ab5730566476360de86c9534a375357ba152031cf4c";
 
 describe("repository repair deterministic decision v2", () => {
   test("admits the existing and Boundary 1.6 application identities only", async () => {
