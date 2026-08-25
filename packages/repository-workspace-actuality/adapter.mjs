@@ -324,7 +324,8 @@ async function runTests(context, root) {
 }
 
 function canonicalProcessOutput(value, root) {
-  return value.split(root).join("<workspace>").replace(/ \[\d+(?:\.\d+)?ms\]/g, "");
+  return value.split(root).join("<workspace>")
+    .replace(/ \[\d+(?:\.\d+)?(?:ms|s|µs|us|ns)\]/g, "");
 }
 
 async function replaceApproved(context, root, request) {

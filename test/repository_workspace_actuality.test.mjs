@@ -130,6 +130,23 @@ describe("repository workspace actuality", () => {
     expect(after.payload.passed).toBe(true);
   });
 
+  test("canonicalizes every Bun duration unit from typed test results", async () => {
+    const context = await fixtureContext();
+    const executable = join(context.workspaceRoot, "fixture-bun");
+    await writeFile(executable, `#!/bin/sh
+printf 'stdout [1.20s] [250µs] [9us] [7ns] [3ms] keep[4ms]\\n'
+printf 'stderr [2s]\\n' >&2
+exit 1
+`, { mode: 0o755 });
+    context.bunExecutable = executable;
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.stdout).toBe("stdout keep[4ms]\n");
+    expect(result.payload.stderr).toBe("stderr\n");
+    expect(result.payload.passed).toBe(false);
+  });
+
   test("rejects traversal, metadata writes, stale approval, and stale digests before writing", async () => {
     const context = await fixtureContext();
     expect((await workspace.preflight(context, request("read", { role: "source", path: "src/../secret" }))).payload.reason)
