@@ -116,6 +116,12 @@ describe("World Effect protocol v1", () => {
 
 describe("CapabilityRouterV1 authority boundary", () => {
   it("exposes the router's exact receiver-owned outcome admission", () => {
+    assert.throws(() => admitCapabilityOutcomeV1(null), { code: "ERR_CAPABILITY_V1_OUTCOME" });
+    assert.throws(() => admitCapabilityOutcomeV1([]), { code: "ERR_CAPABILITY_V1_OUTCOME" });
+    assert.throws(
+      () => admitCapabilityOutcomeV1({ requestId: "test", status: "bogus" }),
+      { code: "ERR_CAPABILITY_V1_STATUS" }
+    );
     assert.throws(
       () => admitCapabilityOutcomeV1({ requestId: "test", status: "ok", worldState: Buffer.from("forbidden") }),
       { code: "ERR_CAPABILITY_V1_WORLD_EVIDENCE" }
@@ -124,6 +130,10 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(Object.getPrototypeOf(admitted), null);
     assert.equal(admitted.payload.value, 41);
     assert.equal(Object.isFrozen(admitted), true);
+    assert.throws(
+      () => admitCapabilityOutcomeV1(admitted, "other"),
+      { code: "ERR_CAPABILITY_V1_OUTCOME_TARGET" }
+    );
     assert.throws(
       () => admitCapabilityOutcomeV1({
         requestId: "test",
@@ -222,6 +232,23 @@ describe("CapabilityRouterV1 authority boundary", () => {
     assert.equal(
       firstResult.handlerConfigurationIdentity,
       secondResult.handlerConfigurationIdentity
+    );
+  });
+
+  it("requires receiver context application identity to match the authenticated request", async () => {
+    const requestApplicationId = Buffer.from(REQUEST.subarray(44, 76));
+    const router = new CapabilityRouterV1({ bindings: [binding({
+      applicationIds: [requestApplicationId],
+      adapter: {
+        preflight: async (_context, request) => ({ requestId: request.requestId, status: "ok", payload: {} }),
+        resolve: async (_context, request) => ({ requestId: request.requestId, status: "ok", payload: { value: 41 } })
+      }
+    })] });
+    assert.equal((await router.resolve({ applicationId: requestApplicationId.toString("hex") }, REQUEST)).result.status,
+      EffectStatus.ok);
+    await assert.rejects(
+      () => router.resolve({ applicationId: Buffer.alloc(32, 0xa5).toString("hex") }, REQUEST),
+      { code: "ERR_CAPABILITY_V1_APPLICATION_CONTEXT_MISMATCH" }
     );
   });
 

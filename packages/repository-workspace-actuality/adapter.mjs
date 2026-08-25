@@ -305,27 +305,47 @@ async function collectReadableFiles(directory, prefix, result) {
 async function runTests(context, root) {
   bump(context, "effectAttempts");
   bump(context, "testRuns");
+  const workspaceAliases = [...new Set([
+    root,
+    context.workspaceRoot,
+    context.workspaceRootReal
+  ].filter((value) => typeof value === "string" && value.length > 0))]
+    .sort((left, right) => right.length - left.length);
   const captured = await spawnBounded(context.bunExecutable, ["test"], {
     cwd: root,
     env: {
       HOME: context.temporaryHome,
       TMPDIR: context.temporaryHome,
       NO_COLOR: "1"
-    }
+    },
+    maximumCaptureBytes: canonicalCaptureBytes(workspaceAliases)
   });
+  const canonicalStdout = canonicalProcessOutput(captured.stdout, workspaceAliases);
+  const canonicalStderr = canonicalProcessOutput(captured.stderr, workspaceAliases);
   const result = {
     ...captured,
-    stdout: canonicalProcessOutput(captured.stdout, root),
-    stderr: canonicalProcessOutput(captured.stderr, root)
+    stdout: truncateUtf8(canonicalStdout, MAXIMUM_PROCESS_BYTES),
+    stderr: truncateUtf8(canonicalStderr, MAXIMUM_PROCESS_BYTES),
+    stdoutTruncated: captured.stdoutTruncated ||
+      Buffer.byteLength(canonicalStdout, "utf8") > MAXIMUM_PROCESS_BYTES,
+    stderrTruncated: captured.stderrTruncated ||
+      Buffer.byteLength(canonicalStderr, "utf8") > MAXIMUM_PROCESS_BYTES
   };
   context.lastTestPassed = result.passed;
   if (!result.passed) context.preMutationTestFailed = true;
   return result;
 }
 
-function canonicalProcessOutput(value, root) {
-  return value.split(root).join("<workspace>")
-    .replace(/ \[\d+(?:\.\d+)?(?:ms|s|µs|us|ns)\]/g, "");
+function canonicalProcessOutput(value, workspaceAliases) {
+  let canonical = value;
+  for (const root of workspaceAliases) canonical = canonical.split(root).join("<workspace>");
+  return canonical.replace(/ \[\d+(?:\.\d+)?(?:ms|s|µs|us|ns)\](?=\r?$)/gm, "");
+}
+
+function canonicalCaptureBytes(workspaceAliases) {
+  const rootBytes = Math.max(...workspaceAliases.map((root) => Buffer.byteLength(root, "utf8")));
+  const replacementBytes = Buffer.byteLength("<workspace>", "utf8");
+  return MAXIMUM_PROCESS_BYTES * Math.max(1, Math.ceil(rootBytes / replacementBytes)) + rootBytes;
 }
 
 async function replaceApproved(context, root, request) {
@@ -459,7 +479,16 @@ async function readUtf8Bounded(path) {
 
 function spawnBounded(executable, argv, options) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(executable, argv, { ...options, shell: false, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const {
+      maximumCaptureBytes = MAXIMUM_PROCESS_BYTES,
+      ...spawnOptions
+    } = options;
+    const child = spawn(executable, argv, {
+      ...spawnOptions,
+      shell: false,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
     const stdout = [];
     const stderr = [];
     let stdoutLength = 0;
@@ -468,12 +497,14 @@ function spawnBounded(executable, argv, options) {
     let stderrTruncated = false;
     const capture = (parts, lengthName, truncatedName) => (chunk) => {
       let length = lengthName === "stdout" ? stdoutLength : stderrLength;
-      if (length < MAXIMUM_PROCESS_BYTES) {
-        const admitted = Buffer.from(chunk).subarray(0, MAXIMUM_PROCESS_BYTES - length);
+      const bytes = Buffer.from(chunk);
+      const remaining = Math.max(0, maximumCaptureBytes - length);
+      if (remaining > 0) {
+        const admitted = bytes.subarray(0, remaining);
         parts.push(admitted);
         length += admitted.length;
       }
-      if (length < chunk.length || length >= MAXIMUM_PROCESS_BYTES) {
+      if (bytes.length > remaining) {
         if (truncatedName === "stdout") stdoutTruncated = true;
         else stderrTruncated = true;
       }

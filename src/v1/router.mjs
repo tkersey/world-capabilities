@@ -69,11 +69,18 @@ export class CapabilityRouterV1 {
   async resolve(context, requestBytes) {
     const request = decodeEffectRequest(requestBytes, this.limits);
     const binding = this.#bindingFor(request);
+    assertContextApplication(context, request);
     const projected = projectRequest(binding, request);
-    const preflight = admitOutcome(await binding.adapter.preflight(context, projected));
+    const preflight = admitCapabilityOutcomeV1(
+      await binding.adapter.preflight(context, projected),
+      projected.requestId
+    );
     assertOutcome(preflight, projected);
     const outcome = preflight.status === "ok"
-      ? admitOutcome(await binding.adapter.resolve(context, projected))
+      ? admitCapabilityOutcomeV1(
+        await binding.adapter.resolve(context, projected),
+        projected.requestId
+      )
       : preflight;
     assertOutcome(outcome, projected);
     const status = statusCode(outcome.status);
@@ -127,8 +134,19 @@ export class CapabilityRouterV1 {
   }
 }
 
-export function admitCapabilityOutcomeV1(value) {
-  return admitOutcome(value);
+export function admitCapabilityOutcomeV1(value, expectedRequestId = null) {
+  const admitted = admitOutcome(value);
+  if (!admitted || typeof admitted !== "object" || Array.isArray(admitted) ||
+      typeof admitted.requestId !== "string" || admitted.requestId.length === 0) {
+    fail("ERR_CAPABILITY_V1_OUTCOME");
+  }
+  if (expectedRequestId !== null &&
+      (typeof expectedRequestId !== "string" || expectedRequestId.length === 0 ||
+        admitted.requestId !== expectedRequestId)) {
+    fail("ERR_CAPABILITY_V1_OUTCOME_TARGET");
+  }
+  statusCode(admitted.status);
+  return admitted;
 }
 
 function assertBinding(binding) {
@@ -190,6 +208,17 @@ function assertOutcome(value, request) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail("ERR_CAPABILITY_V1_OUTCOME");
   if (value.requestId !== request.requestId) fail("ERR_CAPABILITY_V1_OUTCOME_TARGET");
   statusCode(value.status);
+}
+
+function assertContextApplication(context, request) {
+  if (!context || typeof context !== "object" ||
+      !Object.prototype.hasOwnProperty.call(context, "applicationId")) return;
+  const expected = Buffer.from(request.applicationId);
+  const actual = context.applicationId;
+  const matched = typeof actual === "string"
+    ? /^[0-9a-f]{64}$/.test(actual) && actual === expected.toString("hex")
+    : actual instanceof Uint8Array && sameBytes(actual, expected);
+  if (!matched) fail("ERR_CAPABILITY_V1_APPLICATION_CONTEXT_MISMATCH");
 }
 
 function admitOutcome(value, path = "$", depth = 0) {

@@ -134,17 +134,42 @@ describe("repository workspace actuality", () => {
     const context = await fixtureContext();
     const executable = join(context.workspaceRoot, "fixture-bun");
     await writeFile(executable, `#!/bin/sh
-printf 'stdout [1.20s] [250µs] [9us] [7ns] [3ms] keep[4ms]\\n'
-printf 'stderr [2s]\\n' >&2
+printf 'first [1.20s]\\nsecond [250µs]\\nthird [9us]\\nfourth [7ns]\\nfifth [3ms]\\nsemantic [4ms] remains\\n'
+printf 'stderr [2s]\\nsemantic stderr [8ms] remains\\n' >&2
 exit 1
 `, { mode: 0o755 });
     context.bunExecutable = executable;
 
     const result = await workspace.resolve(context, request("test", { suite: "default" }));
     expect(result.status).toBe("ok");
-    expect(result.payload.stdout).toBe("stdout keep[4ms]\n");
-    expect(result.payload.stderr).toBe("stderr\n");
+    expect(result.payload.stdout).toBe(
+      "first\nsecond\nthird\nfourth\nfifth\nsemantic [4ms] remains\n"
+    );
+    expect(result.payload.stderr).toBe("stderr\nsemantic stderr [8ms] remains\n");
     expect(result.payload.passed).toBe(false);
+  });
+
+  test("canonicalizes workspace paths before enforcing the process byte ceiling", async () => {
+    const context = await fixtureContext();
+    const executable = join(context.workspaceRoot, "fixture-bun");
+    await writeFile(executable, `#!/bin/sh
+root=${JSON.stringify(context.workspaceRoot)}
+i=0
+while [ "$i" -lt 600 ]; do
+  printf '%s' "$root"
+  i=$((i + 1))
+done
+printf '\\n'
+exit 1
+`, { mode: 0o755 });
+    context.bunExecutable = executable;
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    const canonical = `${"<workspace>".repeat(600)}\n`;
+    expect(result.status).toBe("ok");
+    expect(result.payload.stdout).toBe(canonical.slice(0, 4096));
+    expect(result.payload.stdoutTruncated).toBe(true);
+    expect(result.payload.stdout).not.toContain(context.workspaceRoot);
   });
 
   test("rejects traversal, metadata writes, stale approval, and stale digests before writing", async () => {
