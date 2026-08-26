@@ -506,29 +506,29 @@ function spawnBounded(executable, argv, options) {
 function canonicalCapture(workspaceAliases) {
   const collector = boundedUtf8Collector(MAXIMUM_PROCESS_BYTES);
   const durations = durationSuffixStripper(collector);
-  const aliases = workspaceAliasCanonicalizer(workspaceAliases, durations.write);
-  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-  let failure = null;
+  const aliases = workspaceAliasCanonicalizer(
+    workspaceAliases,
+    durations.write,
+    collector.isTruncated
+  );
+  const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
   return {
     write(chunk) {
-      if (failure !== null) return;
-      try {
-        aliases.write(decoder.decode(chunk, { stream: true }));
-      } catch (error) {
-        failure = error;
-      }
+      if (collector.isTruncated()) return;
+      aliases.write(decoder.decode(chunk, { stream: true }));
     },
     finish() {
-      if (failure !== null) throw failure;
-      aliases.write(decoder.decode());
-      aliases.finish();
-      durations.finish();
+      if (!collector.isTruncated()) {
+        aliases.write(decoder.decode());
+        aliases.finish();
+        durations.finish();
+      }
       return collector.finish();
     }
   };
 }
 
-function workspaceAliasCanonicalizer(workspaceAliases, emit) {
+function workspaceAliasCanonicalizer(workspaceAliases, emit, stopped) {
   const aliases = [...workspaceAliases].sort((left, right) => right.length - left.length);
   let pending = "";
   const drain = (final) => {
@@ -538,12 +538,20 @@ function workspaceAliasCanonicalizer(workspaceAliases, emit) {
         alias.length > pending.length && alias.startsWith(pending));
       if (exact !== undefined && !couldExtend) {
         emit("<workspace>");
+        if (stopped()) {
+          pending = "";
+          return;
+        }
         pending = pending.slice(exact.length);
         continue;
       }
       if (!final && aliases.some((alias) => alias.startsWith(pending))) return;
       const [first] = pending;
       emit(first);
+      if (stopped()) {
+        pending = "";
+        return;
+      }
       pending = pending.slice(first.length);
     }
   };
@@ -666,7 +674,11 @@ function durationSuffixStripper(collector) {
   };
   return {
     write(value) {
-      for (const character of value) writeCharacter(character);
+      if (collector.isTruncated()) return;
+      for (const character of value) {
+        writeCharacter(character);
+        if (collector.isTruncated()) return;
+      }
     },
     finish() {
       if (state === "closed") {
@@ -698,6 +710,9 @@ function boundedUtf8Collector(maximumBytes) {
     },
     markTruncated() {
       truncated = true;
+    },
+    isTruncated() {
+      return truncated;
     },
     finish() {
       return { text: decodeCaptured(parts), truncated };

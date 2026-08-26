@@ -209,6 +209,38 @@ exit 1
     expect(result.payload.stdoutTruncated).toBe(false);
   });
 
+  test("stops canonical work after ordinary output irreversibly exceeds the ceiling", async () => {
+    const context = await fixtureContext();
+    await writeFile(join(context.workspaceRoot, "test/range.test.mjs"), `import { expect, test } from "bun:test";
+test("large output", () => {
+  process.stdout.write("x".repeat(50 * 1024 * 1024));
+  expect(true).toBe(true);
+});
+`);
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.passed).toBe(true);
+    expect(Buffer.byteLength(result.payload.stdout, "utf8")).toBe(4096);
+    expect(result.payload.stdoutTruncated).toBe(true);
+  });
+
+  test("replaces invalid UTF-8 without discarding the typed test result", async () => {
+    const context = await fixtureContext();
+    const executable = join(context.workspaceRoot, "fixture-bun");
+    await writeFile(executable, `#!/bin/sh
+printf '\\377invalid output\\n'
+exit 1
+`, { mode: 0o755 });
+    context.bunExecutable = executable;
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.passed).toBe(false);
+    expect(result.payload.stdout).toBe("�invalid output\n");
+    expect(context.preMutationTestFailed).toBe(true);
+  });
+
   test("rejects traversal, metadata writes, stale approval, and stale digests before writing", async () => {
     const context = await fixtureContext();
     expect((await workspace.preflight(context, request("read", { role: "source", path: "src/../secret" }))).payload.reason)

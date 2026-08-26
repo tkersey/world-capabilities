@@ -15,7 +15,7 @@
     "human"
   ],
   "checksums": {
-    "adapter.mjs": "9c8ad2cd326e046d1879fff7b111e49303d12fc3e0d472a367f939f02d401305",
+    "adapter.mjs": "5988253d193415538658da40cf6a2f9d8da7d950c86ed0ce6510152902cf9a3b",
     "application-ids.json": "f9652d47d758390d19738d0f93f00e3af0baaeb3a593e00f89cfbfcc61c9f9b5"
   },
   "conformanceCorpusFingerprint": "02e725eadf1e428d78b4f76bc21f8081574cc0c3a6a67cdbaeb10296f1d27155",
@@ -103,7 +103,7 @@
   },
   "packageName": "@tkersey/world-capabilities/repository-workspace-actuality",
   "packageVersion": "2.3.3",
-  "packFingerprint": "02d9d3e5a7920d8ab65618b5caf2e3df7a9bd13b59661333291e98bdfe0db032",
+  "packFingerprint": "e8aa850bc6178b6555408ded38f530066303828e8b87fde657f4a435593e035d",
   "packFormatVersion": "foundry-effect-pack-v1",
   "recoverSupport": true,
   "recoveryClass": "idempotent",
