@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import * as workspace from "../packages/repository-workspace-actuality/adapter.mjs";
 import workspaceManifest from "../packages/repository-workspace-actuality/manifest.json" with { type: "json" };
@@ -172,6 +172,43 @@ exit 1
     expect(result.payload.stdout).not.toContain(context.workspaceRoot);
   });
 
+  test("canonicalizes only absolute workspace aliases without rewriting its marker", async () => {
+    const context = await fixtureContext();
+    const absoluteRoot = context.workspaceRoot;
+    const executable = join(absoluteRoot, "fixture-bun");
+    await writeFile(executable, `#!/bin/sh
+printf '%s\n' ${JSON.stringify(absoluteRoot)}
+printf '<workspace>\nworkspace\n'
+exit 1
+`, { mode: 0o755 });
+    context.workspaceRoot = relative(process.cwd(), absoluteRoot);
+    context.bunExecutable = executable;
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.stdout).toBe("<workspace>\n<workspace>\nworkspace\n");
+  });
+
+  test("enforces the byte ceiling after removing Bun duration suffixes", async () => {
+    const context = await fixtureContext("/tmp/wc-actuality-");
+    const executable = join(context.workspaceRoot, "fixture-bun");
+    await writeFile(executable, `#!/bin/sh
+i=0
+while [ "$i" -lt 3000 ]; do
+  printf ' [1ms]\\n'
+  i=$((i + 1))
+done
+printf 'late diagnostic\\n'
+exit 1
+`, { mode: 0o755 });
+    context.bunExecutable = executable;
+
+    const result = await workspace.resolve(context, request("test", { suite: "default" }));
+    expect(result.status).toBe("ok");
+    expect(result.payload.stdout).toBe(`${"\n".repeat(3000)}late diagnostic\n`);
+    expect(result.payload.stdoutTruncated).toBe(false);
+  });
+
   test("rejects traversal, metadata writes, stale approval, and stale digests before writing", async () => {
     const context = await fixtureContext();
     expect((await workspace.preflight(context, request("read", { role: "source", path: "src/../secret" }))).payload.reason)
@@ -206,8 +243,8 @@ exit 1
   });
 });
 
-async function fixtureContext() {
-  const root = await mkdtemp(join(tmpdir(), "agent-actuality-workspace-"));
+async function fixtureContext(prefix = join(tmpdir(), "agent-actuality-workspace-")) {
+  const root = await mkdtemp(prefix);
   temporaryRoots.push(root);
   await mkdir(join(root, "src"));
   await mkdir(join(root, "test"));
