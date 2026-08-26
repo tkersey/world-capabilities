@@ -307,9 +307,9 @@ async function runTests(context, root) {
   bump(context, "testRuns");
   const workspaceAliases = [...new Set([
     root,
-    context.workspaceRoot,
-    context.workspaceRootReal
-  ].filter((value) => typeof value === "string" && value.length > 0))]
+    resolvePath(context.workspaceRoot),
+    resolvePath(context.workspaceRootReal)
+  ].filter((value) => typeof value === "string" && isAbsolute(value)))]
     .sort((left, right) => right.length - left.length);
   const captured = await spawnBounded(context.bunExecutable, ["test"], {
     cwd: root,
@@ -318,34 +318,12 @@ async function runTests(context, root) {
       TMPDIR: context.temporaryHome,
       NO_COLOR: "1"
     },
-    maximumCaptureBytes: canonicalCaptureBytes(workspaceAliases)
+    workspaceAliases
   });
-  const canonicalStdout = canonicalProcessOutput(captured.stdout, workspaceAliases);
-  const canonicalStderr = canonicalProcessOutput(captured.stderr, workspaceAliases);
-  const result = {
-    ...captured,
-    stdout: truncateUtf8(canonicalStdout, MAXIMUM_PROCESS_BYTES),
-    stderr: truncateUtf8(canonicalStderr, MAXIMUM_PROCESS_BYTES),
-    stdoutTruncated: captured.stdoutTruncated ||
-      Buffer.byteLength(canonicalStdout, "utf8") > MAXIMUM_PROCESS_BYTES,
-    stderrTruncated: captured.stderrTruncated ||
-      Buffer.byteLength(canonicalStderr, "utf8") > MAXIMUM_PROCESS_BYTES
-  };
+  const result = { ...captured };
   context.lastTestPassed = result.passed;
   if (!result.passed) context.preMutationTestFailed = true;
   return result;
-}
-
-function canonicalProcessOutput(value, workspaceAliases) {
-  let canonical = value;
-  for (const root of workspaceAliases) canonical = canonical.split(root).join("<workspace>");
-  return canonical.replace(/ \[\d+(?:\.\d+)?(?:ms|s|µs|us|ns)\](?=\r?$)/gm, "");
-}
-
-function canonicalCaptureBytes(workspaceAliases) {
-  const rootBytes = Math.max(...workspaceAliases.map((root) => Buffer.byteLength(root, "utf8")));
-  const replacementBytes = Buffer.byteLength("<workspace>", "utf8");
-  return MAXIMUM_PROCESS_BYTES * Math.max(1, Math.ceil(rootBytes / replacementBytes)) + rootBytes;
 }
 
 async function replaceApproved(context, root, request) {
@@ -480,7 +458,7 @@ async function readUtf8Bounded(path) {
 function spawnBounded(executable, argv, options) {
   return new Promise((resolvePromise, rejectPromise) => {
     const {
-      maximumCaptureBytes = MAXIMUM_PROCESS_BYTES,
+      workspaceAliases,
       ...spawnOptions
     } = options;
     const child = spawn(executable, argv, {
@@ -489,30 +467,10 @@ function spawnBounded(executable, argv, options) {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"]
     });
-    const stdout = [];
-    const stderr = [];
-    let stdoutLength = 0;
-    let stderrLength = 0;
-    let stdoutTruncated = false;
-    let stderrTruncated = false;
-    const capture = (parts, lengthName, truncatedName) => (chunk) => {
-      let length = lengthName === "stdout" ? stdoutLength : stderrLength;
-      const bytes = Buffer.from(chunk);
-      const remaining = Math.max(0, maximumCaptureBytes - length);
-      if (remaining > 0) {
-        const admitted = bytes.subarray(0, remaining);
-        parts.push(admitted);
-        length += admitted.length;
-      }
-      if (bytes.length > remaining) {
-        if (truncatedName === "stdout") stdoutTruncated = true;
-        else stderrTruncated = true;
-      }
-      if (lengthName === "stdout") stdoutLength = length;
-      else stderrLength = length;
-    };
-    child.stdout.on("data", capture(stdout, "stdout", "stdout"));
-    child.stderr.on("data", capture(stderr, "stderr", "stderr"));
+    const stdout = canonicalCapture(workspaceAliases);
+    const stderr = canonicalCapture(workspaceAliases);
+    child.stdout.on("data", (chunk) => stdout.write(chunk));
+    child.stderr.on("data", (chunk) => stderr.write(chunk));
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -523,17 +481,228 @@ function spawnBounded(executable, argv, options) {
     child.once("error", (error) => { clearTimeout(timer); rejectPromise(error); });
     child.once("close", (code, signal) => {
       clearTimeout(timer);
+      let stdoutResult;
+      let stderrResult;
+      try {
+        stdoutResult = stdout.finish();
+        stderrResult = stderr.finish();
+      } catch (error) {
+        rejectPromise(error);
+        return;
+      }
       const exitCode = timedOut ? -1 : (Number.isInteger(code) ? code : signal ? -1 : -1);
       resolvePromise({
         exitCode,
         passed: !timedOut && exitCode === 0,
-        stdout: decodeCaptured(stdout),
-        stderr: decodeCaptured(stderr),
-        stdoutTruncated,
-        stderrTruncated
+        stdout: stdoutResult.text,
+        stderr: stderrResult.text,
+        stdoutTruncated: stdoutResult.truncated,
+        stderrTruncated: stderrResult.truncated
       });
     });
   });
+}
+
+function canonicalCapture(workspaceAliases) {
+  const collector = boundedUtf8Collector(MAXIMUM_PROCESS_BYTES);
+  const durations = durationSuffixStripper(collector);
+  const aliases = workspaceAliasCanonicalizer(workspaceAliases, durations.write);
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  let failure = null;
+  return {
+    write(chunk) {
+      if (failure !== null) return;
+      try {
+        aliases.write(decoder.decode(chunk, { stream: true }));
+      } catch (error) {
+        failure = error;
+      }
+    },
+    finish() {
+      if (failure !== null) throw failure;
+      aliases.write(decoder.decode());
+      aliases.finish();
+      durations.finish();
+      return collector.finish();
+    }
+  };
+}
+
+function workspaceAliasCanonicalizer(workspaceAliases, emit) {
+  const aliases = [...workspaceAliases].sort((left, right) => right.length - left.length);
+  let pending = "";
+  const drain = (final) => {
+    while (pending.length > 0) {
+      const exact = aliases.find((alias) => pending.startsWith(alias));
+      const couldExtend = !final && aliases.some((alias) =>
+        alias.length > pending.length && alias.startsWith(pending));
+      if (exact !== undefined && !couldExtend) {
+        emit("<workspace>");
+        pending = pending.slice(exact.length);
+        continue;
+      }
+      if (!final && aliases.some((alias) => alias.startsWith(pending))) return;
+      const [first] = pending;
+      emit(first);
+      pending = pending.slice(first.length);
+    }
+  };
+  return {
+    write(value) {
+      pending += value;
+      drain(false);
+    },
+    finish() {
+      drain(true);
+    }
+  };
+}
+
+function durationSuffixStripper(collector) {
+  let state = "normal";
+  let candidate = "";
+  let candidateOverflow = false;
+  const appendCandidate = (value) => {
+    if (!candidateOverflow) {
+      candidate += value;
+      if (Buffer.byteLength(candidate, "utf8") > MAXIMUM_PROCESS_BYTES + 4) {
+        candidateOverflow = true;
+      }
+    }
+  };
+  const resetCandidate = () => {
+    state = "normal";
+    candidate = "";
+    candidateOverflow = false;
+  };
+  const emitCandidate = () => {
+    collector.write(candidate);
+    if (candidateOverflow) collector.markTruncated();
+    resetCandidate();
+  };
+  const writeCharacter = (character) => {
+    for (;;) {
+      if (state === "normal") {
+        if (character === " ") {
+          candidate = " ";
+          state = "space";
+        } else {
+          collector.write(character);
+        }
+        return;
+      }
+      if (state === "space") {
+        if (character === "[") {
+          appendCandidate(character);
+          state = "open";
+          return;
+        }
+      } else if (state === "open") {
+        if (/\d/.test(character)) {
+          appendCandidate(character);
+          state = "digits";
+          return;
+        }
+      } else if (state === "digits" || state === "fraction") {
+        if (/\d/.test(character)) {
+          appendCandidate(character);
+          return;
+        }
+        if (state === "digits" && character === ".") {
+          appendCandidate(character);
+          state = "decimal";
+          return;
+        }
+        if (character === "s") {
+          appendCandidate(character);
+          state = "unit";
+          return;
+        }
+        if (character === "m" || character === "u" || character === "n" || character === "µ") {
+          appendCandidate(character);
+          state = "unit-prefix";
+          return;
+        }
+      } else if (state === "decimal") {
+        if (/\d/.test(character)) {
+          appendCandidate(character);
+          state = "fraction";
+          return;
+        }
+      } else if (state === "unit-prefix") {
+        if (character === "s") {
+          appendCandidate(character);
+          state = "unit";
+          return;
+        }
+      } else if (state === "unit") {
+        if (character === "]") {
+          appendCandidate(character);
+          state = "closed";
+          return;
+        }
+      } else if (state === "closed") {
+        if (character === "\n") {
+          resetCandidate();
+          collector.write("\n");
+          return;
+        }
+        if (character === "\r") {
+          state = "closed-cr";
+          return;
+        }
+      } else if (state === "closed-cr") {
+        if (character === "\n") {
+          resetCandidate();
+          collector.write("\r\n");
+          return;
+        }
+        emitCandidate();
+        collector.write("\r");
+        continue;
+      }
+      emitCandidate();
+    }
+  };
+  return {
+    write(value) {
+      for (const character of value) writeCharacter(character);
+    },
+    finish() {
+      if (state === "closed") {
+        resetCandidate();
+      } else if (state === "closed-cr") {
+        resetCandidate();
+        collector.write("\r");
+      } else if (state !== "normal") {
+        emitCandidate();
+      }
+    }
+  };
+}
+
+function boundedUtf8Collector(maximumBytes) {
+  const parts = [];
+  let length = 0;
+  let truncated = false;
+  return {
+    write(value) {
+      const bytes = Buffer.from(value, "utf8");
+      const remaining = Math.max(0, maximumBytes - length);
+      if (remaining > 0) {
+        const admitted = bytes.subarray(0, remaining);
+        parts.push(admitted);
+        length += admitted.length;
+      }
+      if (bytes.length > remaining) truncated = true;
+    },
+    markTruncated() {
+      truncated = true;
+    },
+    finish() {
+      return { text: decodeCaptured(parts), truncated };
+    }
+  };
 }
 
 function decodeCaptured(parts) {
